@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>게시판 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+      <div>
+        <h1>게시판</h1>
+        <p>스터디 모집과 정보 공유</p>
+      </div>
+      <button class="btn btn-primary" id="writeBtn">✏️ 글쓰기</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="seg" id="typeSeg">
+        <button data-type="" class="active">전체</button>
+        <button data-type="post">게시글</button>
+        <button data-type="study">스터디</button>
+      </div>
+      <div class="search">
+        <input type="search" id="searchInput" placeholder="제목·내용 검색...">
+      </div>
+      <select id="sortSelect">
+        <option value="latest">최신순</option>
+        <option value="views">조회순</option>
+      </select>
+    </div>
+
+    <div class="post-list" id="postList">
+      <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    renderNav();
+
+    const state = { page: 1, size: 10, type: '', q: '', sort: 'latest' };
+    const listEl = document.getElementById('postList');
+    const pagEl  = document.getElementById('pagination');
+
+    document.getElementById('writeBtn').onclick = () => {
+      if (!Auth.isLoggedIn) { location.href = '/login?next=/write'; return; }
+      location.href = '/write';
+    };
+
+    // 타입 필터
+    document.getElementById('typeSeg').onclick = (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      document.querySelectorAll('#typeSeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.type = btn.dataset.type; state.page = 1; load();
+    };
+    // 검색 (디바운스)
+    let deb;
+    document.getElementById('searchInput').oninput = (e) => {
+      clearTimeout(deb);
+      deb = setTimeout(() => { state.q = e.target.value.trim(); state.page = 1; load(); }, 350);
+    };
+    document.getElementById('sortSelect').onchange = (e) => {
+      state.sort = e.target.value; state.page = 1; load();
+    };
+
+    function typeBadge(t) {
+      return t === 'study'
+        ? '<span class="tbadge study">스터디</span>'
+        : '<span class="tbadge post">게시글</span>';
+    }
+    function statusBadge(p) {
+      if (p.type !== 'study') return '';
+      return p.status === 'closed'
+        ? '<span class="tbadge closed">마감</span>'
+        : '<span class="tbadge open">모집중</span>';
+    }
+
+    async function load() {
+      listEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>';
+      const qs = new URLSearchParams({
+        page: state.page, size: state.size, sort: state.sort,
+      });
+      if (state.type) qs.set('type', state.type);
+      if (state.q)    qs.set('q', state.q);
+
+      try {
+        const d = await api('/api/posts?' + qs.toString(), { auth: false });
+        const posts = d.posts || [];
+        if (!posts.length) {
+          listEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">게시글이 없어요. 첫 글을 작성해보세요!</p>';
+          pagEl.innerHTML = '';
+          return;
+        }
+        listEl.innerHTML = posts.map(p => `
+          <a class="post-item" href="/post?id=${p.id}">
+            <div class="pi-main">
+              <div class="pi-title">${typeBadge(p.type)}${statusBadge(p)} ${escapeHtml(p.title)}</div>
+              <div class="pi-meta">
+                <span>${escapeHtml(p.author)}</span>
+                ${p.category ? `<span>· ${escapeHtml(p.category)}</span>` : ''}
+                <span>· ${(p.created_at || '').slice(0, 10)}</span>
+              </div>
+            </div>
+            <div class="pi-views"><strong>${p.view_count}</strong>조회</div>
+          </a>`).join('');
+        renderPagination(d.page, d.total_pages);
+      } catch (err) {
+        listEl.innerHTML = `<p class="muted text-center" style="padding:40px 0;">불러오지 못했어요: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    function renderPagination(page, totalPages) {
+      if (totalPages <= 1) { pagEl.innerHTML = ''; return; }
+      let html = `<button ${page<=1?'disabled':''} data-p="${page-1}">‹</button>`;
+      const start = Math.max(1, page - 2);
+      const end   = Math.min(totalPages, start + 4);
+      for (let i = start; i <= end; i++) {
+        html += `<button class="${i===page?'active':''}" data-p="${i}">${i}</button>`;
+      }
+      html += `<button ${page>=totalPages?'disabled':''} data-p="${page+1}">›</button>`;
+      pagEl.innerHTML = html;
+      pagEl.querySelectorAll('button[data-p]').forEach(b => {
+        b.onclick = () => { state.page = +b.dataset.p; load(); window.scrollTo(0,0); };
+      });
+    }
+
+    load();
+  </script>
+</body>
+</html>

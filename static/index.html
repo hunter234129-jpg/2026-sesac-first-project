@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyBoard · 함께 공부하는 우주</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <section class="hero">
+    <canvas id="solarCanvas"></canvas>
+
+    <h1>오늘도 <span class="accent">한 걸음</span> 더<br>함께 공부해요</h1>
+    <p class="lead">
+      공부 시간 기록부터 스터디 모집, 위키 정리, 클랜 활동까지.<br>
+      각자의 궤도를 돌지만, 같은 항성을 향해.
+    </p>
+    <button class="btn btn-success btn-lg" id="startBtn">오늘의 공부 시작하기 →</button>
+
+    <div class="ranking-preview card" id="rankingCard" style="text-align:left;">
+      <div style="font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">
+        🔥 인기 위키 (오늘)
+      </div>
+      <div id="rankingList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+    </div>
+  </section>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    renderNav();
+
+    document.getElementById('startBtn').onclick = () => {
+      location.href = Auth.isLoggedIn ? '/dashboard' : '/login';
+    };
+
+    /* ── 인기 위키 랭킹 ── */
+    (async () => {
+      const list = document.getElementById('rankingList');
+      try {
+        const data = await api('/api/wiki?period=today&limit=5', { auth: false });
+        const items = data.ranking || [];
+        if (!items.length) {
+          list.innerHTML = '<p class="muted" style="font-size:14px;">아직 등록된 위키가 없어요. 첫 문서를 만들어보세요!</p>';
+          return;
+        }
+        list.innerHTML = items.map((w, i) => `
+          <div style="display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--border);">
+            <span style="color:var(--cyan); font-weight:800; width:20px;">${i + 1}</span>
+            <a href="/wiki?slug=${encodeURIComponent(w.slug)}" style="flex:1;">${escapeHtml(w.title)}</a>
+            <span class="muted" style="font-size:13px;">조회 ${w.view_count}</span>
+          </div>`).join('');
+      } catch (e) {
+        list.innerHTML = `<p class="muted" style="font-size:14px;">랭킹을 불러오지 못했어요</p>`;
+      }
+    })();
+
+    /* ════════════════ 태양계 캔버스 ════════════════ */
+    (() => {
+      const canvas = document.getElementById('solarCanvas');
+      const ctx = canvas.getContext('2d');
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let W, H, DPR, cx, cy, maxR, stars = [];
+      const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+
+      // 행성: orbit(궤도 비율 0~1) · size(반지름 비율) · color[r,g,b] · speed · angle0 · ring
+      const planets = [
+        { orbit: 0.22, size: 0.013, color: [165,150,135], speed: 0.55, a: 0.4 },
+        { orbit: 0.31, size: 0.020, color: [222,184,120], speed: 0.40, a: 2.1 },
+        { orbit: 0.41, size: 0.022, color: [ 78,150,225], speed: 0.32, a: 5.0, glow:'rgba(90,160,235,.4)' },
+        { orbit: 0.51, size: 0.018, color: [205, 95, 60], speed: 0.26, a: 1.2 },
+        { orbit: 0.66, size: 0.040, color: [212,172,120], speed: 0.16, a: 3.4 },
+        { orbit: 0.80, size: 0.034, color: [228,205,150], speed: 0.12, a: 0.8, ring: true },
+        { orbit: 0.93, size: 0.028, color: [ 96,170,240], speed: 0.09, a: 4.4, glow:'rgba(90,209,255,.4)' },
+      ];
+
+      function resize() {
+        DPR = Math.min(window.devicePixelRatio || 1, 2);
+        W = canvas.clientWidth; H = canvas.clientHeight;
+        canvas.width = W * DPR; canvas.height = H * DPR;
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        cx = W / 2; cy = H / 2;
+        maxR = Math.min(W, H) * 0.46;
+        stars = [];
+        const n = Math.round(W * H / 7000);
+        for (let i = 0; i < n; i++) {
+          stars.push({
+            x: Math.random() * W, y: Math.random() * H,
+            r: Math.random() * 1.3 + 0.2,
+            tw: Math.random() * Math.PI * 2,
+            sp: Math.random() * 0.04 + 0.01,
+          });
+        }
+      }
+
+      function shade(c, f) {  // f>0 밝게, f<0 어둡게
+        const m = (v) => Math.max(0, Math.min(255, Math.round(f > 0 ? v + (255 - v) * f : v * (1 + f))));
+        return `rgb(${m(c[0])},${m(c[1])},${m(c[2])})`;
+      }
+
+      function drawSun(t) {
+        const r = maxR * 0.115;
+        const flick = 1 + Math.sin(t * 1.8) * 0.03;
+        // 외곽 코로나 글로우
+        const bloom = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r * 5.5 * flick);
+        bloom.addColorStop(0, 'rgba(255,180,90,.55)');
+        bloom.addColorStop(0.18, 'rgba(255,140,60,.28)');
+        bloom.addColorStop(0.5, 'rgba(255,110,50,.08)');
+        bloom.addColorStop(1, 'rgba(255,110,50,0)');
+        ctx.fillStyle = bloom;
+        ctx.fillRect(0, 0, W, H);
+        // 본체
+        const body = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.25, r * 0.1, cx, cy, r);
+        body.addColorStop(0, '#fff6e0');
+        body.addColorStop(0.4, '#ffd27a');
+        body.addColorStop(0.8, '#ff9a3d');
+        body.addColorStop(1, '#ff6a2a');
+        ctx.beginPath(); ctx.arc(cx, cy, r * flick, 0, Math.PI * 2);
+        ctx.fillStyle = body; ctx.fill();
+      }
+
+      function drawPlanet(p, t) {
+        const ang = p.a + (reduce ? 0 : t * p.speed);
+        const orad = maxR * p.orbit;
+        const x = cx + Math.cos(ang) * orad;
+        const y = cy + Math.sin(ang) * orad * 0.62;   // 약간 기울어진 궤도(원근)
+        const r = Math.max(2, maxR * p.size);
+
+        // 궤도 링
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, orad, orad * 0.62, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(140,160,220,.07)';
+        ctx.lineWidth = 1; ctx.stroke();
+
+        // 발광(지구/해왕성 등)
+        if (p.glow) {
+          const gl = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 2.6);
+          gl.addColorStop(0, p.glow); gl.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, r * 2.6, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // 태양 방향(광원)
+        const dx = cx - x, dy = cy - y, d = Math.hypot(dx, dy) || 1;
+        const hx = x + (dx / d) * r * 0.5, hy = y + (dy / d) * r * 0.5;
+
+        // 토성 뒤쪽 링
+        if (p.ring) drawRing(x, y, r, ang, true);
+
+        // 구체 셰이딩
+        const g = ctx.createRadialGradient(hx, hy, r * 0.05, x, y, r);
+        g.addColorStop(0, shade(p.color, 0.55));
+        g.addColorStop(0.45, shade(p.color, 0.05));
+        g.addColorStop(0.85, shade(p.color, -0.55));
+        g.addColorStop(1, shade(p.color, -0.78));
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = g; ctx.fill();
+
+        // 림 라이트(태양 쪽 가장자리)
+        ctx.save();
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
+        const rim = ctx.createRadialGradient(hx, hy, r * 0.7, hx, hy, r * 1.25);
+        rim.addColorStop(0, 'rgba(255,255,255,0)');
+        rim.addColorStop(1, 'rgba(255,245,220,.35)');
+        ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+
+        // 토성 앞쪽 링
+        if (p.ring) drawRing(x, y, r, ang, false);
+      }
+
+      function drawRing(x, y, r, ang, back) {
+        ctx.save();
+        ctx.translate(x, y); ctx.rotate(-0.5);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 2.1, r * 0.7, 0, back ? Math.PI : 0, back ? Math.PI * 2 : Math.PI);
+        ctx.strokeStyle = 'rgba(228,205,150,.55)'; ctx.lineWidth = r * 0.45; ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 2.5, r * 0.83, 0, back ? Math.PI : 0, back ? Math.PI * 2 : Math.PI);
+        ctx.strokeStyle = 'rgba(228,205,150,.22)'; ctx.lineWidth = r * 0.3; ctx.stroke();
+        ctx.restore();
+      }
+
+      function frame(ts) {
+        const t = ts / 1000;
+        ctx.clearRect(0, 0, W, H);
+
+        // 패럴랙스 이징
+        mouse.x += (mouse.tx - mouse.x) * 0.05;
+        mouse.y += (mouse.ty - mouse.y) * 0.05;
+        ctx.save();
+        ctx.translate(mouse.x, mouse.y);
+
+        // 별
+        for (const s of stars) {
+          const a = 0.4 + Math.sin(t * 2 + s.tw) * 0.35;
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(205,214,255,${a})`; ctx.fill();
+        }
+
+        drawSun(t);
+        // 뒤(아래쪽 y)부터 그려 겹침 자연스럽게
+        const order = planets.map((p, i) => {
+          const ang = p.a + (reduce ? 0 : t * p.speed);
+          return { p, depth: Math.sin(ang) };
+        }).sort((a, b) => a.depth - b.depth);
+        for (const o of order) drawPlanet(o.p, t);
+
+        ctx.restore();
+        if (!reduce) requestAnimationFrame(frame);
+      }
+
+      window.addEventListener('resize', resize);
+      window.addEventListener('mousemove', (e) => {
+        mouse.tx = (e.clientX / window.innerWidth - 0.5) * -30;
+        mouse.ty = (e.clientY / window.innerHeight - 0.5) * -18;
+      });
+      resize();
+      if (reduce) frame(0); else requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>클랜 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+      <div>
+        <h1>클랜</h1>
+        <p>함께 공부할 스터디 그룹 · 기여도 랭킹</p>
+      </div>
+      <button class="btn btn-primary" id="newClanBtn">＋ 클랜 만들기</button>
+    </div>
+
+    <div class="alert" id="alert"></div>
+
+    <!-- 생성 폼 (토글) -->
+    <form class="card hidden" id="createForm" style="margin-bottom:20px;">
+      <div class="field">
+        <label for="clanName">클랜 이름 *</label>
+        <input type="text" id="clanName" placeholder="예: 정처기 6월 합격조" maxlength="100" required>
+      </div>
+      <div class="field">
+        <label for="clanDesc">소개</label>
+        <textarea id="clanDesc" rows="3" placeholder="클랜 소개 (선택)" style="resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="submit" class="btn btn-primary" id="createBtn">만들기</button>
+        <button type="button" class="btn btn-ghost" id="cancelCreate">취소</button>
+      </div>
+    </form>
+
+    <div class="clan-grid" id="clanGrid">
+      <p class="muted" style="padding:40px 0;">불러오는 중...</p>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    renderNav();
+    const alertEl = document.getElementById('alert');
+
+    /* ── 생성 폼 토글 ── */
+    const createForm = document.getElementById('createForm');
+    document.getElementById('newClanBtn').onclick = () => {
+      if (!Auth.isLoggedIn) { location.href = '/login?next=/clans'; return; }
+      createForm.classList.toggle('hidden');
+      if (!createForm.classList.contains('hidden')) document.getElementById('clanName').focus();
+    };
+    document.getElementById('cancelCreate').onclick = () => createForm.classList.add('hidden');
+
+    createForm.onsubmit = async (e) => {
+      e.preventDefault();
+      hideAlert(alertEl);
+      const btn = document.getElementById('createBtn');
+      setLoading(btn, true);
+      try {
+        const d = await api('/api/clans', { method: 'POST', body: {
+          name: document.getElementById('clanName').value.trim(),
+          description: document.getElementById('clanDesc').value.trim(),
+        }});
+        location.href = '/clan?id=' + d.id;
+      } catch (err) {
+        showAlert(alertEl, err.message);
+        setLoading(btn, false, '만들기');
+      }
+    };
+
+    /* ── 목록 ── */
+    const medals = { 0: '🥇', 1: '🥈', 2: '🥉' };
+    async function load() {
+      const grid = document.getElementById('clanGrid');
+      try {
+        const clans = await api('/api/clans', { auth: false });
+        if (!clans.length) {
+          grid.innerHTML = '<p class="muted" style="padding:40px 0;">아직 클랜이 없어요. 첫 클랜을 만들어보세요!</p>';
+          return;
+        }
+        grid.innerHTML = clans.map((c, i) => `
+          <a class="clan-card" href="/clan?id=${c.id}">
+            <div class="cc-rank">${medals[i] || `#${i+1}`} <span>기여도 랭킹</span></div>
+            <div class="cc-name">${escapeHtml(c.name)}</div>
+            <div class="cc-desc">${escapeHtml(c.description || '소개가 없어요.')}</div>
+            <div class="cc-stats">
+              <span><b>${c.member_count}</b> <span class="muted">명</span></span>
+              <span><b>${c.total_score}</b> <span class="muted">점</span></span>
+              <span class="muted">👑 ${escapeHtml(c.leader)}</span>
+            </div>
+          </a>`).join('');
+      } catch (err) {
+        grid.innerHTML = `<p class="muted" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

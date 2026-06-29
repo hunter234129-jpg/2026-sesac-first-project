@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)",
+      "PowerShell(cd C:\\\\workspace\\\\flask4_module; $p = Start-Process -FilePath \".\\\\.venv\\\\Scripts\\\\python.exe\" -ArgumentList \"app.py\" -RedirectStandardOutput \"scratchpad_o.log\" -RedirectStandardError \"scratchpad_e.log\" -WindowStyle Hidden -PassThru; Start-Sleep -Seconds 3; .\\\\.venv\\\\Scripts\\\\python.exe scratchpad_wiki_test.py; Stop-Process -Id $p.Id -Force; Remove-Item \"scratchpad_o.log\",\"scratchpad_e.log\",\"scratchpad_wiki_test.py\" -ErrorAction SilentlyContinue)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(Get-ChildItem -Path \"C:\\\\workspace\\\\flask4_module\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(ConvertTo-Json)",
+      "Bash(Out-String)"
+    ]
+  }
+}

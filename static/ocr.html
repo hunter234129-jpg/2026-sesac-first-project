@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCR 텍스트 추출 · StudyBoard</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container" style="max-width:720px;">
+    <div class="dash-header"><h1>🔭 OCR 텍스트 추출</h1><p>교재·필기 사진을 올리면 텍스트로 변환해드려요.</p></div>
+
+    <div class="alert" id="alert"></div>
+
+    <div class="card section">
+      <div class="dropzone" id="dropzone">
+        <div class="dz-icon">🖼️</div>
+        <div class="dz-text">이미지를 클릭하거나 드래그해서 업로드하세요<br>(PNG, JPG · 한글+영어 인식)</div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" class="hidden">
+      <img id="preview" class="ocr-preview hidden" alt="미리보기">
+      <div class="mt-16 hidden" id="runRow">
+        <button class="btn btn-primary" id="runBtn">텍스트 추출하기</button>
+      </div>
+    </div>
+
+    <div class="card section hidden" id="resultCard">
+      <div class="section-head">
+        <h2>추출 결과</h2>
+        <button class="btn btn-ghost" id="copyBtn" style="padding:7px 14px;">복사</button>
+      </div>
+      <textarea id="resultText" class="ocr-result" placeholder="추출된 텍스트가 여기에 표시돼요"></textarea>
+      <div class="mt-16" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-success" id="askBtn">🛰️ 이 내용 AI에게 질문하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+
+    const alertEl = document.getElementById('alert');
+    const dz      = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const runRow  = document.getElementById('runRow');
+    const runBtn  = document.getElementById('runBtn');
+    const resultCard = document.getElementById('resultCard');
+    const resultText = document.getElementById('resultText');
+    let currentFile = null;
+
+    function setFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showAlert(alertEl, '이미지 파일을 올려주세요.'); return;
+      }
+      currentFile = file;
+      preview.src = URL.createObjectURL(file);
+      preview.classList.remove('hidden');
+      runRow.classList.remove('hidden');
+      hideAlert(alertEl);
+    }
+
+    dz.onclick = () => fileInput.click();
+    fileInput.onchange = () => fileInput.files[0] && setFile(fileInput.files[0]);
+    ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+    dz.addEventListener('drop', e => e.dataTransfer.files[0] && setFile(e.dataTransfer.files[0]));
+
+    runBtn.onclick = async () => {
+      if (!currentFile) return;
+      setLoading(runBtn, true);
+      hideAlert(alertEl);
+      try {
+        const fd = new FormData();
+        fd.append('file', currentFile);
+        const d = await api('/api/ocr', { method: 'POST', body: fd, isForm: true });
+        resultText.value = d.text || '';
+        resultCard.classList.remove('hidden');
+        if (!d.text) showAlert(alertEl, '이미지에서 텍스트를 찾지 못했어요. 더 선명한 사진을 써보세요.', 'success');
+      } catch (err) {
+        showAlert(alertEl, err.message);
+      } finally {
+        setLoading(runBtn, false, '텍스트 추출하기');
+      }
+    };
+
+    document.getElementById('copyBtn').onclick = async () => {
+      try { await navigator.clipboard.writeText(resultText.value); showAlert(alertEl, '복사됐어요.', 'success'); }
+      catch (_) { resultText.select(); document.execCommand('copy'); }
+    };
+
+    document.getElementById('askBtn').onclick = () => {
+      const t = resultText.value.trim();
+      if (!t) { showAlert(alertEl, '먼저 텍스트를 추출하세요.'); return; }
+      const q = `다음은 교재에서 추출한 내용이야. 쉽게 설명해줘:\n\n${t}`;
+      location.href = '/chat?q=' + encodeURIComponent(q);
+    };
+  </script>
+</body>
+</html>

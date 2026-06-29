@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>클랜 상세 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container" style="max-width:720px;">
+    <a href="/clans" class="muted" style="font-size:14px;">← 클랜 목록</a>
+    <div class="alert mt-16" id="alert"></div>
+
+    <div class="card mt-16" id="clanCard">
+      <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
+    </div>
+
+    <div class="card section" id="membersCard" style="margin-top:20px; display:none;">
+      <div class="section-head"><h2>멤버 <span id="memberCount" class="muted"></span></h2></div>
+      <div class="rank-list" id="memberList"></div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    renderNav();
+    const clanId  = queryParam('id');
+    const alertEl = document.getElementById('alert');
+    const myId    = Auth.userId;
+    if (!clanId) showAlert(alertEl, '잘못된 접근입니다.');
+
+    let amMember = false, amLeader = false;
+
+    async function load() {
+      const card = document.getElementById('clanCard');
+      try {
+        const c = await api('/api/clans/' + clanId, { auth: false });
+        amLeader = Auth.isLoggedIn && c.leader === Auth.username;
+
+        // 멤버 로드 (가입 여부 판단)
+        const members = await api(`/api/clans/${clanId}/members`, { auth: false });
+        amMember = Auth.isLoggedIn && members.some(m => m.id === myId);
+
+        let actionBtn = '';
+        if (!Auth.isLoggedIn) {
+          actionBtn = `<a class="btn btn-primary" href="/login?next=${encodeURIComponent('/clan?id='+clanId)}">로그인 후 가입</a>`;
+        } else if (amLeader) {
+          actionBtn = `<span class="badge">👑 클랜장</span>`;
+        } else if (amMember) {
+          actionBtn = `<button class="btn btn-ghost" id="leaveBtn">탈퇴하기</button>`;
+        } else {
+          actionBtn = `<button class="btn btn-primary" id="joinBtn">가입하기</button>`;
+        }
+
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+            <div>
+              <div style="font-size:24px; font-weight:700; margin-bottom:6px;">${escapeHtml(c.name)}</div>
+              <div class="muted" style="font-size:14px;">👑 ${escapeHtml(c.leader)} · 멤버 ${c.member_count}명 · 총 기여도 ${c.total_score}점</div>
+            </div>
+            <div>${actionBtn}</div>
+          </div>
+          <p style="margin-top:16px; font-size:15px; line-height:1.7; white-space:pre-wrap;">${escapeHtml(c.description || '소개가 없어요.')}</p>`;
+
+        const joinBtn = document.getElementById('joinBtn');
+        if (joinBtn) joinBtn.onclick = async () => {
+          setLoading(joinBtn, true);
+          try { await api(`/api/clans/${clanId}/join`, { method: 'POST' }); load(); }
+          catch (err) { showAlert(alertEl, err.message); setLoading(joinBtn, false, '가입하기'); }
+        };
+        const leaveBtn = document.getElementById('leaveBtn');
+        if (leaveBtn) leaveBtn.onclick = async () => {
+          if (!confirm('클랜에서 탈퇴할까요?')) return;
+          setLoading(leaveBtn, true);
+          try { await api(`/api/clans/${clanId}/leave`, { method: 'DELETE' }); load(); }
+          catch (err) { showAlert(alertEl, err.message); setLoading(leaveBtn, false, '탈퇴하기'); }
+        };
+
+        renderMembers(members, c.leader);
+      } catch (err) {
+        card.innerHTML = `<p class="muted text-center" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    function renderMembers(members, leaderName) {
+      document.getElementById('membersCard').style.display = 'block';
+      document.getElementById('memberCount').textContent = `${members.length}명`;
+      const el = document.getElementById('memberList');
+      el.innerHTML = members.map((m, i) => {
+        const isLeader = m.username === leaderName;
+        const isMe = m.id === myId;
+        return `
+          <div class="rank-row ${isMe ? 'me' : ''}">
+            <div class="rank-num">${i + 1}</div>
+            <div class="rank-name">
+              ${isLeader ? '👑 ' : ''}${escapeHtml(m.username)}
+              ${isMe ? '<span class="you">나</span>' : ''}
+            </div>
+            <div class="rank-time">${m.contribution_score}점</div>
+          </div>`;
+      }).join('');
+    }
+
+    if (clanId) load();
+  </script>
+</body>
+</html>

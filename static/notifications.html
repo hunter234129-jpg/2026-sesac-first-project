@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>알림 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container" style="max-width:720px;">
+    <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+      <div>
+        <h1>알림</h1>
+        <p>읽지 않은 알림 <span class="badge" id="unreadBadge">0</span></p>
+      </div>
+      <button class="btn btn-ghost" id="readAllBtn">모두 읽음</button>
+    </div>
+
+    <div class="alert" id="alert"></div>
+
+    <div class="card" style="padding:8px 12px;">
+      <div class="notif-list" id="notifList">
+        <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
+      </div>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+
+    const alertEl = document.getElementById('alert');
+    const listEl  = document.getElementById('notifList');
+    const pagEl   = document.getElementById('pagination');
+    let page = 1;
+    const SIZE = 15;
+
+    const typeLabel = { keyword: '키워드', system: '시스템', comment: '댓글' };
+
+    async function load() {
+      listEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>';
+      try {
+        const d = await api(`/api/notifications?page=${page}&size=${SIZE}`);
+        document.getElementById('unreadBadge').textContent = d.unread || 0;
+        const items = d.notifications || [];
+        if (!items.length) {
+          listEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">알림이 없어요.</p>';
+          pagEl.innerHTML = '';
+          return;
+        }
+        listEl.innerHTML = items.map(n => `
+          <div class="notif-item ${n.is_read ? 'read' : 'unread'}"
+               data-id="${n.id}" data-ref-type="${n.ref_type || ''}" data-ref-id="${n.ref_id || ''}">
+            <span class="ni-dot"></span>
+            <div class="ni-body">
+              <div class="ni-text">${escapeHtml(n.content)}</div>
+              <div class="ni-date">${(n.created_at || '').replace('T',' ').slice(0,16)}</div>
+            </div>
+            <span class="ni-type">${typeLabel[n.type] || n.type}</span>
+          </div>`).join('');
+
+        listEl.querySelectorAll('.notif-item').forEach(el => {
+          el.onclick = () => openNotif(el);
+        });
+        renderPagination(d.page, d.total_pages);
+      } catch (err) {
+        listEl.innerHTML = `<p class="muted text-center" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    async function openNotif(el) {
+      const id      = el.dataset.id;
+      const refType = el.dataset.refType;
+      const refId   = el.dataset.refId;
+      // 읽음 처리
+      if (el.classList.contains('unread')) {
+        try { await api(`/api/notifications/${id}/read`, { method: 'PATCH' }); } catch (_) {}
+      }
+      // 연결된 대상으로 이동
+      if (refType === 'post' && refId) {
+        location.href = '/post?id=' + refId;
+      } else {
+        el.classList.remove('unread'); el.classList.add('read');
+        updateBell();
+        load();
+      }
+    }
+
+    document.getElementById('readAllBtn').onclick = async () => {
+      try {
+        await api('/api/notifications/read-all', { method: 'PATCH' });
+        updateBell();
+        load();
+      } catch (err) { showAlert(alertEl, err.message); }
+    };
+
+    function renderPagination(cur, total) {
+      if (total <= 1) { pagEl.innerHTML = ''; return; }
+      let html = `<button ${cur<=1?'disabled':''} data-p="${cur-1}">‹</button>`;
+      const start = Math.max(1, cur - 2), end = Math.min(total, start + 4);
+      for (let i = start; i <= end; i++)
+        html += `<button class="${i===cur?'active':''}" data-p="${i}">${i}</button>`;
+      html += `<button ${cur>=total?'disabled':''} data-p="${cur+1}">›</button>`;
+      pagEl.innerHTML = html;
+      pagEl.querySelectorAll('button[data-p]').forEach(b => {
+        b.onclick = () => { page = +b.dataset.p; load(); window.scrollTo(0,0); };
+      });
+    }
+
+    load();
+  </script>
+</body>
+</html>

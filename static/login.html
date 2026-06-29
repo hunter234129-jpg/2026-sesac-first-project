@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="center-screen">
+    <form class="card auth-card" id="loginForm">
+      <h2>로그인</h2>
+      <p class="sub">다시 만나서 반가워요 👋</p>
+
+      <div class="alert" id="alert"></div>
+
+      <div class="field">
+        <label for="email">이메일</label>
+        <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label for="password">비밀번호</label>
+        <input type="password" id="password" placeholder="비밀번호" autocomplete="current-password" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" id="submitBtn">로그인</button>
+
+      <p class="switch">아직 계정이 없으신가요? <a href="/register">회원가입</a></p>
+    </form>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    renderNav();
+    // 이미 로그인 상태면 대시보드로
+    if (Auth.isLoggedIn) location.href = '/dashboard';
+
+    const form  = document.getElementById('loginForm');
+    const alert = document.getElementById('alert');
+    const btn   = document.getElementById('submitBtn');
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      hideAlert(alert);
+      setLoading(btn, true);
+      try {
+        const data = await api('/api/auth/login', {
+          method: 'POST', auth: false,
+          body: {
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+          }
+        });
+        Auth.save(data.access_token, data.username);
+        const next = queryParam('next') || '/dashboard';
+        location.href = next;
+      } catch (err) {
+        showAlert(alert, err.message);
+        setLoading(btn, false, '로그인');
+      }
+    };
+  </script>
+</body>
+</html>
