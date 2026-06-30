@@ -7,4 +7,4 @@ requests
 beautifulsoup4
 pytesseract
 pillow
-anthropic
+google-genai
