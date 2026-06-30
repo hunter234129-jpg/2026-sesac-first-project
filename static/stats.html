@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>공부 통계 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header"><h1>공부 통계</h1><p>나의 공부 기록과 전체 랭킹</p></div>
+
+    <div class="alert" id="alert"></div>
+
+    <!-- 요약 -->
+    <div class="stat-cards" id="summary">
+      <div class="sc"><div class="sc-label">누적 공부 시간</div><div class="sc-value" id="sumTotal">-</div></div>
+      <div class="sc"><div class="sc-label">총 세션</div><div class="sc-value green" id="sumSessions">-</div></div>
+      <div class="sc"><div class="sc-label">최근 7일</div><div class="sc-value" id="sum7">-</div></div>
+      <div class="sc"><div class="sc-label">일 평균(7일)</div><div class="sc-value" id="sumAvg">-</div></div>
+    </div>
+
+    <!-- 연속 공부 + 잔디 -->
+    <div class="card section">
+      <div class="section-head"><h2>🔥 연속 공부 &amp; 잔디</h2><span class="muted" id="heatHint" style="font-size:12px;"></span></div>
+      <div class="streak-grid">
+        <div class="streak-cell"><div class="em" id="stFire">🔥</div><div class="v" id="stCur">-</div><div class="k">현재 연속</div></div>
+        <div class="streak-cell"><div class="em">🏆</div><div class="v cy" id="stMax">-</div><div class="k">최장 연속</div></div>
+        <div class="streak-cell"><div class="em">🪐</div><div class="v gr" id="stDays">-</div><div class="k">공부한 날</div></div>
+      </div>
+      <div class="heatmap" id="heatmap"><p class="chart-empty">불러오는 중...</p></div>
+      <div class="heat-legend">적음
+        <span class="heat-cell"></span><span class="heat-cell l1"></span><span class="heat-cell l2"></span><span class="heat-cell l3"></span><span class="heat-cell l4"></span>
+        많음</div>
+    </div>
+
+    <!-- 차트 -->
+    <div class="card section">
+      <div class="section-head">
+        <h2>공부 시간 추이</h2>
+        <div class="seg" id="periodSeg">
+          <button data-p="day" class="active">일별</button>
+          <button data-p="week">주별</button>
+        </div>
+      </div>
+      <div class="chart" id="chart"><p class="chart-empty">불러오는 중...</p></div>
+    </div>
+
+    <!-- 랭킹 -->
+    <div class="card section">
+      <div class="tabs" id="rankTabs">
+        <button class="tab active" data-r="today">오늘</button>
+        <button class="tab" data-r="week">이번 주</button>
+        <button class="tab" data-r="all">전체</button>
+      </div>
+      <div class="rank-list" id="rankList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+    const alertEl = document.getElementById('alert');
+    const myId = Auth.userId;
+
+    /* 초를 "Xh Ym" 또는 "Ym"으로 */
+    function fmtDur(sec) {
+      sec = +sec || 0;
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor(sec % 3600 / 60);
+      if (h && m) return `${h}시간 ${m}분`;
+      if (h)      return `${h}시간`;
+      return `${m}분`;
+    }
+    function fmtShort(sec) {
+      sec = +sec || 0;
+      const h = sec / 3600;
+      return h >= 1 ? h.toFixed(1) + 'h' : Math.round(sec/60) + 'm';
+    }
+
+    /* ── 요약 ── */
+    async function loadSummary() {
+      try {
+        const d = await api('/api/study/stats?period=day');
+        const total = d.total || {};
+        document.getElementById('sumTotal').textContent    = fmtDur(total.total_sec);
+        document.getElementById('sumSessions').textContent = (total.session_count || 0) + '회';
+        const last7 = (d.stats || []).reduce((s, x) => s + (+x.total_sec || 0), 0);
+        document.getElementById('sum7').textContent  = fmtDur(last7);
+        document.getElementById('sumAvg').textContent = fmtDur(Math.round(last7 / 7));
+      } catch (err) { showAlert(alertEl, err.message); }
+    }
+
+    /* ── 차트 ── */
+    function lastNDates(n) {
+      const arr = [];
+      const today = new Date();
+      for (let i = n - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        arr.push({ key, label: `${d.getMonth()+1}/${d.getDate()}`, isToday: i === 0 });
+      }
+      return arr;
+    }
+
+    async function loadChart(period) {
+      const chartEl = document.getElementById('chart');
+      chartEl.innerHTML = '<p class="chart-empty">불러오는 중...</p>';
+      try {
+        const d = await api('/api/study/stats?period=' + period);
+        const raw = d.stats || [];
+        let cols;
+
+        if (period === 'day') {
+          // 최근 7일 빈 날짜 채우기
+          const map = {};
+          raw.forEach(x => { map[String(x.period_key).slice(0,10)] = +x.total_sec || 0; });
+          cols = lastNDates(7).map(d => ({ label: d.label, sec: map[d.key] || 0, today: d.isToday }));
+        } else {
+          // 주별: 오래된 주 → 최신 주 순으로
+          const sorted = [...raw].reverse();
+          cols = sorted.map(x => ({
+            label: (x.week_start || '').slice(5) || '주',
+            sec: +x.total_sec || 0, today: false,
+          }));
+          if (!cols.length) cols = [];
+        }
+
+        if (!cols.length || cols.every(c => c.sec === 0)) {
+          chartEl.innerHTML = '<p class="chart-empty">아직 공부 기록이 없어요. 대시보드에서 "공부 시작"을 눌러보세요!</p>';
+          return;
+        }
+
+        const max = Math.max(...cols.map(c => c.sec), 1);
+        chartEl.innerHTML = cols.map(c => {
+          const h = Math.round((c.sec / max) * 100);
+          return `
+            <div class="bar-col">
+              <div class="bar-value ${c.sec ? '' : 'zero'}">${c.sec ? fmtShort(c.sec) : '0'}</div>
+              <div class="bar-wrap">
+                <div class="bar ${c.today ? 'today' : ''}" style="height:${c.sec ? h : 0}%"></div>
+              </div>
+              <div class="bar-label">${escapeHtml(c.label)}</div>
+            </div>`;
+        }).join('');
+      } catch (err) {
+        chartEl.innerHTML = `<p class="chart-empty">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    document.getElementById('periodSeg').onclick = (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      document.querySelectorAll('#periodSeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadChart(btn.dataset.p);
+    };
+
+    /* ── 랭킹 ── */
+    async function loadRanking(period) {
+      const el = document.getElementById('rankList');
+      el.innerHTML = '<p class="muted" style="font-size:14px;">불러오는 중...</p>';
+      try {
+        const d = await api('/api/study/ranking?period=' + period + '&limit=20', { auth: false });
+        const rows = d.ranking || [];
+        if (!rows.length) {
+          el.innerHTML = '<p class="muted" style="font-size:14px; padding:16px 0;">해당 기간 기록이 없어요.</p>';
+          return;
+        }
+        const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+        el.innerHTML = rows.map((r, i) => {
+          const rank = i + 1;
+          const isMe = r.id === myId;
+          const numHtml = medals[rank]
+            ? `<div class="rank-num medal">${medals[rank]}</div>`
+            : `<div class="rank-num">${rank}</div>`;
+          return `
+            <div class="rank-row ${isMe ? 'me' : ''}">
+              ${numHtml}
+              <div class="rank-name">${escapeHtml(r.username)}${isMe ? '<span class="you">나</span>' : ''}</div>
+              <div class="rank-time">${fmtDur(r.total_sec)}</div>
+              <div class="rank-sessions">${r.session_count}회</div>
+            </div>`;
+        }).join('');
+      } catch (err) {
+        el.innerHTML = `<p class="muted" style="font-size:14px;">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    document.getElementById('rankTabs').onclick = (e) => {
+      const tab = e.target.closest('.tab');
+      if (!tab) return;
+      document.querySelectorAll('#rankTabs .tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      loadRanking(tab.dataset.r);
+    };
+
+    /* ── 연속 공부 + 잔디 ── */
+    function ymd(d) {
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    async function loadStreak() {
+      try {
+        const d = await api('/api/study/streak');
+        document.getElementById('stCur').textContent  = (d.current_streak || 0) + '일';
+        document.getElementById('stMax').textContent  = (d.longest_streak || 0) + '일';
+        document.getElementById('stDays').textContent = (d.total_days || 0) + '일';
+        document.getElementById('stFire').style.opacity = d.studied_today ? '1' : '.35';
+      } catch (_) {}
+    }
+    async function loadHeatmap() {
+      const wrap = document.getElementById('heatmap');
+      try {
+        const d = await api('/api/study/heatmap?days=119');
+        const map = {};
+        (d.days || []).forEach(x => { map[x.date] = +x.total_sec || 0; });
+        const today = new Date(); today.setHours(0,0,0,0);
+        const cur = new Date(today);
+        cur.setDate(today.getDate() - 118);
+        cur.setDate(cur.getDate() - cur.getDay());   // 주 시작(일요일)으로 정렬
+        const lvl = sec => {
+          if (!sec) return '';
+          const h = sec / 3600;
+          if (h < 0.5) return 'l1';
+          if (h < 1.5) return 'l2';
+          if (h < 3)   return 'l3';
+          return 'l4';
+        };
+        const weeks = []; let studiedDays = 0;
+        while (cur <= today) {
+          const col = [];
+          for (let i = 0; i < 7; i++) {
+            if (cur > today) { col.push('<div class="heat-cell future"></div>'); }
+            else {
+              const key = ymd(cur), sec = map[key] || 0;
+              if (sec) studiedDays++;
+              col.push(`<div class="heat-cell ${lvl(sec)}" title="${key} · ${sec ? fmtDur(sec) : '기록 없음'}"></div>`);
+            }
+            cur.setDate(cur.getDate() + 1);
+          }
+          weeks.push('<div class="heat-week">' + col.join('') + '</div>');
+        }
+        wrap.innerHTML = weeks.join('');
+        document.getElementById('heatHint').textContent = `최근 17주 · 공부한 날 ${studiedDays}일`;
+      } catch (err) {
+        wrap.innerHTML = `<p class="chart-empty">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    /* ── 초기 로드 ── */
+    loadSummary();
+    loadStreak();
+    loadHeatmap();
+    loadChart('day');
+    loadRanking('today');
+  </script>
+</body>
+</html>

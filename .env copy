@@ -1,0 +1,4 @@
+DB_HOST=192.168.56.102
+DB_USER=scott
+DB_PASSWORD=tiger
+DB_NAME=mydb

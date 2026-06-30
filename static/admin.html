@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>관리자 · StudyBoard</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header"><h1>🛸 관리자</h1><p>회원과 게시글을 관리해요.</p></div>
+    <div class="alert" id="alert"></div>
+    <div id="denied" class="card hidden"><p class="text-center" style="padding:30px 0;">관리자 권한이 필요해요.</p></div>
+
+    <div id="adminBody" class="hidden">
+      <!-- 통계 -->
+      <div class="stat-cards" id="stats"></div>
+
+      <!-- 탭 -->
+      <div class="card section">
+        <div class="tabs" id="tabs">
+          <button class="tab active" data-tab="users">회원</button>
+          <button class="tab" data-tab="posts">게시글</button>
+        </div>
+        <div class="tab-panel active" id="panel-users"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+        <div class="tab-panel" id="panel-posts"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+    const alertEl = document.getElementById('alert');
+
+    if (!Auth.isAdmin) {
+      document.getElementById('denied').classList.remove('hidden');
+    } else {
+      document.getElementById('adminBody').classList.remove('hidden');
+      init();
+    }
+
+    async function init() {
+      loadStats(); loadUsers(); loadPosts();
+      document.querySelectorAll('.tab').forEach(t => {
+        t.onclick = () => {
+          document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+          t.classList.add('active');
+          document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+        };
+      });
+    }
+
+    async function loadStats() {
+      try {
+        const s = await api('/api/admin/stats');
+        document.getElementById('stats').innerHTML = `
+          <div class="sc"><div class="sc-label">회원</div><div class="sc-value">${s.users}</div></div>
+          <div class="sc"><div class="sc-label">게시글</div><div class="sc-value green">${s.posts}</div></div>
+          <div class="sc"><div class="sc-label">위키</div><div class="sc-value">${s.wiki}</div></div>
+          <div class="sc"><div class="sc-label">클랜</div><div class="sc-value">${s.clans}</div></div>`;
+      } catch (err) { showAlert(alertEl, err.message); }
+    }
+
+    async function loadUsers() {
+      const el = document.getElementById('panel-users');
+      try {
+        const d = await api('/api/admin/users?size=50');
+        const users = d.users || [];
+        el.innerHTML = users.map(u => `
+          <div class="row">
+            <span class="row-value">
+              ${escapeHtml(u.username)}
+              ${u.is_admin ? '<span class="badge" style="margin-left:6px;">관리자</span>' : ''}
+              ${u.is_deleted ? '<span class="tbadge closed" style="margin-left:6px;">탈퇴</span>' : ''}
+              <div class="muted" style="font-size:12px;">${escapeHtml(u.email)} · ${(u.created_at||'').slice(0,10)}</div>
+            </span>
+            <span style="display:flex; gap:6px;">
+              <button class="btn btn-ghost" style="padding:5px 10px; font-size:12px;" data-admin="${u.id}" data-cur="${u.is_admin?1:0}">${u.is_admin?'관리자 해제':'관리자 지정'}</button>
+              ${u.is_deleted ? '' : `<button class="btn btn-danger" style="padding:5px 10px; font-size:12px;" data-del-user="${u.id}">탈퇴</button>`}
+            </span>
+          </div>`).join('') || '<p class="muted" style="font-size:14px;">회원이 없어요.</p>';
+
+        el.querySelectorAll('[data-admin]').forEach(b => b.onclick = async () => {
+          try { await api(`/api/admin/users/${b.dataset.admin}/admin`, { method: 'PATCH', body: { is_admin: b.dataset.cur !== '1' } }); loadUsers(); }
+          catch (err) { showAlert(alertEl, err.message); }
+        });
+        el.querySelectorAll('[data-del-user]').forEach(b => b.onclick = async () => {
+          if (!confirm('이 회원을 탈퇴 처리할까요?')) return;
+          try { await api(`/api/admin/users/${b.dataset.delUser}`, { method: 'DELETE' }); loadUsers(); loadStats(); }
+          catch (err) { showAlert(alertEl, err.message); }
+        });
+      } catch (err) { el.innerHTML = `<p class="muted" style="font-size:14px;">${escapeHtml(err.message)}</p>`; }
+    }
+
+    async function loadPosts() {
+      const el = document.getElementById('panel-posts');
+      try {
+        const d = await api('/api/admin/posts?size=50');
+        const posts = d.posts || [];
+        el.innerHTML = posts.map(p => `
+          <div class="row">
+            <span class="row-value">
+              <a href="/post?id=${p.id}">${escapeHtml(p.title)}</a>
+              ${p.deleted_at ? '<span class="tbadge closed" style="margin-left:6px;">삭제됨</span>' : ''}
+              <div class="muted" style="font-size:12px;">${escapeHtml(p.author)} · 조회 ${p.view_count} · ${(p.created_at||'').slice(0,10)}</div>
+            </span>
+            ${p.deleted_at ? '' : `<button class="btn btn-danger" style="padding:5px 10px; font-size:12px;" data-del-post="${p.id}">삭제</button>`}
+          </div>`).join('') || '<p class="muted" style="font-size:14px;">게시글이 없어요.</p>';
+
+        el.querySelectorAll('[data-del-post]').forEach(b => b.onclick = async () => {
+          if (!confirm('이 게시글을 삭제할까요?')) return;
+          try { await api(`/api/admin/posts/${b.dataset.delPost}`, { method: 'DELETE' }); loadPosts(); loadStats(); }
+          catch (err) { showAlert(alertEl, err.message); }
+        });
+      } catch (err) { el.innerHTML = `<p class="muted" style="font-size:14px;">${escapeHtml(err.message)}</p>`; }
+    }
+  </script>
+</body>
+</html>

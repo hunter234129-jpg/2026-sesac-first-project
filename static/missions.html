@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>미션 · StudyBoard</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container" style="max-width:720px;">
+    <div class="dash-header"><h1>🎯 오늘의 미션</h1><p>매일 자정에 새로운 미션이 생성돼요.</p></div>
+
+    <div class="alert" id="alert"></div>
+
+    <div class="card section" id="todayCard" style="text-align:center; padding:36px 28px;">
+      <p class="muted" style="font-size:14px;">불러오는 중...</p>
+    </div>
+
+    <div class="card section">
+      <div class="section-head"><h2>완료한 미션</h2></div>
+      <div id="historyList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+    const alertEl = document.getElementById('alert');
+
+    async function loadToday() {
+      const card = document.getElementById('todayCard');
+      try {
+        const m = await api('/api/missions/today');
+        card.innerHTML = `
+          <div style="font-size:46px; margin-bottom:8px; filter:drop-shadow(0 6px 14px rgba(0,0,0,.5));">${m.is_done ? '🌟' : '🪐'}</div>
+          <div style="font-size:21px; font-weight:800; margin-bottom:8px;">${escapeHtml(m.title)}</div>
+          <div class="muted" style="font-size:14px; max-width:440px; margin:0 auto 20px;">${escapeHtml(m.content || '')}</div>
+          ${m.is_done
+            ? '<span class="badge" style="font-size:14px; padding:6px 16px;">완료 ✓</span>'
+            : '<button class="btn btn-success btn-lg" id="doneBtn">완료하기</button>'}`;
+        const dn = document.getElementById('doneBtn');
+        if (dn) dn.onclick = async () => {
+          setLoading(dn, true);
+          try { await api(`/api/missions/${m.id}/done`, { method: 'POST' }); loadToday(); loadHistory(); }
+          catch (err) { showAlert(alertEl, err.message); setLoading(dn, false, '완료하기'); }
+        };
+      } catch (err) {
+        card.innerHTML = `<p class="muted">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    async function loadHistory() {
+      const el = document.getElementById('historyList');
+      try {
+        const list = await api('/api/missions/history');
+        el.innerHTML = list.length ? list.map(h => `
+          <div class="row">
+            <span class="row-value">🌟 ${escapeHtml(h.title)}</span>
+            <span class="muted" style="font-size:13px;">${(h.done_at || h.date || '').replace('T',' ').slice(0,16)}</span>
+          </div>`).join('')
+          : '<p class="muted" style="font-size:14px;">아직 완료한 미션이 없어요.</p>';
+      } catch (err) {
+        el.innerHTML = `<p class="muted" style="font-size:14px;">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    loadToday();
+    loadHistory();
+  </script>
+</body>
+</html>

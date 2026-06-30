@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>게시글 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container" style="max-width:760px;">
+    <a href="/board" class="muted" style="font-size:14px;">← 목록으로</a>
+    <div class="alert mt-16" id="alert"></div>
+
+    <div class="post-detail card mt-16" id="postCard">
+      <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
+    </div>
+
+    <div class="comments-section" id="commentsSection" style="display:none;">
+      <h3>댓글 <span id="commentCount">0</span></h3>
+      <div id="commentList"></div>
+
+      <form class="comment-form" id="commentForm">
+        <textarea id="commentInput" placeholder="댓글을 입력하세요" required></textarea>
+        <div><button type="submit" class="btn btn-primary" style="padding:8px 20px;">댓글 등록</button></div>
+      </form>
+      <p class="muted mt-8" id="loginToComment" style="display:none; font-size:14px;">
+        댓글을 작성하려면 <a href="/login">로그인</a>하세요.
+      </p>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    renderNav();
+    const postId  = queryParam('id');
+    const alertEl = document.getElementById('alert');
+    if (!postId) { showAlert(alertEl, '잘못된 접근입니다.'); }
+
+    const myId = Auth.userId;
+
+    /* ── 게시글 상세 ── */
+    async function loadPost() {
+      const card = document.getElementById('postCard');
+      try {
+        const p = await api('/api/posts/' + postId, { auth: false });
+        const isOwner = Auth.isLoggedIn && p.user_id === myId;
+        const isStudy = p.type === 'study';
+
+        const typeBadge = isStudy
+          ? '<span class="tbadge study">스터디</span>'
+          : '<span class="tbadge post">게시글</span>';
+        const statusBadge = isStudy
+          ? (p.status === 'closed' ? '<span class="tbadge closed">마감</span>' : '<span class="tbadge open">모집중</span>')
+          : '';
+
+        let recruitHtml = '';
+        if (isStudy) {
+          recruitHtml = `
+            <div class="pd-recruit">
+              <div><div class="label">모집 인원</div>${p.recruit_count || 0}명</div>
+              <div><div class="label">모집 마감일</div>${p.recruit_deadline || '미정'}</div>
+              <div><div class="label">분야</div>${escapeHtml(p.field || '미지정')}</div>
+            </div>`;
+        }
+
+        let ownerActions = '';
+        if (isOwner) {
+          ownerActions = `
+            <div class="pd-actions">
+              ${isStudy ? `<button class="btn btn-ghost" id="toggleStatusBtn" style="padding:7px 14px;">${p.status === 'open' ? '모집 마감' : '다시 모집'}</button>` : ''}
+              <a class="btn btn-ghost" href="/write?id=${p.id}" style="padding:7px 14px;">수정</a>
+              <button class="btn btn-danger" id="deleteBtn" style="padding:7px 14px;">삭제</button>
+            </div>`;
+        }
+
+        card.innerHTML = `
+          <div class="pd-title">${typeBadge} ${statusBadge} ${escapeHtml(p.title)}</div>
+          <div class="pd-meta">
+            <span>✍️ ${escapeHtml(p.author)}</span>
+            <span>👁 조회 ${p.view_count}</span>
+            ${p.category ? `<span>🏷️ ${escapeHtml(p.category)}</span>` : ''}
+            <span>🕒 ${(p.created_at || '').replace('T',' ').slice(0,16)}</span>
+            ${ownerActions}
+          </div>
+          ${recruitHtml}
+          <div class="pd-content">${escapeHtml(p.content || '(내용 없음)')}</div>`;
+
+        // 삭제
+        const delBtn = document.getElementById('deleteBtn');
+        if (delBtn) delBtn.onclick = async () => {
+          if (!confirm('정말 삭제하시겠어요?')) return;
+          try { await api('/api/posts/' + postId, { method: 'DELETE' }); location.href = '/board'; }
+          catch (err) { showAlert(alertEl, err.message); }
+        };
+        // 모집 상태 토글
+        const tBtn = document.getElementById('toggleStatusBtn');
+        if (tBtn) tBtn.onclick = async () => {
+          const next = p.status === 'open' ? 'closed' : 'open';
+          try { await api(`/api/posts/${postId}/status`, { method: 'PATCH', body: { status: next } }); loadPost(); }
+          catch (err) { showAlert(alertEl, err.message); }
+        };
+      } catch (err) {
+        card.innerHTML = `<p class="muted text-center" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    /* ── 댓글 ── */
+    function commentHtml(c) {
+      const mine = Auth.isLoggedIn && c.user_id === myId;
+      const replies = (c.replies || []).map(commentHtml).join('');
+      return `
+        <div class="comment" data-cid="${c.id}">
+          <div class="comment-meta">
+            <span class="cm-author">${escapeHtml(c.username)}</span>
+            <span class="cm-date">${(c.created_at||'').replace('T',' ').slice(0,16)}</span>
+          </div>
+          <div class="comment-body" data-body>${escapeHtml(c.content)}</div>
+          <div class="comment-actions">
+            ${Auth.isLoggedIn ? `<button data-act="reply">답글</button>` : ''}
+            ${mine ? `<button data-act="edit">수정</button><button data-act="delete">삭제</button>` : ''}
+          </div>
+          <div data-reply-slot></div>
+          ${replies ? `<div class="comment-replies">${replies}</div>` : ''}
+        </div>`;
+    }
+
+    async function loadComments() {
+      const listEl = document.getElementById('commentList');
+      try {
+        const tree = await api(`/api/posts/${postId}/comments`, { auth: false });
+        const count = countComments(tree);
+        document.getElementById('commentCount').textContent = count;
+        listEl.innerHTML = tree.length ? tree.map(commentHtml).join('')
+          : '<p class="muted" style="font-size:14px; padding:8px 0;">첫 댓글을 남겨보세요.</p>';
+        wireComments(listEl);
+      } catch (err) {
+        listEl.innerHTML = `<p class="muted">${escapeHtml(err.message)}</p>`;
+      }
+    }
+    function countComments(nodes) {
+      return nodes.reduce((n, c) => n + 1 + countComments(c.replies || []), 0);
+    }
+
+    function wireComments(root) {
+      root.querySelectorAll('.comment').forEach(el => {
+        const cid = el.dataset.cid;
+        el.querySelectorAll(':scope > .comment-actions button').forEach(btn => {
+          btn.onclick = () => handleCommentAction(btn.dataset.act, el, cid);
+        });
+      });
+    }
+
+    function handleCommentAction(act, el, cid) {
+      const slot = el.querySelector(':scope > [data-reply-slot]');
+      const body = el.querySelector(':scope > .comment-body');
+
+      if (act === 'reply') {
+        if (slot.querySelector('form')) { slot.innerHTML = ''; return; }
+        slot.innerHTML = `
+          <form class="comment-form reply-form">
+            <textarea placeholder="답글을 입력하세요" required></textarea>
+            <div><button type="submit" class="btn btn-ghost" style="padding:6px 16px;">답글 등록</button></div>
+          </form>`;
+        slot.querySelector('form').onsubmit = async (e) => {
+          e.preventDefault();
+          const content = slot.querySelector('textarea').value.trim();
+          if (!content) return;
+          try {
+            await api(`/api/posts/${postId}/comments`, { method:'POST', body: { content, parent_id: +cid } });
+            loadComments();
+          } catch (err) { showAlert(alertEl, err.message); }
+        };
+      }
+
+      if (act === 'edit') {
+        const original = body.textContent;
+        if (body.querySelector('textarea')) return;
+        body.innerHTML = `
+          <form class="comment-form" style="margin-top:0;">
+            <textarea required>${escapeHtml(original)}</textarea>
+            <div style="display:flex; gap:6px;">
+              <button type="submit" class="btn btn-primary" style="padding:5px 14px;">저장</button>
+              <button type="button" class="btn btn-ghost" data-cancel style="padding:5px 14px;">취소</button>
+            </div>
+          </form>`;
+        body.querySelector('[data-cancel]').onclick = () => loadComments();
+        body.querySelector('form').onsubmit = async (e) => {
+          e.preventDefault();
+          const content = body.querySelector('textarea').value.trim();
+          if (!content) return;
+          try {
+            await api(`/api/posts/${postId}/comments/${cid}`, { method:'PUT', body: { content } });
+            loadComments();
+          } catch (err) { showAlert(alertEl, err.message); }
+        };
+      }
+
+      if (act === 'delete') {
+        if (!confirm('댓글을 삭제할까요? (답글도 함께 삭제됩니다)')) return;
+        api(`/api/posts/${postId}/comments/${cid}`, { method:'DELETE' })
+          .then(loadComments)
+          .catch(err => showAlert(alertEl, err.message));
+      }
+    }
+
+    // 댓글 작성 폼
+    document.getElementById('commentsSection').style.display = 'block';
+    if (Auth.isLoggedIn) {
+      document.getElementById('commentForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const ta = document.getElementById('commentInput');
+        const content = ta.value.trim();
+        if (!content) return;
+        try {
+          await api(`/api/posts/${postId}/comments`, { method:'POST', body: { content } });
+          ta.value = '';
+          loadComments();
+        } catch (err) { showAlert(alertEl, err.message); }
+      };
+    } else {
+      document.getElementById('commentForm').style.display = 'none';
+      document.getElementById('loginToComment').style.display = 'block';
+    }
+
+    if (postId) { loadPost(); loadComments(); }
+  </script>
+</body>
+</html>

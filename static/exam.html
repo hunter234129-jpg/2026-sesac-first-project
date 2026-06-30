@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>시험 일정 · StudyBoard</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+      <div>
+        <h1>🗓️ 국가기술자격 시험 일정</h1>
+        <p>Q-net 연간 시험일정 (1시간마다 갱신)</p>
+      </div>
+      <button class="btn btn-ghost" id="refreshBtn">새로고침</button>
+    </div>
+
+    <div class="alert" id="alert"></div>
+    <div id="content"><p class="muted text-center" style="padding:50px 0;">불러오는 중...</p></div>
+    <p class="muted mt-16" style="font-size:12px;">
+      출처: <a href="https://www.q-net.or.kr" target="_blank" rel="noopener">q-net.or.kr</a> · 실제 접수일은 큐넷에서 다시 확인하세요.
+    </p>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    renderNav();
+    const alertEl = document.getElementById('alert');
+    const content = document.getElementById('content');
+
+    async function load(refresh) {
+      content.innerHTML = '<p class="muted text-center" style="padding:50px 0;">불러오는 중...' +
+                          (refresh ? ' (사이트 크롤링 중, 몇 초 걸릴 수 있어요)' : '') + '</p>';
+      try {
+        const d = await api('/api/exam-schedule' + (refresh ? '?refresh=1' : ''), { auth: false });
+        const rows = d.schedules || [];
+        if (!rows.length) {
+          content.innerHTML = '<div class="card"><p class="muted text-center" style="padding:30px 0;">표시할 일정이 없어요. 새로고침을 눌러보세요.</p></div>';
+          return;
+        }
+
+        // 헤더 키 수집 (columns 형태 / dict 형태 모두 지원)
+        const dictRows = rows.filter(r => !r.columns);
+        let html = '';
+        if (dictRows.length) {
+          const keys = [...new Set(dictRows.flatMap(r => Object.keys(r)))];
+          html = `<div class="table-scroll"><table class="data"><thead><tr>${
+            keys.map(k => `<th>${escapeHtml(k)}</th>`).join('')
+          }</tr></thead><tbody>${
+            dictRows.map(r => `<tr>${keys.map(k => `<td>${escapeHtml(r[k] || '')}</td>`).join('')}</tr>`).join('')
+          }</tbody></table></div>`;
+        } else {
+          // columns 배열만 있는 경우
+          html = `<div class="table-scroll"><table class="data"><tbody>${
+            rows.map(r => `<tr>${(r.columns || []).map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')
+          }</tbody></table></div>`;
+        }
+        const cached = d.cached ? `<span class="badge" style="margin-bottom:12px;">캐시됨${d.stale ? ' (갱신 실패)' : ''}</span>` : '';
+        content.innerHTML = cached + html;
+      } catch (err) {
+        content.innerHTML = `<div class="card"><p class="muted text-center" style="padding:30px 0;">${escapeHtml(err.message)}</p></div>`;
+      }
+    }
+
+    document.getElementById('refreshBtn').onclick = () => load(true);
+    load(false);
+  </script>
+</body>
+</html>

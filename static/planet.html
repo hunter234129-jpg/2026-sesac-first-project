@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>내 행성 · StudyBoard</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container" style="max-width:760px;">
+    <div class="dash-header"><h1>🪐 내 행성</h1><p>공부한 시간이 쌓일수록 나만의 우주가 자라요.</p></div>
+    <div class="alert" id="alert"></div>
+
+    <div class="card section">
+      <div class="planet-stage">
+        <div class="orb-wrap"><div class="orb" id="orb"></div><div class="orb-ring" id="orbRing"></div></div>
+        <div class="planet-lv" id="planetLv">LV.·</div>
+        <div class="planet-name" id="planetName">불러오는 중...</div>
+        <div class="planet-desc" id="planetDesc"></div>
+        <div class="planet-prog">
+          <div class="pl"><span id="progLabel"></span><span id="progRight"></span></div>
+          <div class="prog"><i id="progBar" style="width:0%"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card section">
+      <div class="section-head"><h2>성장 단계</h2><span class="muted" id="totalH" style="font-size:12px;"></span></div>
+      <div class="roadmap" id="roadmap"></div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+
+    /* 단계별 행성 외형 */
+    function applyOrb(level) {
+      const orb  = document.getElementById('orb');
+      const ring = document.getElementById('orbRing');
+      const V = {
+        0: { s: 84,  bg: 'radial-gradient(circle at 38% 32%, rgba(170,190,240,.95), rgba(74,90,138,.55) 58%, rgba(30,40,80,0) 78%)', g: '0 0 40px 6px rgba(120,140,200,.35)' },
+        1: { s: 108, bg: 'radial-gradient(circle at 35% 30%, #d9c2a8, #8a6f52 58%, #43321f)',                 g: '0 0 34px 4px rgba(180,150,110,.4)' },
+        2: { s: 128, bg: 'radial-gradient(circle at 34% 30%, #e6ebf5, #9aa3c2 55%, #424c70)',                 g: '0 0 36px 5px rgba(150,170,220,.4)' },
+        3: { s: 152, bg: 'radial-gradient(circle at 33% 28%, #bfe6ff, #5b8cff 45%, #1c3aa8 80%)',             g: '0 0 44px 6px rgba(91,140,255,.45)' },
+        4: { s: 168, bg: 'radial-gradient(circle at 33% 28%, #aef0c8, #3fe0b0 40%, #1f7a8c 72%, #0c3a55)',    g: '0 0 46px 7px rgba(63,224,176,.45)' },
+        5: { s: 172, bg: 'radial-gradient(circle at 34% 30%, #ffe6b3, #ffb347 46%, #b5651d 80%)',             g: '0 0 46px 7px rgba(255,179,71,.45)', ring: true },
+        6: { s: 188, bg: 'radial-gradient(circle at 42% 40%, #fff6d8, #ffd166 34%, #ff7b3d 68%, #d2401a)',    g: '0 0 70px 16px rgba(255,150,70,.7)' },
+        7: { s: 196, bg: 'radial-gradient(circle at 44% 42%, #ffffff, #ffe6ff 28%, #b08bff 58%, #6a3fc0)',    g: '0 0 80px 18px rgba(176,139,255,.75)' },
+        8: { s: 210, bg: 'conic-gradient(from 0deg, #5ad1ff, #b08bff, #ffb347, #3fe0b0, #5ad1ff)',            g: '0 0 64px 14px rgba(120,150,255,.6)', galaxy: true },
+      };
+      const v = V[level] || V[0];
+      orb.style.width = orb.style.height = v.s + 'px';
+      orb.style.background = v.bg;
+      orb.style.boxShadow = v.g + ', inset -16px -12px 40px rgba(0,0,0,.45)';
+      orb.classList.toggle('galaxy', !!v.galaxy);
+      ring.classList.toggle('show', !!v.ring);
+    }
+
+    async function load() {
+      try {
+        const d = await api('/api/study/planet');
+        applyOrb(d.level);
+        document.getElementById('planetLv').textContent   = 'LV.' + d.level;
+        document.getElementById('planetName').textContent = `${d.emoji} ${d.name}`;
+        document.getElementById('planetDesc').textContent = d.desc;
+        document.getElementById('totalH').textContent     = `누적 ${d.total_hours}시간`;
+
+        if (d.is_max) {
+          document.getElementById('progLabel').textContent = '최종 단계 달성! 🎉';
+          document.getElementById('progRight').textContent = '';
+          document.getElementById('progBar').style.width   = '100%';
+        } else {
+          document.getElementById('progLabel').textContent = `다음 단계: ${d.next_name}`;
+          document.getElementById('progRight').textContent = `${d.hours_to_next}시간 남음`;
+          document.getElementById('progBar').style.width   = Math.round(d.progress * 100) + '%';
+        }
+
+        document.getElementById('roadmap').innerHTML = (d.stages || []).map(s => {
+          const cls = s.level === d.level ? 'cur' : (d.level > s.level ? 'done' : '');
+          return `<div class="rm ${cls}">
+            <div class="rm-em">${s.emoji}</div>
+            <div class="rm-name">${escapeHtml(s.name)}</div>
+            <div class="rm-h">${s.min_hours}h</div>
+          </div>`;
+        }).join('');
+      } catch (err) {
+        showAlert(document.getElementById('alert'), err.message);
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

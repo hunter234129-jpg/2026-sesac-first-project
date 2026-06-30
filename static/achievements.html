@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>업적 · StudyBoard</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+      <div><h1>🏅 업적</h1><p>공부 여정에서 모은 뱃지들</p></div>
+      <div class="streak-cell" style="min-width:130px;"><div class="v cy" id="achCount">-</div><div class="k">획득한 뱃지</div></div>
+    </div>
+
+    <div class="alert" id="alert"></div>
+    <div id="achWrap"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+
+    function achCard(a) {
+      const pct = Math.round(a.progress * 100);
+      const label = a.unlocked
+        ? `획득 ✓${a.unlocked_at ? ' · ' + a.unlocked_at.slice(0, 10) : ''}`
+        : `${a.current} / ${a.threshold}`;
+      return `<div class="ach ${a.unlocked ? 'unlocked' : 'locked'}">
+        <div class="ach-em">${a.emoji}</div>
+        <div class="ach-body">
+          <div class="ach-title">${escapeHtml(a.title)} ${a.unlocked ? '<span class="ach-check">✓</span>' : ''}</div>
+          <div class="ach-desc">${escapeHtml(a.desc)}</div>
+          <div class="prog"><i style="width:${pct}%"></i></div>
+          <div class="ach-prog-label">${escapeHtml(label)}</div>
+        </div>
+      </div>`;
+    }
+
+    async function load() {
+      const wrap = document.getElementById('achWrap');
+      try {
+        const d = await api('/api/achievements');
+        document.getElementById('achCount').textContent = `${d.unlocked_count}/${d.total_count}`;
+
+        const cats = {};
+        d.achievements.forEach(a => { (cats[a.category] = cats[a.category] || []).push(a); });
+
+        wrap.innerHTML = Object.entries(cats).map(([cat, items]) => `
+          <div class="card section">
+            <div class="section-head"><h2>${escapeHtml(cat)}</h2>
+              <span class="muted" style="font-size:12px;">${items.filter(i => i.unlocked).length}/${items.length}</span>
+            </div>
+            <div class="ach-grid">${items.map(achCard).join('')}</div>
+          </div>`).join('');
+
+        if (d.newly_unlocked && d.newly_unlocked.length) {
+          showAlert(document.getElementById('alert'), `🎉 새 업적 ${d.newly_unlocked.length}개를 획득했어요!`, 'success');
+        }
+      } catch (err) {
+        wrap.innerHTML = `<p class="muted" style="font-size:14px;">${escapeHtml(err.message)}</p>`;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

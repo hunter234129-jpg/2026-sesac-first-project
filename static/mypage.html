@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마이페이지 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container" style="max-width:760px;">
+    <div class="dash-header">
+      <h1>마이페이지</h1>
+      <p>프로필과 활동을 관리하세요.</p>
+    </div>
+
+    <div class="alert" id="alert"></div>
+
+    <!-- 프로필 -->
+    <div class="card section">
+      <div class="section-head">
+        <h2>프로필</h2>
+        <button class="btn btn-ghost" id="editBtn" style="padding:7px 16px;">수정</button>
+      </div>
+
+      <!-- 조회 모드 -->
+      <div id="profileView">
+        <div class="profile-top">
+          <div class="avatar" id="avatar">?</div>
+          <div>
+            <div style="font-size:20px; font-weight:700;" id="pName">-</div>
+            <div id="verifyBadge"></div>
+          </div>
+        </div>
+        <div class="row"><span class="row-label">이메일</span><span class="row-value" id="pEmail">-</span></div>
+        <div class="row"><span class="row-label">실명</span><span class="row-value" id="pReal">-</span></div>
+        <div class="row"><span class="row-label">가입일</span><span class="row-value" id="pJoined">-</span></div>
+      </div>
+
+      <!-- 수정 모드 -->
+      <form id="profileEdit" class="hidden">
+        <div class="field">
+          <label for="eName">닉네임</label>
+          <input type="text" id="eName">
+        </div>
+        <div class="field">
+          <label for="eReal">실명</label>
+          <input type="text" id="eReal" placeholder="실명 (선택)">
+        </div>
+        <div class="field">
+          <label for="ePw">새 비밀번호</label>
+          <input type="password" id="ePw" placeholder="변경할 때만 입력" autocomplete="new-password">
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button type="submit" class="btn btn-primary" id="saveBtn">저장</button>
+          <button type="button" class="btn btn-ghost" id="cancelBtn">취소</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 실명 인증 -->
+    <div class="card section" id="verifySection">
+      <div class="section-head"><h2>실명 인증</h2></div>
+      <div id="verifyBody"></div>
+    </div>
+
+    <!-- 관심 키워드 -->
+    <div class="card section">
+      <div class="section-head">
+        <h2>관심 키워드</h2>
+        <span class="muted" style="font-size:13px;">등록한 키워드가 포함된 새 글이 올라오면 알림을 받아요</span>
+      </div>
+      <div class="chips" id="keywordChips"><span class="muted" style="font-size:14px;">불러오는 중...</span></div>
+      <form class="chip-add" id="keywordForm">
+        <input type="text" id="keywordInput" placeholder="예: 정보처리기사" maxlength="100">
+        <button type="submit" class="btn btn-ghost">추가</button>
+      </form>
+    </div>
+
+    <!-- 내 활동 -->
+    <div class="card section">
+      <div class="tabs">
+        <button class="tab active" data-tab="posts">내 게시글</button>
+        <button class="tab" data-tab="wiki">내 위키 기여</button>
+      </div>
+      <div class="tab-panel active" id="panel-posts"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+      <div class="tab-panel" id="panel-wiki"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+    </div>
+
+    <!-- 위험 구역 -->
+    <div class="danger-zone">
+      <h2>회원 탈퇴</h2>
+      <p class="muted" style="font-size:14px; margin-bottom:14px;">
+        탈퇴하면 로그인할 수 없게 됩니다. 작성한 글과 기록은 보존됩니다.
+      </p>
+      <button class="btn btn-danger" id="withdrawBtn">회원 탈퇴</button>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+
+    const alertEl = document.getElementById('alert');
+    let me = null;
+
+    /* ── 프로필 로드 ── */
+    async function loadProfile() {
+      me = await api('/api/auth/me');
+      document.getElementById('avatar').textContent = (me.username || '?')[0].toUpperCase();
+      document.getElementById('pName').textContent  = me.username;
+      document.getElementById('pEmail').textContent = me.email;
+      document.getElementById('pReal').textContent  = me.real_name || '미등록';
+      document.getElementById('pJoined').textContent = (me.created_at || '').replace('T', ' ').slice(0, 16);
+      document.getElementById('verifyBadge').innerHTML = me.is_verified
+        ? '<span class="badge">✓ 실명 인증됨</span>'
+        : '<span class="muted" style="font-size:13px;">미인증</span>';
+      renderVerifySection();
+    }
+
+    /* ── 프로필 수정 ── */
+    const view = document.getElementById('profileView');
+    const edit = document.getElementById('profileEdit');
+    document.getElementById('editBtn').onclick = () => {
+      document.getElementById('eName').value = me.username || '';
+      document.getElementById('eReal').value = me.real_name || '';
+      document.getElementById('ePw').value   = '';
+      view.classList.add('hidden'); edit.classList.remove('hidden');
+    };
+    document.getElementById('cancelBtn').onclick = () => {
+      edit.classList.add('hidden'); view.classList.remove('hidden');
+    };
+    edit.onsubmit = async (e) => {
+      e.preventDefault();
+      hideAlert(alertEl);
+      const btn = document.getElementById('saveBtn');
+      setLoading(btn, true);
+      const body = {
+        username: document.getElementById('eName').value.trim(),
+        real_name: document.getElementById('eReal').value.trim(),
+      };
+      const pw = document.getElementById('ePw').value;
+      if (pw) body.password = pw;
+      try {
+        await api('/api/auth/me', { method: 'PUT', body });
+        // 닉네임이 바뀌면 저장된 표시 이름도 갱신
+        Auth.save(Auth.token, body.username || Auth.username);
+        await loadProfile();
+        renderNav();
+        edit.classList.add('hidden'); view.classList.remove('hidden');
+        showAlert(alertEl, '프로필이 수정됐어요.', 'success');
+      } catch (err) {
+        showAlert(alertEl, err.message);
+      } finally {
+        setLoading(btn, false, '저장');
+      }
+    };
+
+    /* ── 실명 인증 ── */
+    function renderVerifySection() {
+      const body = document.getElementById('verifyBody');
+      if (me.is_verified) {
+        body.innerHTML = '<p class="muted" style="font-size:14px;">✓ 이미 실명 인증이 완료된 계정이에요.</p>';
+        return;
+      }
+      body.innerHTML = `
+        <div class="field">
+          <label for="vName">이름</label>
+          <input type="text" id="vName" placeholder="실명" value="${escapeHtml(me.real_name || '')}">
+        </div>
+        <div class="field">
+          <label for="vCode">인증번호</label>
+          <input type="text" id="vCode" placeholder="6자리 숫자" maxlength="6" inputmode="numeric">
+          <p class="hint">데모 환경에서는 6자리 숫자(예: 123456)를 입력하면 인증돼요.</p>
+        </div>
+        <button class="btn btn-primary" id="verifyBtn">인증하기</button>`;
+      document.getElementById('verifyBtn').onclick = async () => {
+        hideAlert(alertEl);
+        const btn = document.getElementById('verifyBtn');
+        setLoading(btn, true);
+        try {
+          await api('/api/auth/verify', { method: 'POST', body: {
+            real_name: document.getElementById('vName').value.trim(),
+            code: document.getElementById('vCode').value.trim(),
+          }});
+          await loadProfile();
+          showAlert(alertEl, '실명 인증이 완료됐어요.', 'success');
+        } catch (err) {
+          showAlert(alertEl, err.message);
+          setLoading(btn, false, '인증하기');
+        }
+      };
+    }
+
+    /* ── 관심 키워드 ── */
+    async function loadKeywords() {
+      const box = document.getElementById('keywordChips');
+      try {
+        const list = await api('/api/keywords');
+        if (!list.length) {
+          box.innerHTML = '<span class="muted" style="font-size:14px;">등록된 키워드가 없어요.</span>';
+          return;
+        }
+        box.innerHTML = list.map(k => `
+          <span class="chip">${escapeHtml(k.keyword)}
+            <button title="삭제" data-kw="${escapeHtml(k.keyword)}">×</button>
+          </span>`).join('');
+        box.querySelectorAll('button[data-kw]').forEach(b => {
+          b.onclick = async () => {
+            try {
+              await api('/api/keywords/' + encodeURIComponent(b.dataset.kw), { method: 'DELETE' });
+              loadKeywords();
+            } catch (err) { showAlert(alertEl, err.message); }
+          };
+        });
+      } catch (err) {
+        box.innerHTML = `<span class="muted" style="font-size:14px;">불러오지 못했어요.</span>`;
+      }
+    }
+    document.getElementById('keywordForm').onsubmit = async (e) => {
+      e.preventDefault();
+      hideAlert(alertEl);
+      const input = document.getElementById('keywordInput');
+      const kw = input.value.trim();
+      if (!kw) return;
+      try {
+        await api('/api/keywords', { method: 'POST', body: { keyword: kw } });
+        input.value = '';
+        loadKeywords();
+      } catch (err) { showAlert(alertEl, err.message); }
+    };
+
+    /* ── 탭 (내 게시글 / 내 위키) ── */
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+      };
+    });
+
+    async function loadMyPosts() {
+      const el = document.getElementById('panel-posts');
+      try {
+        const d = await api('/api/auth/me/posts');
+        const posts = d.posts || [];
+        el.innerHTML = posts.length ? posts.map(p => `
+          <div class="row">
+            <span class="row-value">${escapeHtml(p.title)}
+              <span class="muted" style="font-size:12px;">· ${p.type === 'study' ? '스터디' : '게시글'}</span>
+            </span>
+            <span class="muted" style="font-size:13px;">조회 ${p.view_count} · ${(p.created_at||'').slice(0,10)}</span>
+          </div>`).join('')
+          : '<p class="muted" style="font-size:14px;">작성한 게시글이 없어요.</p>';
+      } catch (err) {
+        el.innerHTML = '<p class="muted" style="font-size:14px;">불러오지 못했어요.</p>';
+      }
+    }
+    async function loadMyWiki() {
+      const el = document.getElementById('panel-wiki');
+      try {
+        const d = await api('/api/auth/me/wiki');
+        const wikis = d.wikis || [];
+        el.innerHTML = wikis.length ? wikis.map(w => `
+          <div class="row">
+            <span class="row-value">${escapeHtml(w.title)}
+              <span class="muted" style="font-size:12px;">· ${w.contribution_count}회 기여</span>
+            </span>
+            <span class="muted" style="font-size:13px;">조회 ${w.view_count}</span>
+          </div>`).join('')
+          : '<p class="muted" style="font-size:14px;">기여한 위키가 없어요.</p>';
+      } catch (err) {
+        el.innerHTML = '<p class="muted" style="font-size:14px;">불러오지 못했어요.</p>';
+      }
+    }
+
+    /* ── 회원 탈퇴 ── */
+    document.getElementById('withdrawBtn').onclick = async () => {
+      if (!confirm('정말 탈퇴하시겠어요? 다시 로그인할 수 없게 됩니다.')) return;
+      try {
+        await api('/api/auth/me', { method: 'DELETE' });
+        alert('탈퇴가 완료됐어요. 그동안 이용해주셔서 감사합니다.');
+        Auth.logout();
+      } catch (err) { showAlert(alertEl, err.message); }
+    };
+
+    /* ── 초기 로드 ── */
+    (async () => {
+      try { await loadProfile(); }
+      catch (err) { showAlert(alertEl, '프로필을 불러오지 못했어요: ' + err.message); }
+    })();
+    loadKeywords();
+    loadMyPosts();
+    loadMyWiki();
+  </script>
+</body>
+</html>

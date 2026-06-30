@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>스터디 게시판 API</title>
+  <style>
+    body { font-family: 'Segoe UI','Malgun Gothic',sans-serif; background:#0d1117; color:#c9d1d9; margin:0; padding:40px; }
+    h1   { color:#58a6ff; margin-bottom:4px; }
+    p    { color:#3fb950; font-size:14px; margin-top:0; }
+    h2   { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:1px; margin:28px 0 8px; }
+    ul   { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:4px; }
+    li   { font-size:13px; }
+    code { background:#161b22; padding:2px 7px; border-radius:4px; color:#79c0ff; font-size:12px; }
+    .note { color:#8b949e; font-size:12px; margin-left:8px; }
+  </style>
+</head>
+<body>
+  <!-- 관리자 전용 가드 -->
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.isLoggedIn)      location.replace('/login?next=/api-docs');
+    else if (!Auth.isAdmin)    location.replace('/dashboard');
+  </script>
+
+  <h1>스터디 게시판 API</h1>
+  <p>● Server running on 192.168.56.102</p>
+
+  <h2>Auth</h2>
+  <ul>
+    <li><code>POST   /api/auth/register</code>   <span class="note">회원가입 — username, email, password, real_name?, interest_keywords?</span></li>
+    <li><code>POST   /api/auth/login</code>       <span class="note">로그인 → access_token</span></li>
+    <li><code>GET    /api/auth/me</code>          <span class="note">내 정보 (JWT)</span></li>
+    <li><code>PUT    /api/auth/me</code>          <span class="note">정보 수정 — username?, password?, real_name?, interest_keywords? (JWT)</span></li>
+    <li><code>DELETE /api/auth/me</code>          <span class="note">탈퇴 soft delete (JWT)</span></li>
+    <li><code>GET    /api/auth/me/posts</code>    <span class="note">내 게시글 목록 (JWT, page, size)</span></li>
+    <li><code>GET    /api/auth/me/wiki</code>     <span class="note">내 위키 기여 목록 (JWT, page, size)</span></li>
+    <li><code>POST   /api/auth/verify</code>      <span class="note">실명 인증 — real_name, code(6자리) (JWT)</span></li>
+  </ul>
+
+  <h2>Posts / Study</h2>
+  <ul>
+    <li><code>GET    /api/posts</code>               <span class="note">목록 (page, size, q, sort, type, category)</span></li>
+    <li><code>POST   /api/posts</code>               <span class="note">작성 (JWT) — type: post|study</span></li>
+    <li><code>GET    /api/posts/:id</code>            <span class="note">상세</span></li>
+    <li><code>PUT    /api/posts/:id</code>            <span class="note">수정 (JWT, 본인)</span></li>
+    <li><code>DELETE /api/posts/:id</code>            <span class="note">삭제 (JWT, 본인)</span></li>
+    <li><code>PATCH  /api/posts/:id/status</code>    <span class="note">모집상태 변경 (JWT)</span></li>
+  </ul>
+
+  <h2>Comments</h2>
+  <ul>
+    <li><code>GET    /api/posts/:id/comments</code>        <span class="note">댓글 목록 (트리)</span></li>
+    <li><code>POST   /api/posts/:id/comments</code>        <span class="note">댓글 작성 (JWT)</span></li>
+    <li><code>PUT    /api/posts/:id/comments/:cid</code>   <span class="note">수정 (JWT, 본인)</span></li>
+    <li><code>DELETE /api/posts/:id/comments/:cid</code>   <span class="note">삭제 (JWT, 본인)</span></li>
+  </ul>
+
+  <h2>Study Session</h2>
+  <ul>
+    <li><code>POST /api/study/start</code>              <span class="note">공부 시작 (JWT)</span></li>
+    <li><code>POST /api/study/end</code>                <span class="note">공부 종료 · duration 자동 계산 (JWT)</span></li>
+    <li><code>GET  /api/study/status</code>             <span class="note">현재 세션 상태 (JWT)</span></li>
+    <li><code>GET  /api/study/stats?period=day|week</code> <span class="note">일별·주별 통계 (JWT)</span></li>
+    <li><code>GET  /api/study/ranking?period=today|week|all</code> <span class="note">공부 시간 순위</span></li>
+    <li><code>GET  /api/study/streak</code>             <span class="note">연속 공부일 · 최장 연속 (JWT)</span></li>
+    <li><code>GET  /api/study/heatmap?days=119</code>   <span class="note">잔디 — 날짜별 공부시간 (JWT)</span></li>
+    <li><code>GET  /api/study/live</code>               <span class="note">실시간 공부 중 인원</span></li>
+    <li><code>GET  /api/study/planet</code>             <span class="note">내 행성 성장 단계 (JWT)</span></li>
+  </ul>
+
+  <h2>Keywords / Notifications</h2>
+  <ul>
+    <li><code>GET    /api/keywords</code>                     <span class="note">내 키워드 목록 (JWT)</span></li>
+    <li><code>POST   /api/keywords</code>                     <span class="note">키워드 등록 (JWT)</span></li>
+    <li><code>DELETE /api/keywords/:keyword</code>            <span class="note">키워드 삭제 (JWT)</span></li>
+    <li><code>GET    /api/notifications</code>                <span class="note">알림 목록 (JWT, page, size)</span></li>
+    <li><code>PATCH  /api/notifications/:id/read</code>       <span class="note">읽음 처리 (JWT)</span></li>
+    <li><code>PATCH  /api/notifications/read-all</code>       <span class="note">전체 읽음 (JWT)</span></li>
+  </ul>
+
+  <h2>Clans</h2>
+  <ul>
+    <li><code>GET    /api/clans</code>                        <span class="note">클랜 목록 · 기여도 랭킹</span></li>
+    <li><code>POST   /api/clans</code>                        <span class="note">클랜 생성 (JWT)</span></li>
+    <li><code>GET    /api/clans/:id</code>                    <span class="note">클랜 상세</span></li>
+    <li><code>GET    /api/clans/:id/members</code>            <span class="note">멤버 조회</span></li>
+    <li><code>POST   /api/clans/:id/join</code>               <span class="note">가입 (JWT)</span></li>
+    <li><code>DELETE /api/clans/:id/leave</code>              <span class="note">탈퇴 (JWT)</span></li>
+    <li><code>GET    /api/clans/ranking</code>                <span class="note">클랜전 — 이번 주 합산 공부시간 랭킹</span></li>
+    <li><code>GET    /api/clans/:id/battle</code>             <span class="note">클랜전 현황 · 목표 진행률 · 멤버 기여</span></li>
+    <li><code>PUT    /api/clans/:id/goal</code>               <span class="note">주간 공동 목표 설정 (JWT, 클랜장)</span></li>
+  </ul>
+
+  <h2>Wiki</h2>
+  <ul>
+    <li><code>GET    /api/wiki</code>                      <span class="note">조회수 랭킹 (period=today|week)</span></li>
+    <li><code>GET    /api/wiki/search?q=</code>            <span class="note">주제 검색</span></li>
+    <li><code>POST   /api/wiki</code>                      <span class="note">주제 생성 (JWT)</span></li>
+    <li><code>GET    /api/wiki/:slug</code>                <span class="note">위키 상세 + 조회수</span></li>
+    <li><code>PUT    /api/wiki/:slug</code>                <span class="note">수정 → 히스토리 저장 (JWT)</span></li>
+    <li><code>GET    /api/wiki/:slug/history</code>        <span class="note">수정 이력</span></li>
+    <li><code>POST   /api/wiki/:slug/rollback/:rev_id</code> <span class="note">버전 롤백 (JWT)</span></li>
+    <li><code>DELETE /api/wiki/:slug</code>               <span class="note">삭제 (관리자)</span></li>
+  </ul>
+
+  <h2>File Upload</h2>
+  <ul>
+    <li><code>POST   /api/upload</code>          <span class="note">multipart/form-data — file, ref_type?, ref_id? (JWT)</span></li>
+    <li><code>GET    /api/files/:stored</code>   <span class="note">파일 다운로드/조회</span></li>
+    <li><code>DELETE /api/files/:id</code>       <span class="note">삭제 (JWT, 본인/관리자)</span></li>
+  </ul>
+
+  <h2>Mission</h2>
+  <ul>
+    <li><code>GET  /api/missions/today</code>          <span class="note">오늘의 랜덤 미션 (JWT)</span></li>
+    <li><code>POST /api/missions/:id/done</code>       <span class="note">미션 완료 체크 (JWT)</span></li>
+    <li><code>GET  /api/missions/history</code>        <span class="note">완료 미션 이력 (JWT)</span></li>
+  </ul>
+
+  <h2>Crawling</h2>
+  <ul>
+    <li><code>GET /api/exam-schedule</code>            <span class="note">q-net 연간 시험일정 (1시간 캐시, refresh=1)</span></li>
+  </ul>
+
+  <h2>Achievements / Planet</h2>
+  <ul>
+    <li><code>GET /api/achievements</code>             <span class="note">업적 목록 + 진행률 (방문 시 달성분 자동 획득, JWT)</span></li>
+    <li><code>GET /api/study/planet</code>             <span class="note">내 행성 성장 단계 (JWT)</span></li>
+  </ul>
+
+  <h2>OCR / AI</h2>
+  <ul>
+    <li><code>POST /api/ocr</code>                      <span class="note">이미지 → 텍스트 (multipart, JWT)</span></li>
+    <li><code>POST /api/ai/chat</code>                  <span class="note">AI 챗봇 대화 (JWT)</span></li>
+    <li><code>POST /api/ai/summarize</code>             <span class="note">게시글/텍스트 요약 (JWT)</span></li>
+    <li><code>POST /api/ai/plan</code>                  <span class="note">공부 계획 추천 (JWT)</span></li>
+    <li><code>POST /api/ai/wiki-draft</code>            <span class="note">위키 초안 생성 (JWT)</span></li>
+  </ul>
+
+  <h2>Admin</h2>
+  <ul>
+    <li><code>GET    /api/admin/users</code>               <span class="note">회원 목록 (관리자)</span></li>
+    <li><code>DELETE /api/admin/users/:id</code>           <span class="note">회원 탈퇴 처리 (관리자)</span></li>
+    <li><code>PATCH  /api/admin/users/:id/admin</code>     <span class="note">권한 부여/회수 (관리자)</span></li>
+    <li><code>GET    /api/admin/posts</code>               <span class="note">전체 게시글 (관리자)</span></li>
+    <li><code>DELETE /api/admin/posts/:id</code>           <span class="note">게시글 삭제 hard=1 (관리자)</span></li>
+    <li><code>GET    /api/admin/stats</code>               <span class="note">대시보드 통계 (관리자)</span></li>
+  </ul>
+</body>
+</html>

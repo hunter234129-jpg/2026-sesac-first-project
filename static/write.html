@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>글쓰기 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container" style="max-width:760px;">
+    <div class="dash-header"><h1 id="pageTitle">글쓰기</h1></div>
+
+    <div class="alert" id="alert"></div>
+
+    <form class="card" id="writeForm">
+      <div class="field" id="typeField">
+        <label>유형</label>
+        <div class="seg" id="typeSeg">
+          <button type="button" data-type="post" class="active">일반 게시글</button>
+          <button type="button" data-type="study">스터디 모집</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="title">제목 *</label>
+        <input type="text" id="title" placeholder="제목을 입력하세요" required>
+      </div>
+
+      <div class="field">
+        <label for="category">카테고리</label>
+        <input type="text" id="category" placeholder="예: 자격증, 어학, 코딩 (선택)">
+      </div>
+
+      <!-- 스터디 전용 필드 -->
+      <div id="studyFields" class="hidden">
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <div class="field" style="flex:1; min-width:140px;">
+            <label for="recruitCount">모집 인원</label>
+            <input type="number" id="recruitCount" min="0" placeholder="0" value="0">
+          </div>
+          <div class="field" style="flex:1; min-width:140px;">
+            <label for="recruitDeadline">모집 마감일</label>
+            <input type="date" id="recruitDeadline">
+          </div>
+        </div>
+        <div class="field">
+          <label for="field">분야</label>
+          <input type="text" id="field" placeholder="예: 정보처리기사 실기 (선택)">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="content">내용</label>
+        <textarea id="content" rows="12" placeholder="내용을 입력하세요" style="resize:vertical;"></textarea>
+      </div>
+
+      <div style="display:flex; gap:8px;">
+        <button type="submit" class="btn btn-primary" id="submitBtn">등록</button>
+        <a class="btn btn-ghost" id="cancelBtn" href="/board">취소</a>
+      </div>
+    </form>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+
+    const editId  = queryParam('id');           // 있으면 수정 모드
+    const isEdit  = !!editId;
+    const alertEl = document.getElementById('alert');
+    let curType   = 'post';
+
+    const typeSeg     = document.getElementById('typeSeg');
+    const studyFields = document.getElementById('studyFields');
+
+    function setType(t) {
+      curType = t;
+      document.querySelectorAll('#typeSeg button').forEach(b =>
+        b.classList.toggle('active', b.dataset.type === t));
+      studyFields.classList.toggle('hidden', t !== 'study');
+    }
+    typeSeg.onclick = (e) => {
+      const btn = e.target.closest('button');
+      if (btn) setType(btn.dataset.type);
+    };
+
+    // 수정 모드: 기존 값 로드 + 유형 변경 잠금
+    if (isEdit) {
+      document.getElementById('pageTitle').textContent = '글 수정';
+      document.getElementById('submitBtn').textContent = '수정';
+      document.getElementById('cancelBtn').href = '/post?id=' + editId;
+      document.getElementById('typeField').classList.add('hidden'); // 유형은 변경 불가
+      (async () => {
+        try {
+          const p = await api('/api/posts/' + editId, { auth: false });
+          if (p.user_id !== Auth.userId) {
+            showAlert(alertEl, '본인 글만 수정할 수 있어요.');
+            document.getElementById('submitBtn').disabled = true;
+            return;
+          }
+          setType(p.type);
+          document.getElementById('title').value    = p.title || '';
+          document.getElementById('category').value = p.category || '';
+          document.getElementById('content').value  = p.content || '';
+        } catch (err) { showAlert(alertEl, err.message); }
+      })();
+    }
+
+    document.getElementById('writeForm').onsubmit = async (e) => {
+      e.preventDefault();
+      hideAlert(alertEl);
+      const btn = document.getElementById('submitBtn');
+      const title = document.getElementById('title').value.trim();
+      if (!title) { showAlert(alertEl, '제목을 입력해주세요.'); return; }
+      setLoading(btn, true);
+
+      try {
+        if (isEdit) {
+          // 수정: title, content, category만 지원
+          await api('/api/posts/' + editId, { method: 'PUT', body: {
+            title,
+            content:  document.getElementById('content').value,
+            category: document.getElementById('category').value.trim(),
+          }});
+          location.href = '/post?id=' + editId;
+        } else {
+          const body = {
+            type: curType,
+            title,
+            content:  document.getElementById('content').value,
+            category: document.getElementById('category').value.trim(),
+          };
+          if (curType === 'study') {
+            body.recruit_count    = +document.getElementById('recruitCount').value || 0;
+            body.recruit_deadline = document.getElementById('recruitDeadline').value || null;
+            body.field            = document.getElementById('field').value.trim();
+          }
+          const d = await api('/api/posts', { method: 'POST', body });
+          location.href = '/post?id=' + d.id;
+        }
+      } catch (err) {
+        showAlert(alertEl, err.message);
+        setLoading(btn, false, isEdit ? '수정' : '등록');
+      }
+    };
+  </script>
+</body>
+</html>

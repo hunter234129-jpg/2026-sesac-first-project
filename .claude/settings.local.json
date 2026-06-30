@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)",
+      "PowerShell(cd C:\\\\workspace\\\\flask4_module; $p = Start-Process -FilePath \".\\\\.venv\\\\Scripts\\\\python.exe\" -ArgumentList \"app.py\" -RedirectStandardOutput \"scratchpad_o.log\" -RedirectStandardError \"scratchpad_e.log\" -WindowStyle Hidden -PassThru; Start-Sleep -Seconds 3; .\\\\.venv\\\\Scripts\\\\python.exe scratchpad_wiki_test.py; Stop-Process -Id $p.Id -Force; Remove-Item \"scratchpad_o.log\",\"scratchpad_e.log\",\"scratchpad_wiki_test.py\" -ErrorAction SilentlyContinue)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(Get-ChildItem -Path \"C:\\\\workspace\\\\flask4_module\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(ConvertTo-Json)",
+      "Bash(Out-String)",
+      "Bash(python -m py_compile routes/study.py)",
+      "Bash(node --check static/js/api.js)",
+      "Bash(.venv/Scripts/python.exe -c \"from db.connection import get_db; c=get_db\\(\\); cur=c.cursor\\(\\); cur.execute\\('CREATE TABLE IF NOT EXISTS user_achievements \\(user_id INT NOT NULL, achievement_key VARCHAR\\(50\\) NOT NULL, unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY \\(user_id, achievement_key\\), FOREIGN KEY \\(user_id\\) REFERENCES users\\(id\\) ON DELETE CASCADE\\)'\\); c.commit\\(\\); c.close\\(\\); print\\('user_achievements table ready'\\)\")",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(.venv/Scripts/python.exe -m py_compile routes/clan.py routes/study.py)",
+      "Bash(.venv/Scripts/python.exe \"C:/Users/사용자/AppData/Local/Temp/claude/C--workspace-flask4-module/add4cd52-519e-47ba-b865-9c14503cca87/scratchpad/gen_erd.py\")"
+    ]
+  }
+}
