@@ -7,9 +7,5 @@ requests
 beautifulsoup4
 pytesseract
 pillow
-<<<<<<< HEAD
 anthropic
 flask-socketio
-=======
-google-genai
->>>>>>> origin/chatbot-feature
