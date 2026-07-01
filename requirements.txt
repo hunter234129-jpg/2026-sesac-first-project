@@ -5,6 +5,5 @@ python-dotenv
 PyJWT
 requests
 beautifulsoup4
-pytesseract
 pillow
 google-genai

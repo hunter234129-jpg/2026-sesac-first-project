@@ -22,7 +22,7 @@ MAX_UPLOAD_BYTES   = 10 * 1024 * 1024   # 10MB
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'docx', 'xlsx', 'pptx', 'zip'}
 
 # OCR (Tesseract)
-OCR_LANG = os.getenv('OCR_LANG', 'kor+eng')   # kor 데이터 미설치 시 자동으로 eng로 폴백
+OCR_LANG = os.getenv('OCR_LANG', 'korean')   # PaddleOCR 언어코드: korean, en, ch 등
 
 # AI 챗봇 (Gemini API)
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
