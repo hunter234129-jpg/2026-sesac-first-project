@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>접속 중인 멤버 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container" style="max-width:720px;">
+    <div class="dash-header">
+      <h1>🟢 접속 중인 멤버</h1>
+      <p>지금 접속해 있는 멤버에게 바로 채팅을 신청해보세요.</p>
+    </div>
+
+    <div class="card" id="myAvatarCard" style="margin-bottom:20px;">
+      <div id="myAvatarBox"><p class="muted" style="font-size:14px;">연결 중...</p></div>
+    </div>
+
+    <div class="card" style="padding:8px 12px;">
+      <div class="online-list" id="onlineMembersFull"><p class="muted" style="font-size:14px; padding:20px 4px;">연결 중...</p></div>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { throw new Error('redirect'); }
+    renderNav();
+  </script>
+</body>
+</html>

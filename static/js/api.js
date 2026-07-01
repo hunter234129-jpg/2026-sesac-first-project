@@ -111,11 +111,27 @@ function renderNav() {
       <a href="/board">게시판</a>
       <a href="/wiki">위키</a>
       <a href="/dashboard">대시보드</a>
+      <div class="nav-icon-wrap" id="onlineIconWrap">
+        <a href="/members" class="bell online-bell" id="onlineBell" title="접속 중인 멤버">👥<span class="bell-count hidden" id="onlineCount">0</span></a>
+        <div class="nav-dropdown hidden" id="onlineDropdown">
+          <div class="nd-head">🟢 접속 중인 멤버</div>
+          <div class="nd-list" id="onlineDropdownList"><p class="muted" style="font-size:13px;">연결 중...</p></div>
+          <a href="/members" class="nd-viewall">전체보기 →</a>
+        </div>
+      </div>
       <a href="/notifications" class="bell" id="notifBell" title="알림">🔔<span class="bell-count hidden" id="bellCount">0</span></a>
       <span class="muted">${escapeHtml(Auth.username)}님</span>
       <a href="#" id="logoutBtn">로그아웃</a>`;
     document.getElementById('logoutBtn').onclick = (e) => { e.preventDefault(); Auth.logout(); };
     startNotifPolling();
+
+    const onlineBell     = document.getElementById('onlineBell');
+    const onlineDropdown = document.getElementById('onlineDropdown');
+    onlineBell.onclick = (e) => { e.preventDefault(); onlineDropdown.classList.toggle('hidden'); };
+    document.addEventListener('click', (e) => {
+      if (!document.getElementById('onlineIconWrap')?.contains(e.target)) onlineDropdown.classList.add('hidden');
+    });
+    ensureChatWidget();
   } else {
     nav.innerHTML = `
       <a href="/board">게시판</a>
@@ -123,6 +139,21 @@ function renderNav() {
       <a href="/login">로그인</a>
       <a href="/register">회원가입</a>`;
   }
+}
+
+/* 실시간 채팅 위젯 — socket.io 클라이언트 + chat-widget.js를 필요할 때만 동적 로드 */
+function ensureChatWidget() {
+  if (window.__chatWidgetLoading) return;
+  window.__chatWidgetLoading = true;
+  const socketScript = document.createElement('script');
+  socketScript.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+  socketScript.onload = () => {
+    const widgetScript = document.createElement('script');
+    widgetScript.src = '/static/js/chat-widget.js';
+    widgetScript.onload = () => { if (window.startChatWidget) window.startChatWidget(); };
+    document.body.appendChild(widgetScript);
+  };
+  document.body.appendChild(socketScript);
 }
 
 /* 상단 알림 아이콘 — 미읽음 개수 폴링 (30초) */

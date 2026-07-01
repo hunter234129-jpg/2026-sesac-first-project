@@ -2,10 +2,12 @@ from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
 import os
 from config import MAX_UPLOAD_BYTES
+from extensions import socketio
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_BYTES
 CORS(app)
+socketio.init_app(app)
 
 from routes.auth         import auth_bp
 from routes.post         import post_bp
@@ -20,6 +22,8 @@ from routes.crawl        import crawl_bp
 from routes.admin        import admin_bp
 from routes.ocr          import ocr_bp
 from routes.ai           import ai_bp
+import sockets.chat_events  # noqa: F401  (socketio 이벤트 핸들러 등록)
+sockets.chat_events.init_app(app)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(post_bp)
@@ -51,4 +55,4 @@ def serve_page(page):
     return jsonify({'error': 'Not Found', 'code': 'NOT_FOUND'}), 404
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', debug=True)
+    socketio.run(app, host='0.0.0.0', debug=True)
