@@ -175,6 +175,22 @@ CREATE TABLE IF NOT EXISTS files (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- ── 위키 드로잉(Excalidraw 벡터 씬) ──────────────────────────────────
+-- 벡터 데이터는 여기, PNG 스냅샷은 files 테이블에 저장(DB 비대화 방지)
+CREATE TABLE IF NOT EXISTS wiki_drawings (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    wiki_id     INT          NOT NULL,
+    block_id    VARCHAR(64)  NOT NULL,   -- Tiptap 노드의 고유 id (scene_id)
+    scene_json  LONGTEXT,                -- Excalidraw elements+appState 원본(재편집용)
+    png_file_id INT          DEFAULT NULL,
+    updated_by  INT          NOT NULL,
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_wiki_block (wiki_id, block_id),
+    FOREIGN KEY (wiki_id)     REFERENCES wiki_pages(id) ON DELETE CASCADE,
+    FOREIGN KEY (png_file_id) REFERENCES files(id)      ON DELETE SET NULL,
+    FOREIGN KEY (updated_by)  REFERENCES users(id)
+);
+
 -- ── 업적(뱃지) ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_achievements (
     user_id         INT         NOT NULL,
@@ -200,3 +216,17 @@ CREATE TABLE IF NOT EXISTS user_achievements (
 --
 -- ALTER TABLE clans
 --   ADD COLUMN weekly_goal_min INT DEFAULT 600 AFTER leader_id;
+--
+-- CREATE TABLE IF NOT EXISTS wiki_drawings (
+--     id          INT AUTO_INCREMENT PRIMARY KEY,
+--     wiki_id     INT          NOT NULL,
+--     block_id    VARCHAR(64)  NOT NULL,
+--     scene_json  LONGTEXT,
+--     png_file_id INT          DEFAULT NULL,
+--     updated_by  INT          NOT NULL,
+--     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     UNIQUE KEY uq_wiki_block (wiki_id, block_id),
+--     FOREIGN KEY (wiki_id)     REFERENCES wiki_pages(id) ON DELETE CASCADE,
+--     FOREIGN KEY (png_file_id) REFERENCES files(id)      ON DELETE SET NULL,
+--     FOREIGN KEY (updated_by)  REFERENCES users(id)
+-- );

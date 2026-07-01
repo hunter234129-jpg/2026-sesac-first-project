@@ -287,46 +287,92 @@ def rollback_wiki(slug, rev_id):
     return ok({'version': next_ver}, f'v{rev["version"]}으로 롤백 완료')
 
 
-@wiki_bp.route('/api/wiki/<slug>/drawing', methods=['GET'])
-def get_wiki_drawing(slug):
-    conn   = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT drawing_data FROM wiki_pages WHERE slug = %s', (slug,))
-        row = cursor.fetchone()
-    finally:
-        conn.close()
-
-    if not row:
-        return err('위키를 찾을 수 없습니다', 'NOT_FOUND', 404)
-    return ok({'drawing': row['drawing_data']})
-
-
-@wiki_bp.route('/api/wiki/<slug>/drawing', methods=['PUT'])
+@wiki_bp.route('/api/wiki/<slug>/autosave', methods=['PATCH'])
 @login_required
-def save_wiki_drawing(slug):
+def autosave_wiki(slug):
+    """실시간 편집 중 주기적 자동 저장 — 새 버전을 만들지 않고 최신 리비전 내용만 덮어쓴다."""
     data    = request.get_json() or {}
-    drawing = data.get('drawing')   # base64 data URL 또는 None(지우기)
-
-    # 과도한 용량 방지 (~3MB)
-    if drawing and len(drawing) > 3_000_000:
-        return err('드로잉 데이터가 너무 큽니다', 'TOO_LARGE', 413)
+    content = data.get('content', '')
 
     conn   = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute('SELECT id FROM wiki_pages WHERE slug = %s', (slug,))
-        if not cursor.fetchone():
+        wiki = cursor.fetchone()
+        if not wiki:
             return err('위키를 찾을 수 없습니다', 'NOT_FOUND', 404)
+
         cursor.execute(
-            'UPDATE wiki_pages SET drawing_data = %s WHERE slug = %s',
-            (drawing, slug)
+            '''UPDATE wiki_revisions SET content = %s
+               WHERE wiki_id = %s
+               ORDER BY version DESC LIMIT 1''',
+            (content, wiki['id'])
         )
         conn.commit()
     finally:
         conn.close()
 
-    return ok({}, '드로잉 저장 완료')
+    return ok({}, '자동 저장 완료')
+
+
+@wiki_bp.route('/api/wiki/<slug>/drawings/<block_id>', methods=['GET'])
+def get_wiki_drawing_block(slug, block_id):
+    conn   = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            '''SELECT d.scene_json, d.updated_at, f.stored_name
+               FROM wiki_pages w
+               JOIN wiki_drawings d ON d.wiki_id = w.id AND d.block_id = %s
+               LEFT JOIN files f    ON f.id = d.png_file_id
+               WHERE w.slug = %s''',
+            (block_id, slug)
+        )
+        row = cursor.fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        return ok({'scene_json': None, 'image_url': None})
+    return ok({
+        'scene_json': row['scene_json'],
+        'image_url':  f'/api/files/{row["stored_name"]}' if row['stored_name'] else None,
+    })
+
+
+@wiki_bp.route('/api/wiki/<slug>/drawings/<block_id>', methods=['PUT'])
+@login_required
+def save_wiki_drawing_block(slug, block_id):
+    data       = request.get_json() or {}
+    scene_json = data.get('scene_json', '')
+    png_file_id = data.get('png_file_id')
+
+    # 벡터 데이터 자체는 DB에 남되, 과도한 용량은 방지 (~2MB)
+    if scene_json and len(scene_json) > 2_000_000:
+        return err('그림 데이터가 너무 큽니다', 'TOO_LARGE', 413)
+
+    conn   = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT id FROM wiki_pages WHERE slug = %s', (slug,))
+        wiki = cursor.fetchone()
+        if not wiki:
+            return err('위키를 찾을 수 없습니다', 'NOT_FOUND', 404)
+
+        cursor.execute(
+            '''INSERT INTO wiki_drawings (wiki_id, block_id, scene_json, png_file_id, updated_by)
+               VALUES (%s, %s, %s, %s, %s)
+               ON DUPLICATE KEY UPDATE
+                 scene_json  = VALUES(scene_json),
+                 png_file_id = VALUES(png_file_id),
+                 updated_by  = VALUES(updated_by)''',
+            (wiki['id'], block_id, scene_json, png_file_id, g.user_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return ok({}, '그림 저장 완료')
 
 
 @wiki_bp.route('/api/wiki/<slug>', methods=['DELETE'])

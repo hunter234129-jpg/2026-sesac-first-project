@@ -49,47 +49,23 @@
       <div class="wiki-doc card mt-16" id="docCard">
         <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
       </div>
-      <!-- 편집 영역 -->
-      <div class="card mt-16" id="editCard" style="display:none;">
-        <div class="section-head">
-          <h2 id="editTitle">편집</h2>
-          <button class="btn btn-ghost" id="aiDraftBtn" style="padding:7px 14px;">🛰️ AI 초안 생성</button>
-        </div>
-        <div class="field">
-          <textarea id="editContent" rows="16" style="resize:vertical;" placeholder="내용을 입력하세요 (자유 형식)"></textarea>
-        </div>
-        <div class="field">
-          <label for="editSummary">변경 요약</label>
-          <input type="text" id="editSummary" placeholder="예: 오타 수정, 예제 추가" maxlength="200">
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn btn-primary" id="saveEditBtn">저장</button>
-          <button class="btn btn-ghost" id="cancelEditBtn">취소</button>
-        </div>
-      </div>
       <!-- 이력 영역 -->
       <div class="card section mt-16" id="historyCard" style="display:none;">
         <div class="section-head"><h2>수정 이력</h2></div>
         <div id="historyList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
       </div>
-
-      <!-- 낙서(드로잉) 영역 -->
-      <div class="card section mt-16" id="drawCard" style="display:none;">
-        <div class="section-head"><h2>🎨 낙서</h2></div>
-        <div class="draw-toolbar">
-          <input type="color" id="drawColor" value="#1f6feb" title="색상">
-          <input type="range" id="drawSize" min="1" max="40" value="4" title="굵기">
-          <button class="btn btn-ghost" id="eraserBtn" style="padding:6px 12px;">지우개</button>
-          <button class="btn btn-ghost" id="clearBtn" style="padding:6px 12px;">전체 지우기</button>
-          <button class="btn btn-primary" id="saveDrawBtn" style="padding:6px 14px; margin-left:auto;">저장</button>
-        </div>
-        <canvas id="drawCanvas"></canvas>
-      </div>
     </div>
   </div>
 
   <script src="/static/js/api.js"></script>
-  <script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="/static/js/excalidraw-modal.js"></script>
+  <script type="module" src="/static/js/wiki-editor.js"></script>
+  <script type="module">
+    // module 스크립트끼리는 문서 순서대로 실행이 보장되므로(타이머 폴링과 달리
+    // 백그라운드 탭 스로틀링의 영향을 받지 않음), wiki-editor.js 다음에 이 스크립트가
+    // 오는 것만으로 window.WikiEditor가 이미 준비돼 있음이 보장된다.
     renderNav();
     const alertEl = document.getElementById('alert');
     const slug    = queryParam('slug');
@@ -190,9 +166,8 @@
 
     async function loadDoc() {
       const card = document.getElementById('docCard');
-      // 편집/이력 닫기
-      document.getElementById('editCard').style.display = 'none';
       document.getElementById('historyCard').style.display = 'none';
+      if (window.WikiEditor) await WikiEditor.destroy();
       try {
         const w = await api('/api/wiki/' + encodeURIComponent(slug), { auth: false });
         curDoc = w;
@@ -203,8 +178,6 @@
             <div class="wd-title">${escapeHtml(w.title)}</div>
             <div class="wd-actions">
               <button class="btn btn-ghost" id="historyBtn" style="padding:7px 14px;">이력</button>
-              <button class="btn btn-ghost" id="drawBtn" style="padding:7px 14px;">🎨 낙서</button>
-              ${canEdit ? `<button class="btn btn-primary" id="editBtn" style="padding:7px 14px;">편집</button>` : ''}
               ${isAdmin ? `<button class="btn btn-danger" id="delBtn" style="padding:7px 14px;">삭제</button>` : ''}
             </div>
           </div>
@@ -214,47 +187,41 @@
             <span>🔧 최종: ${escapeHtml(w.last_editor)}</span>
             <span>👁 조회 ${w.view_count}</span>
             <span>🕒 ${(w.last_updated||'').replace('T',' ').slice(0,16)}</span>
+            <span class="live-dot" title="실시간 연결됨">●</span>
+            <span class="muted" id="syncStatus" style="font-size:12px;"></span>
           </div>
-          <div class="wiki-content">${w.content ? escapeHtml(w.content) : '<span class="muted">아직 내용이 없어요. 편집을 눌러 첫 내용을 작성해보세요.</span>'}</div>`;
+          <div id="editorMount" class="tiptap-mount"></div>`;
 
-        const eb = document.getElementById('editBtn');
-        if (eb) eb.onclick = openEdit;
         document.getElementById('historyBtn').onclick = toggleHistory;
-        document.getElementById('drawBtn').onclick = toggleDraw;
         const db = document.getElementById('delBtn');
         if (db) db.onclick = async () => {
           if (!confirm('이 위키를 삭제할까요? (되돌릴 수 없어요)')) return;
           try { await api('/api/wiki/' + encodeURIComponent(slug), { method: 'DELETE' }); location.href = '/wiki'; }
           catch (err) { showAlert(alertEl, err.message); }
         };
+
+        // 보기/편집 구분 없이 항상 같은 실시간 세션을 연다 — 로그인 사용자는 바로 입력 가능
+        // (서식/삽입 도구모음은 wiki-editor.js가 입력 영역 위에 직접 붙인다),
+        // 아닌 사람은 읽기 전용으로 보되 남의 변경이 새로고침 없이 그대로 반영된다.
+        const syncEl = document.getElementById('syncStatus');
+        if (syncEl) syncEl.textContent = canEdit ? '동기화 중...' : '';
+        await WikiEditor.mount({
+          container: document.getElementById('editorMount'),
+          slug, initialContent: w.content, username: Auth.username, editable: canEdit, title: w.title,
+        });
+        if (syncEl) syncEl.textContent = canEdit ? '자동 저장 켜짐' : '';
       } catch (err) {
         card.innerHTML = `<p class="muted text-center" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
       }
     }
-
-    function openEdit() {
-      const ec = document.getElementById('editCard');
-      ec.style.display = 'block';
-      document.getElementById('editContent').value = curDoc.content || '';
-      document.getElementById('editSummary').value = '';
-      ec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    document.getElementById('cancelEditBtn').onclick = () => {
-      document.getElementById('editCard').style.display = 'none';
-    };
-    document.getElementById('saveEditBtn').onclick = async () => {
-      const btn = document.getElementById('saveEditBtn');
-      setLoading(btn, true);
-      try {
-        await api('/api/wiki/' + encodeURIComponent(slug), { method: 'PUT', body: {
-          content: document.getElementById('editContent').value,
-          summary: document.getElementById('editSummary').value.trim() || '내용 수정',
-        }});
-        await loadDoc();
-        showAlert(alertEl, '저장됐어요.', 'success');
-      } catch (err) { showAlert(alertEl, err.message); }
-      finally { setLoading(btn, false, '저장'); }
-    };
+    window.addEventListener('wiki:autosaved', () => {
+      const el = document.getElementById('syncStatus');
+      if (el) el.textContent = '자동 저장됨 · ' + new Date().toLocaleTimeString();
+    });
+    window.addEventListener('wiki:snapshotted', () => {
+      const el = document.getElementById('syncStatus');
+      if (el) el.textContent = '버전 기록됨 · ' + new Date().toLocaleTimeString();
+    });
 
     let historyOpen = false;
     async function toggleHistory() {
@@ -290,68 +257,6 @@
           };
         });
       } catch (err) { el.innerHTML = `<p class="muted" style="font-size:14px;">${escapeHtml(err.message)}</p>`; }
-    }
-
-    /* ── AI 초안 생성 ── */
-    document.getElementById('aiDraftBtn').onclick = async () => {
-      const btn = document.getElementById('aiDraftBtn');
-      const title = curDoc ? curDoc.title : (slug || '');
-      if (!confirm('AI가 생성한 초안으로 편집창을 채울까요? (기존 입력은 덮어써져요)')) return;
-      setLoading(btn, true);
-      try {
-        const d = await api('/api/ai/wiki-draft', { method: 'POST', body: { title } });
-        document.getElementById('editContent').value = d.draft;
-        showAlert(alertEl, 'AI 초안을 채웠어요. 검토 후 저장하세요.', 'success');
-      } catch (err) { showAlert(alertEl, err.message); }
-      finally { setLoading(btn, false, '🛰️ AI 초안 생성'); }
-    };
-
-    /* ── 낙서 캔버스 ── */
-    let drawOpen = false, drawInit = false, drawing = false, erasing = false;
-    function toggleDraw() {
-      const card = document.getElementById('drawCard');
-      drawOpen = !drawOpen;
-      card.style.display = drawOpen ? 'block' : 'none';
-      if (drawOpen) { setupDraw(); loadDrawing(); card.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-    }
-    function setupDraw() {
-      if (drawInit) return; drawInit = true;
-      const cv = document.getElementById('drawCanvas');
-      const ctx = cv.getContext('2d');
-      cv.width = cv.getBoundingClientRect().width; cv.height = 360;
-      ctx.fillStyle = '#fbfcff'; ctx.fillRect(0, 0, cv.width, cv.height);
-      cv._ctx = ctx;
-      const pos = (e) => { const r = cv.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: t.clientX - r.left, y: t.clientY - r.top }; };
-      const start = (e) => { e.preventDefault(); drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
-      const move = (e) => {
-        if (!drawing) return; e.preventDefault(); const p = pos(e);
-        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        ctx.strokeStyle = erasing ? '#fbfcff' : document.getElementById('drawColor').value;
-        ctx.lineWidth = erasing ? 24 : +document.getElementById('drawSize').value;
-        ctx.lineTo(p.x, p.y); ctx.stroke();
-      };
-      const end = () => { drawing = false; };
-      cv.addEventListener('mousedown', start); cv.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
-      cv.addEventListener('touchstart', start, { passive: false }); cv.addEventListener('touchmove', move, { passive: false }); cv.addEventListener('touchend', end);
-      document.getElementById('eraserBtn').onclick = (e) => { erasing = !erasing; e.target.classList.toggle('btn-primary', erasing); };
-      document.getElementById('clearBtn').onclick = () => { ctx.fillStyle = '#fbfcff'; ctx.fillRect(0, 0, cv.width, cv.height); };
-      document.getElementById('saveDrawBtn').onclick = async () => {
-        const btn = document.getElementById('saveDrawBtn'); setLoading(btn, true);
-        try { await api('/api/wiki/' + encodeURIComponent(slug) + '/drawing', { method: 'PUT', body: { drawing: cv.toDataURL('image/png') } }); showAlert(alertEl, '낙서를 저장했어요.', 'success'); }
-        catch (err) { showAlert(alertEl, err.message); }
-        finally { setLoading(btn, false, '저장'); }
-      };
-    }
-    async function loadDrawing() {
-      try {
-        const d = await api('/api/wiki/' + encodeURIComponent(slug) + '/drawing', { auth: false });
-        if (d.drawing) {
-          const cv = document.getElementById('drawCanvas'); const ctx = cv._ctx;
-          const img = new Image();
-          img.onload = () => { ctx.fillStyle = '#fbfcff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.drawImage(img, 0, 0, cv.width, cv.height); };
-          img.src = d.drawing;
-        }
-      } catch (_) {}
     }
 
     /* ── 라우팅 ── */
