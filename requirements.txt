@@ -9,3 +9,4 @@ pytesseract
 pillow
 anthropic
 flask-socketio
+google-genai
