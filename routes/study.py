@@ -1,5 +1,8 @@
 from flask import Blueprint, jsonify, request, g
+<<<<<<< HEAD
 from datetime import timedelta
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 from db.connection import get_db
 from utils.auth import login_required
 
@@ -63,6 +66,7 @@ def end_study():
 
         cursor.execute('SELECT duration_sec FROM study_sessions WHERE id = %s', (session['id'],))
         duration = cursor.fetchone()['duration_sec']
+<<<<<<< HEAD
 
         # 클랜 기여도 누적 (분 단위) — 가입한 모든 클랜에 반영
         mins = (duration or 0) // 60
@@ -72,6 +76,8 @@ def end_study():
                 (mins, g.user_id)
             )
             conn.commit()
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     finally:
         conn.close()
 
@@ -183,6 +189,7 @@ def study_ranking():
         conn.close()
 
     return ok({'ranking': ranking, 'period': period})
+<<<<<<< HEAD
 
 
 # ── 연속 공부(스트릭) ──────────────────────────────────────────────
@@ -368,3 +375,5 @@ def study_planet():
         'progress':       round(progress, 3),
         'stages':         PLANET_STAGES,
     })
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed

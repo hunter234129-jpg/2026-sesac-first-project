@@ -16,6 +16,7 @@
   </style>
 </head>
 <body>
+<<<<<<< HEAD
   <!-- 관리자 전용 가드 -->
   <script src="/static/js/api.js"></script>
   <script>
@@ -23,6 +24,8 @@
     else if (!Auth.isAdmin)    location.replace('/dashboard');
   </script>
 
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
   <h1>스터디 게시판 API</h1>
   <p>● Server running on 192.168.56.102</p>
 
@@ -63,10 +66,13 @@
     <li><code>GET  /api/study/status</code>             <span class="note">현재 세션 상태 (JWT)</span></li>
     <li><code>GET  /api/study/stats?period=day|week</code> <span class="note">일별·주별 통계 (JWT)</span></li>
     <li><code>GET  /api/study/ranking?period=today|week|all</code> <span class="note">공부 시간 순위</span></li>
+<<<<<<< HEAD
     <li><code>GET  /api/study/streak</code>             <span class="note">연속 공부일 · 최장 연속 (JWT)</span></li>
     <li><code>GET  /api/study/heatmap?days=119</code>   <span class="note">잔디 — 날짜별 공부시간 (JWT)</span></li>
     <li><code>GET  /api/study/live</code>               <span class="note">실시간 공부 중 인원</span></li>
     <li><code>GET  /api/study/planet</code>             <span class="note">내 행성 성장 단계 (JWT)</span></li>
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
   </ul>
 
   <h2>Keywords / Notifications</h2>
@@ -87,9 +93,12 @@
     <li><code>GET    /api/clans/:id/members</code>            <span class="note">멤버 조회</span></li>
     <li><code>POST   /api/clans/:id/join</code>               <span class="note">가입 (JWT)</span></li>
     <li><code>DELETE /api/clans/:id/leave</code>              <span class="note">탈퇴 (JWT)</span></li>
+<<<<<<< HEAD
     <li><code>GET    /api/clans/ranking</code>                <span class="note">클랜전 — 이번 주 합산 공부시간 랭킹</span></li>
     <li><code>GET    /api/clans/:id/battle</code>             <span class="note">클랜전 현황 · 목표 진행률 · 멤버 기여</span></li>
     <li><code>PUT    /api/clans/:id/goal</code>               <span class="note">주간 공동 목표 설정 (JWT, 클랜장)</span></li>
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
   </ul>
 
   <h2>Wiki</h2>
@@ -123,6 +132,7 @@
     <li><code>GET /api/exam-schedule</code>            <span class="note">q-net 연간 시험일정 (1시간 캐시, refresh=1)</span></li>
   </ul>
 
+<<<<<<< HEAD
   <h2>Achievements / Planet</h2>
   <ul>
     <li><code>GET /api/achievements</code>             <span class="note">업적 목록 + 진행률 (방문 시 달성분 자동 획득, JWT)</span></li>
@@ -138,6 +148,8 @@
     <li><code>POST /api/ai/wiki-draft</code>            <span class="note">위키 초안 생성 (JWT)</span></li>
   </ul>
 
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
   <h2>Admin</h2>
   <ul>
     <li><code>GET    /api/admin/users</code>               <span class="note">회원 목록 (관리자)</span></li>

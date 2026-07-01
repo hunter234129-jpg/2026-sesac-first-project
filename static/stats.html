@@ -25,6 +25,7 @@
       <div class="sc"><div class="sc-label">일 평균(7일)</div><div class="sc-value" id="sumAvg">-</div></div>
     </div>
 
+<<<<<<< HEAD
     <!-- 연속 공부 + 잔디 -->
     <div class="card section">
       <div class="section-head"><h2>🔥 연속 공부 &amp; 잔디</h2><span class="muted" id="heatHint" style="font-size:12px;"></span></div>
@@ -39,6 +40,8 @@
         많음</div>
     </div>
 
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     <!-- 차트 -->
     <div class="card section">
       <div class="section-head">
@@ -202,6 +205,7 @@
       loadRanking(tab.dataset.r);
     };
 
+<<<<<<< HEAD
     /* ── 연속 공부 + 잔디 ── */
     function ymd(d) {
       return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -258,6 +262,10 @@
     loadSummary();
     loadStreak();
     loadHeatmap();
+=======
+    /* ── 초기 로드 ── */
+    loadSummary();
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     loadChart('day');
     loadRanking('today');
   </script>

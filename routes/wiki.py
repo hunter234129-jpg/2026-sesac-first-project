@@ -287,6 +287,7 @@ def rollback_wiki(slug, rev_id):
     return ok({'version': next_ver}, f'v{rev["version"]}으로 롤백 완료')
 
 
+<<<<<<< HEAD
 @wiki_bp.route('/api/wiki/<slug>/autosave', methods=['PATCH'])
 @login_required
 def autosave_wiki(slug):
@@ -328,11 +329,20 @@ def get_wiki_drawing_block(slug, block_id):
                WHERE w.slug = %s''',
             (block_id, slug)
         )
+=======
+@wiki_bp.route('/api/wiki/<slug>/drawing', methods=['GET'])
+def get_wiki_drawing(slug):
+    conn   = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT drawing_data FROM wiki_pages WHERE slug = %s', (slug,))
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
         row = cursor.fetchone()
     finally:
         conn.close()
 
     if not row:
+<<<<<<< HEAD
         return ok({'scene_json': None, 'image_url': None})
     return ok({
         'scene_json': row['scene_json'],
@@ -350,11 +360,27 @@ def save_wiki_drawing_block(slug, block_id):
     # 벡터 데이터 자체는 DB에 남되, 과도한 용량은 방지 (~2MB)
     if scene_json and len(scene_json) > 2_000_000:
         return err('그림 데이터가 너무 큽니다', 'TOO_LARGE', 413)
+=======
+        return err('위키를 찾을 수 없습니다', 'NOT_FOUND', 404)
+    return ok({'drawing': row['drawing_data']})
+
+
+@wiki_bp.route('/api/wiki/<slug>/drawing', methods=['PUT'])
+@login_required
+def save_wiki_drawing(slug):
+    data    = request.get_json() or {}
+    drawing = data.get('drawing')   # base64 data URL 또는 None(지우기)
+
+    # 과도한 용량 방지 (~3MB)
+    if drawing and len(drawing) > 3_000_000:
+        return err('드로잉 데이터가 너무 큽니다', 'TOO_LARGE', 413)
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 
     conn   = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute('SELECT id FROM wiki_pages WHERE slug = %s', (slug,))
+<<<<<<< HEAD
         wiki = cursor.fetchone()
         if not wiki:
             return err('위키를 찾을 수 없습니다', 'NOT_FOUND', 404)
@@ -367,12 +393,23 @@ def save_wiki_drawing_block(slug, block_id):
                  png_file_id = VALUES(png_file_id),
                  updated_by  = VALUES(updated_by)''',
             (wiki['id'], block_id, scene_json, png_file_id, g.user_id)
+=======
+        if not cursor.fetchone():
+            return err('위키를 찾을 수 없습니다', 'NOT_FOUND', 404)
+        cursor.execute(
+            'UPDATE wiki_pages SET drawing_data = %s WHERE slug = %s',
+            (drawing, slug)
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
         )
         conn.commit()
     finally:
         conn.close()
 
+<<<<<<< HEAD
     return ok({}, '그림 저장 완료')
+=======
+    return ok({}, '드로잉 저장 완료')
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 
 
 @wiki_bp.route('/api/wiki/<slug>', methods=['DELETE'])

@@ -108,7 +108,10 @@ function renderNav() {
   if (!nav) return;
   if (Auth.isLoggedIn) {
     nav.innerHTML = `
+<<<<<<< HEAD
       <a href="/stats" class="live-badge" id="liveBadge" title="지금 공부 중인 사람 수">🛰️ <b id="liveCount">·</b><span class="live-word">공부 중</span></a>
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
       <a href="/board">게시판</a>
       <a href="/wiki">위키</a>
       <a href="/dashboard">대시보드</a>
@@ -119,13 +122,19 @@ function renderNav() {
     startNotifPolling();
   } else {
     nav.innerHTML = `
+<<<<<<< HEAD
       <a href="/stats" class="live-badge" id="liveBadge" title="지금 공부 중인 사람 수">🛰️ <b id="liveCount">·</b><span class="live-word">공부 중</span></a>
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
       <a href="/board">게시판</a>
       <a href="/wiki">위키</a>
       <a href="/login">로그인</a>
       <a href="/register">회원가입</a>`;
   }
+<<<<<<< HEAD
   startLivePolling();
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 }
 
 /* 상단 알림 아이콘 — 미읽음 개수 폴링 (30초) */
@@ -146,6 +155,7 @@ function startNotifPolling() {
   _notifTimer = setInterval(updateBell, 30000);
 }
 
+<<<<<<< HEAD
 /* 상단 "지금 N명 공부 중" — 실시간 인원 폴링 (20초, 비회원 포함) */
 let _liveTimer = null;
 async function updateLive() {
@@ -164,6 +174,8 @@ function startLivePolling() {
   _liveTimer = setInterval(updateLive, 20000);
 }
 
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => (
     { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]

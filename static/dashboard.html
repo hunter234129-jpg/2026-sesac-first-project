@@ -27,7 +27,10 @@
         <button class="btn btn-ghost btn-lg hidden" id="endStudyBtn">■ 공부 종료</button>
       </div>
       <p class="muted mt-16" id="totalStudy" style="font-size:14px;"></p>
+<<<<<<< HEAD
       <p class="muted" id="streakLine" style="font-size:13px; margin-top:6px;"></p>
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     </div>
 
     <!-- 오늘의 미션 + 알림 -->
@@ -52,15 +55,22 @@
       <a class="tile" href="/wiki"><span class="icon">📚</span><span class="title">위키</span><span class="desc">함께 만드는 학습 자료</span></a>
       <a class="tile" href="/stats"><span class="icon">📊</span><span class="title">공부 통계</span><span class="desc">일별·주별 시간 · 랭킹</span></a>
       <a class="tile" href="/clans"><span class="icon">🛡️</span><span class="title">클랜</span><span class="desc">스터디 그룹 · 기여도</span></a>
+<<<<<<< HEAD
       <a class="tile" href="/achievements"><span class="icon">🏅</span><span class="title">업적</span><span class="desc" id="achTileDesc">뱃지 수집 · 도전 과제</span></a>
       <a class="tile" href="/planet"><span class="icon">🪐</span><span class="title">내 행성</span><span class="desc" id="planetTileDesc">공부로 키우는 나의 우주</span></a>
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
       <a class="tile" href="/chat"><span class="icon">🛰️</span><span class="title">AI 도우미</span><span class="desc">질문 · 학습 계획 추천</span></a>
       <a class="tile" href="/ocr"><span class="icon">🔭</span><span class="title">OCR</span><span class="desc">교재 사진 → 텍스트 변환</span></a>
       <a class="tile" href="/missions"><span class="icon">🎯</span><span class="title">미션</span><span class="desc">오늘의 공부 미션</span></a>
       <a class="tile" href="/exam"><span class="icon">🗓️</span><span class="title">시험 일정</span><span class="desc">Q-net 연간 일정</span></a>
       <a class="tile" href="/mypage"><span class="icon">👤</span><span class="title">마이페이지</span><span class="desc">프로필 · 내 활동</span></a>
       <a class="tile" id="adminTile" href="/admin" style="display:none;"><span class="icon">🛸</span><span class="title">관리자</span><span class="desc">회원 · 게시글 관리</span></a>
+<<<<<<< HEAD
       <a class="tile" id="apiDocsTile" href="/api-docs" style="display:none;"><span class="icon">🔌</span><span class="title">API 문서</span><span class="desc">개발자용 엔드포인트 목록</span></a>
+=======
+      <a class="tile" href="/api-docs"><span class="icon">🔌</span><span class="title">API 문서</span><span class="desc">개발자용 엔드포인트 목록</span></a>
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     </div>
   </div>
 
@@ -69,10 +79,14 @@
     if (!Auth.require()) { /* 로그인 페이지로 이동됨 */ }
     renderNav();
     document.getElementById('greeting').textContent = `안녕하세요, ${Auth.username}님 👋`;
+<<<<<<< HEAD
     if (Auth.isAdmin) {
       document.getElementById('adminTile').style.display = '';
       document.getElementById('apiDocsTile').style.display = '';
     }
+=======
+    if (Auth.isAdmin) document.getElementById('adminTile').style.display = '';
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 
     /* ── 스터디 타이머 ── */
     const timerEl = document.getElementById('timer');
@@ -111,7 +125,10 @@
       try {
         await api('/api/study/start', { method: 'POST' });
         runTimer(0);
+<<<<<<< HEAD
         loadStreak();
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
       } catch (e) { alert(e.message); }
       finally { setLoading(startBtn, false, '▶ 공부 시작'); }
     };
@@ -121,7 +138,10 @@
         const d = await api('/api/study/end', { method: 'POST' });
         stopTimer();
         loadTotal();
+<<<<<<< HEAD
         loadStreak();
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
         alert(`수고했어요! 이번 세션 ${fmt(d.duration_sec)} 공부했어요.`);
       } catch (e) { alert(e.message); }
       finally { setLoading(endBtn, false, '■ 공부 종료'); }
@@ -145,6 +165,7 @@
     }
     loadTotal();
 
+<<<<<<< HEAD
     /* ── 연속 공부(스트릭) ── */
     async function loadStreak() {
       try {
@@ -172,6 +193,8 @@
       } catch (_) {}
     })();
 
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     /* ── 오늘의 미션 ── */
     (async () => {
       const body = document.getElementById('missionBody');

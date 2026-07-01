@@ -10,6 +10,7 @@
       "Bash(Get-ChildItem -Path \"C:\\\\workspace\\\\flask4_module\" -Recurse -Force)",
       "Bash(Select-Object FullName)",
       "Bash(ConvertTo-Json)",
+<<<<<<< HEAD
       "Bash(Out-String)",
       "Bash(python -m py_compile routes/study.py)",
       "Bash(node --check static/js/api.js)",
@@ -17,6 +18,9 @@
       "Bash(.venv/Scripts/python.exe -c ' *)",
       "Bash(.venv/Scripts/python.exe -m py_compile routes/clan.py routes/study.py)",
       "Bash(.venv/Scripts/python.exe \"C:/Users/사용자/AppData/Local/Temp/claude/C--workspace-flask4-module/add4cd52-519e-47ba-b865-9c14503cca87/scratchpad/gen_erd.py\")"
+=======
+      "Bash(Out-String)"
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     ]
   }
 }

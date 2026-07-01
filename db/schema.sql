@@ -1,5 +1,9 @@
 -- 스터디 게시판 DB 초기화
+<<<<<<< HEAD
 -- 실행: mysql -h 192.168.56.102 -u scott -p < db/schema.sql
+=======
+-- 실행: mysql -h 192.168.56.101 -u scott -p < db/schema.sql
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 --
 -- 기존 DB가 있는 경우 맨 아래 Migration 섹션 참고
 
@@ -123,12 +127,20 @@ CREATE TABLE IF NOT EXISTS study_sessions (
 
 -- ── 클랜 ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS clans (
+<<<<<<< HEAD
     id              INT AUTO_INCREMENT PRIMARY KEY,
     name            VARCHAR(100) NOT NULL UNIQUE,
     description     TEXT         DEFAULT NULL,
     leader_id       INT          NOT NULL,
     weekly_goal_min INT          DEFAULT 600,   -- 주간 공동 목표(분), 기본 10시간
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+=======
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT         DEFAULT NULL,
+    leader_id   INT          NOT NULL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     FOREIGN KEY (leader_id) REFERENCES users(id)
 );
 
@@ -175,6 +187,7 @@ CREATE TABLE IF NOT EXISTS files (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+<<<<<<< HEAD
 -- ── 위키 드로잉(Excalidraw 벡터 씬) ──────────────────────────────────
 -- 벡터 데이터는 여기, PNG 스냅샷은 files 테이블에 저장(DB 비대화 방지)
 CREATE TABLE IF NOT EXISTS wiki_drawings (
@@ -200,6 +213,8 @@ CREATE TABLE IF NOT EXISTS user_achievements (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 -- ── Migration (기존 DB 보유 시 실행) ─────────────────────────────────
 -- ALTER TABLE users
 --   ADD COLUMN real_name         VARCHAR(50)  DEFAULT NULL AFTER password_hash,
@@ -213,6 +228,7 @@ CREATE TABLE IF NOT EXISTS user_achievements (
 --
 -- ALTER TABLE wiki_pages
 --   ADD COLUMN drawing_data LONGTEXT DEFAULT NULL AFTER view_count;
+<<<<<<< HEAD
 --
 -- ALTER TABLE clans
 --   ADD COLUMN weekly_goal_min INT DEFAULT 600 AFTER leader_id;
@@ -230,3 +246,5 @@ CREATE TABLE IF NOT EXISTS user_achievements (
 --     FOREIGN KEY (png_file_id) REFERENCES files(id)      ON DELETE SET NULL,
 --     FOREIGN KEY (updated_by)  REFERENCES users(id)
 -- );
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed

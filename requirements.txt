@@ -8,8 +8,12 @@ beautifulsoup4
 pytesseract
 pillow
 <<<<<<< HEAD
+<<<<<<< HEAD
 anthropic
 flask-socketio
 =======
 google-genai
 >>>>>>> origin/chatbot-feature
+=======
+anthropic
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed

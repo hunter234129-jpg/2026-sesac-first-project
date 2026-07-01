@@ -176,6 +176,7 @@ def leave_clan(clan_id):
         conn.close()
 
     return ok({}, '클랜 탈퇴 완료')
+<<<<<<< HEAD
 
 
 # 이번 주 합산 공부시간(초) 식 — 클랜전 공통
@@ -304,3 +305,5 @@ def set_clan_goal(clan_id):
         conn.close()
 
     return ok({'weekly_goal_min': goal}, '주간 목표가 설정됐어요')
+=======
+>>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
