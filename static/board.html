@@ -8,10 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
       <div>
@@ -42,10 +45,13 @@
 
     <div class="pagination" id="pagination"></div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
+    renderRail('board');
 
     const state = { page: 1, size: 10, type: '', q: '', sort: 'latest' };
     const listEl = document.getElementById('postList');
@@ -104,15 +110,17 @@
         }
         listEl.innerHTML = posts.map(p => `
           <a class="post-item" href="/post?id=${p.id}">
-            <div class="pi-main">
-              <div class="pi-title">${typeBadge(p.type)}${statusBadge(p)} ${escapeHtml(p.title)}</div>
-              <div class="pi-meta">
-                <span>${escapeHtml(p.author)}</span>
-                ${p.category ? `<span>· ${escapeHtml(p.category)}</span>` : ''}
-                <span>· ${(p.created_at || '').slice(0, 10)}</span>
-              </div>
+            <div class="pi-top">
+              ${typeBadge(p.type)}${statusBadge(p)}
+              <span class="pi-views"><strong>${p.view_count}</strong> 조회</span>
             </div>
-            <div class="pi-views"><strong>${p.view_count}</strong>조회</div>
+            <div class="pi-title">${escapeHtml(p.title)}</div>
+            <div class="pi-meta">
+              <span class="pi-avatar">${escapeHtml((p.author || '?')[0].toUpperCase())}</span>
+              <span class="pi-author">${escapeHtml(p.author)}</span>
+              ${p.category ? `<span class="pi-cat">· ${escapeHtml(p.category)}</span>` : ''}
+              <span class="pi-date">${(p.created_at || '').slice(0, 10)}</span>
+            </div>
           </a>`).join('');
         renderPagination(d.page, d.total_pages);
       } catch (err) {

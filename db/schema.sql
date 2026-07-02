@@ -226,6 +226,29 @@ CREATE TABLE IF NOT EXISTS user_achievements (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- ── 공부 로드맵(교육과정 단원 순서) ──────────────────────────────────
+-- 콘텐츠(과목별 단원)는 db/seed_curriculum.py로 채움
+CREATE TABLE IF NOT EXISTS curriculum_topics (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    subject     ENUM('국어','영어','수학') NOT NULL,
+    grade       ENUM('중1','중2','중3','고1','고2','고3') NOT NULL,
+    step_order  INT          NOT NULL,   -- 과목 내 전체 학습 순서(학년 관통)
+    unit_name   VARCHAR(100) NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_subject_order (subject, step_order)
+);
+
+CREATE TABLE IF NOT EXISTS user_topic_progress (
+    user_id    INT NOT NULL,
+    topic_id   INT NOT NULL,
+    is_done    TINYINT(1) DEFAULT 0,
+    done_at    DATETIME   DEFAULT NULL,
+    PRIMARY KEY (user_id, topic_id),
+    FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+);
+
 -- ── Migration (기존 DB 보유 시 실행) ─────────────────────────────────
 -- ALTER TABLE users
 --   ADD COLUMN real_name         VARCHAR(50)  DEFAULT NULL AFTER password_hash,
@@ -264,4 +287,25 @@ CREATE TABLE IF NOT EXISTS user_achievements (
 --     FOREIGN KEY (wiki_id)     REFERENCES wiki_pages(id) ON DELETE CASCADE,
 --     FOREIGN KEY (png_file_id) REFERENCES files(id)      ON DELETE SET NULL,
 --     FOREIGN KEY (updated_by)  REFERENCES users(id)
+-- );
+--
+-- CREATE TABLE IF NOT EXISTS curriculum_topics (
+--     id          INT AUTO_INCREMENT PRIMARY KEY,
+--     subject     ENUM('국어','영어','수학') NOT NULL,
+--     grade       ENUM('중1','중2','중3','고1','고2','고3') NOT NULL,
+--     step_order  INT          NOT NULL,
+--     unit_name   VARCHAR(100) NOT NULL,
+--     description VARCHAR(255) DEFAULT NULL,
+--     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+--     UNIQUE KEY uq_subject_order (subject, step_order)
+-- );
+--
+-- CREATE TABLE IF NOT EXISTS user_topic_progress (
+--     user_id    INT NOT NULL,
+--     topic_id   INT NOT NULL,
+--     is_done    TINYINT(1) DEFAULT 0,
+--     done_at    DATETIME   DEFAULT NULL,
+--     PRIMARY KEY (user_id, topic_id),
+--     FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
+--     FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
 -- );

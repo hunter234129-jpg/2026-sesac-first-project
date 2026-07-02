@@ -8,10 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
       <div>
@@ -45,15 +48,22 @@
       <div id="battleList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
     </div>
 
-    <h2 style="font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin:8px 0 14px;">전체 클랜</h2>
-    <div class="clan-grid" id="clanGrid">
-      <p class="muted" style="padding:40px 0;">불러오는 중...</p>
+    <!-- 전체 클랜 기여도 랭킹 테이블 -->
+    <div class="card section" style="padding:14px 12px;">
+      <div class="section-head" style="padding:0 4px;"><h2>🛡️ 전체 클랜 기여도 랭킹</h2><span class="muted" style="font-size:12px;">기여도 순 · 클릭해서 상세보기</span></div>
+      <div class="crt-head"><span style="text-align:center;">순위</span><span>클랜</span><span style="text-align:center;">멤버</span><span>기여도</span><span style="text-align:right;">클랜장</span></div>
+      <div id="clanGrid">
+        <p class="muted" style="padding:24px 12px;">불러오는 중...</p>
+      </div>
     </div>
+  </div>
+  </div>
   </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
+    renderRail('clans');
     const alertEl = document.getElementById('alert');
 
     function fmtMin(m) {
@@ -64,7 +74,7 @@
       return `${mm}분`;
     }
 
-    /* ── 클랜전 랭킹 ── */
+    /* ── 클랜전 랭킹 — 상단 1위 vs 2위 VS 위젯 + 전체 순위 바 ── */
     async function loadBattle() {
       const el = document.getElementById('battleList');
       try {
@@ -75,7 +85,34 @@
           return;
         }
         const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
-        el.innerHTML = rows.map(r => {
+
+        // 1위 vs 2위 히어로 (2개 이상일 때만)
+        let vsHtml = '';
+        if (rows.length >= 2) {
+          const [a, b] = rows;
+          const pa = Math.round((a.progress || 0) * 100);
+          const pb = Math.round((b.progress || 0) * 100);
+          vsHtml = `
+            <div class="battle-vs">
+              <a class="bv-side a" href="/clan?id=${a.id}">
+                <div class="bv-rank">🥇 1위 · ${a.member_count}명</div>
+                <div class="bv-name">${escapeHtml(a.name)}</div>
+                <div class="bv-min">${fmtMin(a.week_min)}</div>
+                <div class="bv-prog"><i style="width:${pa}%"></i></div>
+                <div class="bv-rank" style="margin-top:5px;">목표 달성 ${pa}%</div>
+              </a>
+              <div class="bv-mid">VS</div>
+              <a class="bv-side b" href="/clan?id=${b.id}">
+                <div class="bv-rank">🥈 2위 · ${b.member_count}명</div>
+                <div class="bv-name">${escapeHtml(b.name)}</div>
+                <div class="bv-min">${fmtMin(b.week_min)}</div>
+                <div class="bv-prog"><i style="width:${pb}%"></i></div>
+                <div class="bv-rank" style="margin-top:5px;">목표 달성 ${pb}%</div>
+              </a>
+            </div>`;
+        }
+
+        el.innerHTML = vsHtml + rows.map(r => {
           const pct = Math.round((r.progress || 0) * 100);
           return `<a class="battle-row" href="/clan?id=${r.id}">
             <div class="battle-rank">${medals[r.rank] || ('#' + r.rank)}</div>
@@ -118,29 +155,36 @@
       }
     };
 
-    /* ── 목록 ── */
+    /* ── 목록 — 메달 + 네온 기여도 바 테이블 ── */
     const medals = { 0: '🥇', 1: '🥈', 2: '🥉' };
     async function load() {
       const grid = document.getElementById('clanGrid');
       try {
         const clans = await api('/api/clans', { auth: false });
         if (!clans.length) {
-          grid.innerHTML = '<p class="muted" style="padding:40px 0;">아직 클랜이 없어요. 첫 클랜을 만들어보세요!</p>';
+          grid.innerHTML = '<p class="muted" style="padding:24px 12px;">아직 클랜이 없어요. 첫 클랜을 만들어보세요!</p>';
           return;
         }
-        grid.innerHTML = clans.map((c, i) => `
-          <a class="clan-card" href="/clan?id=${c.id}">
-            <div class="cc-rank">${medals[i] || `#${i+1}`} <span>기여도 랭킹</span></div>
-            <div class="cc-name">${escapeHtml(c.name)}</div>
-            <div class="cc-desc">${escapeHtml(c.description || '소개가 없어요.')}</div>
-            <div class="cc-stats">
-              <span><b>${c.member_count}</b> <span class="muted">명</span></span>
-              <span><b>${c.total_score}</b> <span class="muted">점</span></span>
-              <span class="muted">👑 ${escapeHtml(c.leader)}</span>
-            </div>
-          </a>`).join('');
+        const maxScore = Math.max(1, ...clans.map(c => +c.total_score || 0));
+        grid.innerHTML = clans.map((c, i) => {
+          const barPct = Math.round((+c.total_score || 0) / maxScore * 100);
+          return `
+          <a class="crt-row" href="/clan?id=${c.id}">
+            <span class="crt-rank ${i < 3 ? 'medal' : ''}">${medals[i] || (i + 1)}</span>
+            <span class="crt-name">
+              <span>${escapeHtml(c.name)}</span>
+              <span class="crt-desc">${escapeHtml(c.description || '소개가 없어요.')}</span>
+            </span>
+            <span class="crt-members">${c.member_count}명</span>
+            <span class="crt-score">
+              <span class="prog"><i style="width:${barPct}%"></i></span>
+              <span class="crt-num">${c.total_score}점</span>
+            </span>
+            <span class="crt-leader">👑 ${escapeHtml(c.leader)}</span>
+          </a>`;
+        }).join('');
       } catch (err) {
-        grid.innerHTML = `<p class="muted" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
+        grid.innerHTML = `<p class="muted" style="padding:24px 12px;">${escapeHtml(err.message)}</p>`;
       }
     }
     load();

@@ -8,10 +8,14 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <span class="breadcrumb" id="breadcrumb"></span>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:820px;">
     <div class="alert" id="alert"></div>
 
@@ -26,27 +30,28 @@
 
       <div id="searchResult"></div>
 
-      <div class="card section">
-        <div class="section-head">
-          <h2>조회수 랭킹</h2>
-          <div class="seg" id="periodSeg">
-            <button data-p="today" class="active">오늘</button>
-            <button data-p="week">주간</button>
+      <div class="wiki-home-grid">
+        <div class="card section">
+          <div class="section-head">
+            <h2>조회수 랭킹</h2>
+            <div class="seg" id="periodSeg">
+              <button data-p="today" class="active">오늘</button>
+              <button data-p="week">주간</button>
+            </div>
           </div>
+          <div id="rankList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
         </div>
-        <div id="rankList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
-      </div>
 
-      <div class="card section">
-        <div class="section-head"><h2>최근 생성</h2></div>
-        <div id="recentList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+        <div class="card section">
+          <div class="section-head"><h2>최근 생성</h2></div>
+          <div id="recentList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+        </div>
       </div>
     </div>
 
-    <!-- ════ 상세 뷰 ════ -->
+    <!-- ════ 상세 뷰 — 노션 스타일 풀폭 문서 (카드 박스 없음) ════ -->
     <div id="detailView" style="display:none;">
-      <a href="/wiki" class="muted" style="font-size:14px;">← 위키 홈</a>
-      <div class="wiki-doc card mt-16" id="docCard">
+      <div class="wiki-doc" id="docCard">
         <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
       </div>
       <!-- 이력 영역 -->
@@ -54,7 +59,19 @@
         <div class="section-head"><h2>수정 이력</h2></div>
         <div id="historyList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
       </div>
+      <!-- 하단 중앙 상태바: 단어·글자·읽기시간·저장상태 -->
+      <div class="wiki-statusbar hidden" id="wikiStatusbar">
+        <span id="wsWords">단어 0</span>
+        <span class="ws-sep"></span>
+        <span id="wsChars">글자 0</span>
+        <span class="ws-sep"></span>
+        <span id="wsRead">읽기 약 1분</span>
+        <span class="ws-sep"></span>
+        <span class="ws-save" id="wsSave">연결 중...</span>
+      </div>
     </div>
+  </div>
+  </div>
   </div>
 
   <script src="/static/js/api.js"></script>
@@ -67,11 +84,14 @@
     // 백그라운드 탭 스로틀링의 영향을 받지 않음), wiki-editor.js 다음에 이 스크립트가
     // 오는 것만으로 window.WikiEditor가 이미 준비돼 있음이 보장된다.
     renderNav();
+    renderRail('wiki');
     const alertEl = document.getElementById('alert');
     const slug    = queryParam('slug');
 
     /* ══════════ 홈 뷰 ══════════ */
     function initHome() {
+      // 랭킹/최근 2열 그리드가 들어갈 만큼 홈도 조금 넓게
+      document.querySelector('.container').style.maxWidth = '1000px';
       document.getElementById('homeView').style.display = 'block';
 
       // 검색
@@ -160,6 +180,8 @@
     /* ══════════ 상세 뷰 ══════════ */
     let curDoc = null;
     function initDetail() {
+      // 문서 화면은 홈(820px)보다 넓게 — 노션처럼 화면 폭을 활용한다
+      document.querySelector('.container').style.maxWidth = '1200px';
       document.getElementById('detailView').style.display = 'block';
       loadDoc();
     }
@@ -171,24 +193,28 @@
       try {
         const w = await api('/api/wiki/' + encodeURIComponent(slug), { auth: false });
         curDoc = w;
+        renderBreadcrumb([{ label: '위키 홈', href: '/wiki' }, { label: w.title }]);
         const canEdit = Auth.isLoggedIn;
         const isAdmin = Auth.isAdmin;
         card.innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
-            <div class="wd-title">${escapeHtml(w.title)}</div>
+          <div class="wd-hero-row">
+            <h1 class="wd-hero-title">${escapeHtml(w.title)}</h1>
             <div class="wd-actions">
-              <button class="btn btn-ghost" id="historyBtn" style="padding:7px 14px;">이력</button>
+              <button class="btn btn-ghost" id="historyBtn" style="padding:7px 14px;">🕘 이력</button>
               ${isAdmin ? `<button class="btn btn-danger" id="delBtn" style="padding:7px 14px;">삭제</button>` : ''}
             </div>
           </div>
-          <div class="wd-meta">
+          <div class="wd-meta-row">
             <span class="version-badge">v${w.version}</span>
-            <span>✍️ 최초: ${escapeHtml(w.created_by)}</span>
-            <span>🔧 최종: ${escapeHtml(w.last_editor)}</span>
-            <span>👁 조회 ${w.view_count}</span>
-            <span>🕒 ${(w.last_updated||'').replace('T',' ').slice(0,16)}</span>
-            <span class="live-dot" title="실시간 연결됨">●</span>
-            <span class="muted" id="syncStatus" style="font-size:12px;"></span>
+            <span class="wm-sep">|</span>
+            <span>최초: ${escapeHtml(w.created_by)}</span>
+            <span class="wm-sep">|</span>
+            <span>최종: ${escapeHtml(w.last_editor)}</span>
+            <span class="wm-sep">|</span>
+            <span>조회 ${w.view_count}</span>
+            <span class="wm-sep">|</span>
+            <span>${(w.last_updated||'').replace('T',' ').slice(0,16)}</span>
+            ${canEdit ? '<span class="wm-sep">|</span><span class="wm-save" id="syncStatus"></span>' : ''}
           </div>
           <div id="editorMount" class="tiptap-mount"></div>`;
 
@@ -210,18 +236,37 @@
           slug, initialContent: w.content, username: Auth.username, editable: canEdit, title: w.title,
         });
         if (syncEl) syncEl.textContent = canEdit ? '자동 저장 켜짐' : '';
+        startStatusbar(canEdit);
       } catch (err) {
         card.innerHTML = `<p class="muted text-center" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
       }
     }
-    window.addEventListener('wiki:autosaved', () => {
+
+    /* ── 하단 상태바: 단어/글자/읽기시간(2초 주기) + 저장 상태 ── */
+    let wsTimer = null;
+    function startStatusbar(canEdit) {
+      document.getElementById('wikiStatusbar').classList.remove('hidden');
+      document.getElementById('wsSave').textContent = canEdit ? '자동 저장 켜짐' : '읽기 전용';
+      clearInterval(wsTimer);
+      wsTimer = setInterval(() => {
+        const ed = window.WikiEditor && WikiEditor.getEditor();
+        if (!ed) return;
+        const text = ed.getText().trim();
+        const words = text ? text.split(/\s+/).length : 0;
+        const chars = text.replace(/\s+/g, '').length;
+        document.getElementById('wsWords').textContent = `단어 ${words}`;
+        document.getElementById('wsChars').textContent = `글자 ${chars}`;
+        document.getElementById('wsRead').textContent  = `읽기 약 ${Math.max(1, Math.round(words / 200))}분`;
+      }, 2000);
+    }
+    function setSaveState(label) {
       const el = document.getElementById('syncStatus');
-      if (el) el.textContent = '자동 저장됨 · ' + new Date().toLocaleTimeString();
-    });
-    window.addEventListener('wiki:snapshotted', () => {
-      const el = document.getElementById('syncStatus');
-      if (el) el.textContent = '버전 기록됨 · ' + new Date().toLocaleTimeString();
-    });
+      if (el) el.textContent = label;
+      const ws = document.getElementById('wsSave');
+      if (ws) ws.textContent = label;
+    }
+    window.addEventListener('wiki:autosaved',   () => setSaveState('저장됨 · ' + new Date().toLocaleTimeString()));
+    window.addEventListener('wiki:snapshotted', () => setSaveState('버전 기록됨 · ' + new Date().toLocaleTimeString()));
 
     let historyOpen = false;
     async function toggleHistory() {

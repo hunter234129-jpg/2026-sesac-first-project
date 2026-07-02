@@ -8,10 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:720px;">
     <div class="dash-header"><h1>🎯 오늘의 미션</h1><p>매일 자정에 새로운 미션이 생성돼요.</p></div>
 
@@ -26,11 +29,14 @@
       <div id="historyList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { throw new Error('redirect'); }
     renderNav();
+    renderRail('missions');
     const alertEl = document.getElementById('alert');
 
     async function loadToday() {

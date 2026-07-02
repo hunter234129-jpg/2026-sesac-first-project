@@ -52,10 +52,14 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <span class="breadcrumb" id="breadcrumb"></span>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:760px;">
     <div class="dash-header"><h1 id="pageTitle">글쓰기</h1></div>
 
@@ -115,13 +119,17 @@
       </div>
     </form>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { throw new Error('redirect'); }
     renderNav();
+    renderRail('board');
 
     const editId  = queryParam('id');           // 있으면 수정 모드
+    renderBreadcrumb([{ label: '게시판', href: '/board' }, { label: editId ? '글 수정' : '글쓰기' }]);
     const isEdit  = !!editId;
     const alertEl = document.getElementById('alert');
     let curType   = 'post';
