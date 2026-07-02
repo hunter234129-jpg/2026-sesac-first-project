@@ -12,6 +12,9 @@
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header">
       <h1>❌ 오답노트</h1>
@@ -29,11 +32,14 @@
       <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { /* 로그인 페이지로 이동됨 */ }
     renderNav();
+    renderRail('roadmap');
 
     const wnBody = document.getElementById('wnBody');
     let state = { subject: '전체' };
