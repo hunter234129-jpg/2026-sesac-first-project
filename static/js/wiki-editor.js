@@ -327,7 +327,7 @@ function buildToolbar(editorInstance, { title }) {
     } finally {
       aiBtn.disabled = false; aiBtn.textContent = prevLabel;
     }
-  }, 'tb-insert');
+  }, 'tb-insert tb-ai');
   insertGroup.appendChild(aiBtn);
 
   bar.append(fmtGroup, insertGroup);

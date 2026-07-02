@@ -60,4 +60,6 @@ def serve_page(page):
 if __name__ == '__main__':
     # allow_unsafe_werkzeug: 이 프로젝트는 기존에도 app.run(debug=True)로 개발 서버를
     # 직접 구동했으므로 배포 안전성 수준은 동일하다(운영 배포 시에는 gunicorn+eventlet 등으로 교체 필요).
-    socketio.run(app, host='0.0.0.0', debug=True, allow_unsafe_werkzeug=True)
+    # PORT 환경변수로 포트 변경 가능(기본 5000) — 여러 인스턴스를 나란히 띄울 때 사용.
+    socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', '5000')),
+                 debug=True, allow_unsafe_werkzeug=True)
