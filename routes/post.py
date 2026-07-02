@@ -156,6 +156,15 @@ def update_post(id):
         if data.get('category') is not None:
             updates.append('category = %s')
             params.append(data['category'])
+        if 'recruit_count' in data:
+            updates.append('recruit_count = %s')
+            params.append(int(data['recruit_count'] or 0))
+        if 'recruit_deadline' in data:
+            updates.append('recruit_deadline = %s')
+            params.append(data['recruit_deadline'] or None)
+        if 'field' in data:
+            updates.append('field = %s')
+            params.append(data['field'] or None)
 
         if updates:
             params.append(id)
