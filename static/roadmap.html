@@ -18,11 +18,19 @@
       <p>중1부터 고3까지, 과목별 학습 순서를 따라가고 이해도를 스스로 진단해 보세요</p>
     </div>
 
+    <a href="/wrongnote" class="card wn-entry" id="wnEntry">
+      <div class="wn-entry-icon">❌</div>
+      <div class="wn-entry-body">
+        <div class="wn-entry-title">오답노트</div>
+        <div class="wn-entry-desc" id="wnEntryDesc">불러오는 중...</div>
+      </div>
+      <div class="wn-entry-arrow">→</div>
+    </a>
+
     <div class="card weak-card" id="weakCard">
       <div class="weak-head">
         <span class="wh-title">🧠 약점 복습 추천</span>
-        <span class="muted" style="font-size:12.5px; flex:1;">완료했지만 이해도를 낮게 평가한 단원이에요</span>
-        <a href="/wrongnote" style="font-size:12.5px;">❌ 오답노트 전체보기 →</a>
+        <span class="muted" style="font-size:12.5px;">완료했지만 이해도를 낮게 평가한 단원이에요</span>
       </div>
       <div id="weakBody"><p class="muted" style="font-size:13.5px;">불러오는 중...</p></div>
     </div>
@@ -285,8 +293,21 @@
       }
     }
 
+    async function loadWrongNoteEntry() {
+      const el = document.getElementById('wnEntryDesc');
+      try {
+        const notes = await api('/api/wrongnotes');
+        el.textContent = notes.length > 0
+          ? `틀린 연습문제 ${notes.length}개를 다시 풀어보세요`
+          : '틀린 문제가 없어요 👍';
+      } catch (e) {
+        el.textContent = '불러오지 못했어요';
+      }
+    }
+
     load(qpTopic);
     loadWeak();
+    loadWrongNoteEntry();
   </script>
 </body>
 </html>

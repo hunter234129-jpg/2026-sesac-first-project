@@ -546,6 +546,13 @@ a:hover { color: #9ee4ff; }
 @keyframes markDraw { to { stroke-dashoffset: 0; } }
 
 /* 오답노트 */
+.wn-entry { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; text-decoration: none; transition: transform .15s, border-color .15s; }
+.wn-entry:hover { transform: translateY(-3px); border-color: var(--border-lit); text-decoration: none; }
+.wn-entry-icon { font-size: 26px; flex-shrink: 0; filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
+.wn-entry-body { flex: 1; }
+.wn-entry-title { font-size: 15.5px; font-weight: 800; color: var(--text); }
+.wn-entry-desc { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.wn-entry-arrow { font-size: 18px; color: var(--muted); flex-shrink: 0; }
 .wn-item { margin-bottom: 16px; }
 .wn-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .wn-name { font-weight: 700; font-size: 14px; flex: 1; }
