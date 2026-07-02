@@ -9,9 +9,13 @@
 <body>
   <nav class="navbar">
     <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <span class="breadcrumb" id="breadcrumb"></span>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:720px;">
     <a href="/clans" class="muted" style="font-size:14px;">← 클랜 목록</a>
     <div class="alert mt-16" id="alert"></div>
@@ -36,10 +40,13 @@
       <div class="rank-list" id="memberList"></div>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
+    renderRail('clans');
     const clanId  = queryParam('id');
     const alertEl = document.getElementById('alert');
     const myId    = Auth.userId;
@@ -106,6 +113,7 @@
       const card = document.getElementById('clanCard');
       try {
         const c = await api('/api/clans/' + clanId, { auth: false });
+        renderBreadcrumb([{ label: '클랜', href: '/clans' }, { label: c.name }]);
         amLeader = Auth.isLoggedIn && c.leader === Auth.username;
 
         // 멤버 로드 (가입 여부 판단)

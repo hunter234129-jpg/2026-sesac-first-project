@@ -12,6 +12,9 @@
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:720px;">
     <div class="dash-header">
       <h1>🟢 접속 중인 멤버</h1>
@@ -26,11 +29,14 @@
       <div class="online-list" id="onlineMembersFull"><p class="muted" style="font-size:14px; padding:20px 4px;">연결 중...</p></div>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { throw new Error('redirect'); }
     renderNav();
+    renderRail('members');
   </script>
 </body>
 </html>

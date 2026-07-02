@@ -9,9 +9,13 @@
 <body>
   <nav class="navbar">
     <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <span class="breadcrumb" id="breadcrumb"></span>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:760px;">
     <a href="/board" class="muted" style="font-size:14px;">← 목록으로</a>
     <div class="alert mt-16" id="alert"></div>
@@ -33,10 +37,13 @@
       </p>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
+    renderRail('board');
     const postId  = queryParam('id');
     const alertEl = document.getElementById('alert');
     if (!postId) { showAlert(alertEl, '잘못된 접근입니다.'); }
@@ -48,6 +55,7 @@
       const card = document.getElementById('postCard');
       try {
         const p = await api('/api/posts/' + postId, { auth: false });
+        renderBreadcrumb([{ label: '게시판', href: '/board' }, { label: p.title }]);
         const isOwner = Auth.isLoggedIn && p.user_id === myId;
         const isStudy = p.type === 'study';
 
