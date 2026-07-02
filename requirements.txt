@@ -1,11 +1,13 @@
 flask
 flask-cors
+flask-socketio
+simple-websocket
 pymysql
 python-dotenv
 PyJWT
 requests
 beautifulsoup4
+pytesseract
 pillow
 anthropic
-flask-socketio
 google-genai

@@ -3,27 +3,17 @@ from flask_socketio import join_room, leave_room, emit
 from extensions import socketio
 from utils.auth import decode_token
 
-_sid_users = {}   # sid -> {'user_id', 'username'} | None(비로그인 뷰어)
-
-
-def _user_from_token(token):
+# connect/disconnect 이벤트는 sockets.chat_events도 등록하는데, Flask-SocketIO는
+# 같은 (namespace, event)에 핸들러를 하나만 유지해 나중에 import되는 쪽이 덮어쓴다.
+# 그래서 접속 시점에 캐시하는 대신, 필요할 때(drawing_presence) 그때그때 토큰을 읽는다.
+def _username_from_request():
+    token = request.args.get('token')
     if not token:
         return None
     try:
-        payload = decode_token(token)
-        return {'user_id': payload['user_id'], 'username': payload['username']}
+        return decode_token(token)['username']
     except Exception:
         return None
-
-
-@socketio.on('connect')
-def on_connect():
-    _sid_users[request.sid] = _user_from_token(request.args.get('token'))
-
-
-@socketio.on('disconnect')
-def on_disconnect():
-    _sid_users.pop(request.sid, None)
 
 
 @socketio.on('join_wiki')
@@ -67,10 +57,9 @@ def on_drawing_presence(payload):
     block_id = (payload or {}).get('block_id')
     if not slug or not block_id:
         return
-    user = _sid_users.get(request.sid)
     emit('drawing_presence', {
         'block_id': block_id,
         'editing':  bool((payload or {}).get('editing')),
-        'username': user['username'] if user else '익명',
+        'username': _username_from_request() or '익명',
         'sid':      request.sid,
     }, room=f'wiki:{slug}', include_self=False)

@@ -23,7 +23,9 @@ from routes.admin        import admin_bp
 from routes.ocr          import ocr_bp
 from routes.ai           import ai_bp
 from routes.achievement  import achievement_bp
-import routes.wiki_sync  # noqa: F401 — SocketIO 이벤트 핸들러 등록
+import routes.wiki_sync      # noqa: F401 — 위키 실시간 협업 SocketIO 핸들러 등록
+import sockets.chat_events   # noqa: F401 — 채팅 SocketIO 핸들러 등록
+sockets.chat_events.init_app(app)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(post_bp)

@@ -492,6 +492,24 @@ a:hover { color: #9ee4ff; }
 .battle-name { font-size: 14px; font-weight: 600; margin-bottom: 7px; }
 .battle-val { text-align: right; font-size: 14px; font-weight: 700; color: var(--cyan); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+.bell.online-bell { filter: drop-shadow(0 0 8px rgba(63,224,176,.4)); }
+.bell.online-bell .bell-count { background: var(--green); box-shadow: 0 0 12px rgba(63,224,176,.7); }
+
+/* ── 접속 멤버 드롭다운 (네브바) ── */
+.nav-icon-wrap { position: relative; }
+.nav-dropdown {
+  position: absolute; top: calc(100% + 14px); right: -10px; width: 260px; z-index: 100;
+  background: var(--glass-strong); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--border-lit); border-radius: 14px; box-shadow: var(--elev-3);
+  padding: 12px; animation: chat-toast-in .15s ease-out;
+}
+.nav-dropdown .nd-head { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.nav-dropdown .nd-list { max-height: 260px; overflow-y: auto; }
+.nav-dropdown .online-row { padding: 8px 2px; }
+.nav-dropdown .online-row .online-name { font-size: 13px; }
+.nav-dropdown .online-row .online-chat-btn { padding: 5px 10px; font-size: 12px; }
+.nav-dropdown .nd-viewall { display: block; text-align: center; font-size: 13px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+
 /* 알림 목록 */
 .notif-list { display: flex; flex-direction: column; }
 .notif-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; border-radius: 10px; }
@@ -555,6 +573,116 @@ a:hover { color: #9ee4ff; }
 .quick-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .quick-chip { padding: 8px 14px; border-radius: 99px; background: var(--glass); border: 1px solid var(--border); color: var(--text); font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s; }
 .quick-chip:hover { border-color: var(--border-lit); background: var(--glass-strong); }
+
+/* ── 실시간 1:1 채팅 ── */
+.online-list { display: flex; flex-direction: column; }
+.online-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+.online-row:last-child { border-bottom: none; }
+.online-row .online-name { flex: 1; font-size: 14px; font-weight: 600; }
+.online-row .online-chat-btn { padding: 7px 14px; font-size: 13px; }
+
+/* 아바타 칩 — 만화 캐릭터 이모지 + 컬러 배경(배경과 겹치지 않도록 항상 불투명 원) */
+.avatar-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; line-height: 1; flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.avatar-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.avatar-wrap .online-dot {
+  position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--green); border: 2px solid var(--space-1); box-shadow: 0 0 8px rgba(63,224,176,.8);
+}
+
+/* 내 아바타 박스 (/members 페이지)
+   .card는 backdrop-filter로 자체 스태킹 컨텍스트를 만들기 때문에,
+   내부 팝업이 아래쪽 형제 .card(접속자 목록)에 가려지지 않도록 이 카드 자체를 한 단계 띄운다. */
+#myAvatarCard { position: relative; z-index: 5; }
+#myAvatarBox { position: relative; }
+.my-avatar-row { display: flex; align-items: center; gap: 14px; }
+.my-avatar-text { flex: 1; }
+.my-avatar-title { font-weight: 700; font-size: 15px; }
+.my-avatar-btn { padding: 8px 16px; font-size: 13px; }
+
+/* 아바타 피커 — 밝은 팝업(선택한 원이 배경과 확실히 구분되도록) */
+.avatar-picker {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 232px;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  background: #f4f7ff; border: 1px solid rgba(120,140,200,.4); border-radius: 14px;
+  padding: 12px; box-shadow: var(--elev-3);
+  max-height: 220px; overflow-y: auto;
+}
+.avatar-picker .avatar-pick-item {
+  width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent;
+  font-size: 19px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+}
+.avatar-picker .avatar-pick-item:hover { border-color: #1b2340; transform: scale(1.08); }
+
+/* 채팅 신청 토스트 */
+#chatToastWrap { position: fixed; top: 76px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 10px; max-width: 300px; }
+.chat-toast {
+  background: var(--glass-strong); backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid var(--border-lit); border-radius: 12px; padding: 14px 16px;
+  box-shadow: var(--elev-2), var(--glow-blue); animation: chat-toast-in .2s ease-out;
+}
+.chat-toast .ct-text { font-size: 14px; margin-bottom: 10px; }
+.chat-toast .ct-actions { display: flex; gap: 8px; }
+.chat-toast .ct-actions .btn { padding: 7px 14px; font-size: 13px; }
+@keyframes chat-toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* 플로팅 채팅창 — 우주 테마 배경과 겹치지 않도록 밝은 톤 */
+#chatFloatWrap { position: fixed; bottom: 0; right: 20px; z-index: 190; display: flex; gap: 12px; align-items: flex-end; }
+.chat-float {
+  width: 300px; height: 380px; display: flex; flex-direction: column;
+  background: linear-gradient(180deg, #f7f9ff, #e9eefb); color: #1b2340;
+  border: 1px solid rgba(120,140,200,.4); border-bottom: none; border-radius: 14px 14px 0 0;
+  box-shadow: 0 -6px 30px rgba(0,0,0,.55), var(--elev-3);
+}
+.chat-float .cf-head {
+  position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-bottom: 1px solid rgba(120,140,200,.3); font-size: 14px; font-weight: 700;
+}
+.chat-float .cf-partner { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.chat-float .cf-partner span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-float .cf-head-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.chat-float .cf-my-avatar-btn { border: none; background: none; padding: 0; cursor: pointer; border-radius: 50%; line-height: 1; }
+.chat-float .cf-my-avatar-btn:hover { filter: brightness(1.1); }
+.chat-float .cf-leave { background: none; border: none; color: #5c6690; font-size: 12px; cursor: pointer; padding: 4px 8px; }
+.chat-float .cf-leave:hover { color: #e0455a; }
+.chat-float .cf-log { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.chat-float .cf-msg { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.chat-float .cf-msg.me { align-self: flex-end; background: linear-gradient(130deg, #6ea8ff, #3f7de0); color: #fff; border-bottom-right-radius: 4px; }
+.chat-float .cf-msg.other { align-self: flex-start; background: #fff; border: 1px solid rgba(120,140,200,.3); color: #1b2340; border-bottom-left-radius: 4px; }
+.chat-float .cf-msg.sys { align-self: center; color: #6b7494; font-size: 12px; background: none; }
+.chat-float .cf-msg.blocked { align-self: center; max-width: 92%; color: #c22a3e; background: rgba(255,60,60,.12); border: 1px solid rgba(255,60,60,.4); font-size: 12px; font-weight: 700; text-align: center; }
+.chat-float .cf-msg a { color: inherit; text-decoration: underline; word-break: break-all; }
+.chat-float .cf-msg.other a, .chat-float .cf-msg.sys a { color: #3f7de0; }
+.chat-float .cf-msg.file { padding: 6px; background: none; border: none; }
+.chat-float .cf-file-img { display: block; max-width: 100%; max-height: 180px; border-radius: 10px; box-shadow: var(--elev-1); }
+.chat-float .cf-file-link {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px;
+  background: #fff; border: 1px solid rgba(120,140,200,.35); color: #1b2340; font-size: 13px; text-decoration: none;
+}
+.chat-float .cf-form { position: relative; display: flex; gap: 6px; padding: 10px; border-top: 1px solid rgba(120,140,200,.3); }
+.chat-float .cf-form .cf-text-input { flex: 1; padding: 9px 11px; background: #fff; color: #1b2340; border: 1px solid rgba(120,140,200,.4); border-radius: 9px; font-size: 13px; font-family: var(--font); }
+.chat-float .cf-form .cf-text-input:focus { outline: none; border-color: #6ea8ff; }
+.chat-float .cf-form .cf-text-input:disabled { opacity: .5; }
+.chat-float .cf-form button { padding: 9px 14px; font-size: 13px; }
+.chat-float .cf-emoji-btn, .chat-float .cf-file-btn { background: #fff; border: 1px solid rgba(120,140,200,.4); border-radius: 9px; font-size: 16px; padding: 6px 9px; cursor: pointer; line-height: 1; }
+.chat-float .cf-emoji-btn:hover, .chat-float .cf-file-btn:hover { border-color: #6ea8ff; }
+.chat-float .cf-emoji-btn:disabled, .chat-float .cf-file-btn:disabled { opacity: .5; cursor: not-allowed; }
+.chat-float .cf-file-btn { font-size: 18px; font-weight: 700; color: #3f7de0; }
+
+/* 이모지 피커 */
+.emoji-picker {
+  position: absolute; bottom: calc(100% + 8px); left: 10px; width: 260px;
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
+  background: #f4f7ff; border: 1px solid rgba(120,140,200,.4); border-radius: 12px; padding: 8px;
+  box-shadow: var(--elev-3);
+  max-height: 180px; overflow-y: auto;
+}
+.emoji-picker .emoji-item { background: none; border: none; font-size: 18px; padding: 5px; cursor: pointer; border-radius: 6px; line-height: 1; }
+.emoji-picker .emoji-item:hover { background: rgba(107,168,255,.25); }
 
 /* ── OCR / 드롭존 ── */
 .dropzone {

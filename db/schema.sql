@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash     VARCHAR(255) NOT NULL,
     real_name         VARCHAR(50)  DEFAULT NULL,
     interest_keywords TEXT         DEFAULT NULL,
+    avatar_id         SMALLINT     NOT NULL DEFAULT 0,
     is_admin          TINYINT(1)   DEFAULT 0,
     is_verified       TINYINT(1)   DEFAULT 0,
     is_deleted        TINYINT(1)   DEFAULT 0,
@@ -162,6 +163,31 @@ CREATE TABLE IF NOT EXISTS user_missions (
     FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE CASCADE
 );
 
+-- ── 실시간 1:1 채팅 ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS chat_rooms (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    user1_id   INT      NOT NULL,
+    user2_id   INT      NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    closed_at  DATETIME DEFAULT NULL,
+    FOREIGN KEY (user1_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user2_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    room_id    INT  NOT NULL,
+    sender_id  INT  NOT NULL,
+    content    TEXT NOT NULL,
+    msg_type   ENUM('text','file') DEFAULT 'text',
+    file_url   VARCHAR(255) DEFAULT NULL,
+    file_name  VARCHAR(255) DEFAULT NULL,
+    mime_type  VARCHAR(100) DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (room_id)   REFERENCES chat_rooms(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id)
+);
+
 -- ── 파일 ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS files (
     id         INT AUTO_INCREMENT PRIMARY KEY,
@@ -208,6 +234,9 @@ CREATE TABLE IF NOT EXISTS user_achievements (
 --   ADD COLUMN is_deleted        TINYINT(1)   DEFAULT 0   AFTER is_verified,
 --   ADD COLUMN deleted_at        DATETIME     DEFAULT NULL AFTER is_deleted;
 --
+-- ALTER TABLE users
+--   ADD COLUMN avatar_id SMALLINT NOT NULL DEFAULT 0 AFTER interest_keywords;
+--
 -- ALTER TABLE posts
 --   ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER field;
 --
@@ -216,6 +245,12 @@ CREATE TABLE IF NOT EXISTS user_achievements (
 --
 -- ALTER TABLE clans
 --   ADD COLUMN weekly_goal_min INT DEFAULT 600 AFTER leader_id;
+--
+-- ALTER TABLE chat_messages
+--   ADD COLUMN msg_type  ENUM('text','file') DEFAULT 'text' AFTER content,
+--   ADD COLUMN file_url  VARCHAR(255) DEFAULT NULL AFTER msg_type,
+--   ADD COLUMN file_name VARCHAR(255) DEFAULT NULL AFTER file_url,
+--   ADD COLUMN mime_type VARCHAR(100) DEFAULT NULL AFTER file_name;
 --
 -- CREATE TABLE IF NOT EXISTS wiki_drawings (
 --     id          INT AUTO_INCREMENT PRIMARY KEY,
