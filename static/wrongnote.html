@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오답노트 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header">
+      <h1>❌ 오답노트</h1>
+      <p>로드맵 확인 문제에서 틀린 단원이 자동으로 모여요. 다시 풀어서 맞히면 노트에서 사라져요.</p>
+    </div>
+
+    <div class="tabs" id="subjectTabs">
+      <button class="tab active" data-subject="전체">전체</button>
+      <button class="tab" data-subject="국어">국어</button>
+      <button class="tab" data-subject="영어">영어</button>
+      <button class="tab" data-subject="수학">수학</button>
+    </div>
+
+    <div id="wnBody">
+      <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { /* 로그인 페이지로 이동됨 */ }
+    renderNav();
+
+    const wnBody = document.getElementById('wnBody');
+    let state = { subject: '전체' };
+    let allNotes = [];
+
+    document.getElementById('subjectTabs').onclick = (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      document.querySelectorAll('#subjectTabs .tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.subject = btn.dataset.subject;
+      render();
+    };
+
+    function render() {
+      const notes = state.subject === '전체' ? allNotes : allNotes.filter(n => n.subject === state.subject);
+
+      if (!notes.length) {
+        wnBody.innerHTML = `
+          <div class="card text-center" style="padding:50px 20px;">
+            <div style="font-size:36px; margin-bottom:10px;">🎉</div>
+            <p class="muted">${state.subject === '전체' ? '오답노트가 비어 있어요! 지금까지 완벽해요.' : `${escapeHtml(state.subject)} 과목에는 오답이 없어요.`}</p>
+          </div>`;
+        return;
+      }
+
+      wnBody.innerHTML = notes.map(n => `
+        <div class="card wn-item">
+          <div class="wn-head">
+            <span class="weak-subject-badge">${escapeHtml(n.subject)}</span>
+            <span class="weak-grade">${escapeHtml(n.grade)}</span>
+            <span class="wn-name">${escapeHtml(n.unit_name)}</span>
+            <span class="wn-count">${n.wrong_count}번 틀림</span>
+          </div>
+          <div class="quiz-q">${escapeHtml(n.question)}</div>
+          <div class="quiz-choices">
+            ${n.choices.map((c, i) => `
+              <button class="quiz-choice ${i === n.chosen_index ? 'chosen-wrong' : ''} ${i === n.answer_index ? 'reveal-correct' : ''}" disabled>
+                ${i === n.chosen_index ? '❌ ' : ''}${i === n.answer_index ? '✅ ' : ''}${escapeHtml(c)}
+              </button>`).join('')}
+          </div>
+          <div class="quiz-result"><div class="qr-text">${escapeHtml(n.explanation || '')}</div></div>
+          <div class="wn-actions">
+            <a class="btn btn-ghost" href="/roadmap?subject=${encodeURIComponent(n.subject)}&topic=${n.topic_id}">↻ 다시 풀기</a>
+          </div>
+        </div>`).join('');
+    }
+
+    (async () => {
+      try {
+        allNotes = await api('/api/wrongnotes');
+        render();
+      } catch (e) {
+        wnBody.innerHTML = `<p class="muted text-center" style="padding:40px 0;">불러오지 못했어요: ${escapeHtml(e.message)}</p>`;
+      }
+    })();
+  </script>
+</body>
+</html>

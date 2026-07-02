@@ -262,6 +262,21 @@ CREATE TABLE IF NOT EXISTS curriculum_quiz (
     FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
 );
 
+-- ── 오답노트 ─────────────────────────────────────────────────────────
+-- 확인 문제를 틀리면 자동으로 쌓이고, 다시 풀어서 맞히면 자동으로 사라진다.
+CREATE TABLE IF NOT EXISTS wrong_notes (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    user_id       INT NOT NULL,
+    topic_id      INT NOT NULL,
+    chosen_index  TINYINT NOT NULL,      -- 마지막으로 고른(틀린) 보기 인덱스
+    wrong_count   INT NOT NULL DEFAULT 1,-- 누적 오답 횟수
+    last_wrong_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_topic (user_id, topic_id),
+    FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+);
+
 -- ── Migration (기존 DB 보유 시 실행) ─────────────────────────────────
 -- ALTER TABLE users
 --   ADD COLUMN real_name         VARCHAR(50)  DEFAULT NULL AFTER password_hash,
@@ -336,5 +351,19 @@ CREATE TABLE IF NOT EXISTS curriculum_quiz (
 --     answer_index TINYINT NOT NULL,
 --     explanation  VARCHAR(255) DEFAULT NULL,
 --     created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+-- );
+--
+-- -- 오답노트 테이블 추가
+-- CREATE TABLE IF NOT EXISTS wrong_notes (
+--     id            INT AUTO_INCREMENT PRIMARY KEY,
+--     user_id       INT NOT NULL,
+--     topic_id      INT NOT NULL,
+--     chosen_index  TINYINT NOT NULL,
+--     wrong_count   INT NOT NULL DEFAULT 1,
+--     last_wrong_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+--     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+--     UNIQUE KEY uq_user_topic (user_id, topic_id),
+--     FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
 --     FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
 -- );

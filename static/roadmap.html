@@ -21,7 +21,8 @@
     <div class="card weak-card" id="weakCard">
       <div class="weak-head">
         <span class="wh-title">🧠 약점 복습 추천</span>
-        <span class="muted" style="font-size:12.5px;">완료했지만 이해도를 낮게 평가한 단원이에요</span>
+        <span class="muted" style="font-size:12.5px; flex:1;">완료했지만 이해도를 낮게 평가한 단원이에요</span>
+        <a href="/wrongnote" style="font-size:12.5px;">❌ 오답노트 전체보기 →</a>
       </div>
       <div id="weakBody"><p class="muted" style="font-size:13.5px;">불러오는 중...</p></div>
     </div>
@@ -56,6 +57,10 @@
 
     const UNDER_LABEL = { 1: '많이 어려워요', 2: '어려워요', 3: '보통이에요', 4: '이해했어요', 5: '완벽해요' };
 
+    // 오답노트 등 외부에서 ?subject=수학&topic=5 형태로 들어오면 해당 단원으로 바로 이동
+    const qpTopic = queryParam('topic');
+    const qpSubject = queryParam('subject');
+
     function switchTab(subject) {
       state.subject = subject;
       document.querySelectorAll('#subjectTabs .tab').forEach(b => {
@@ -70,6 +75,9 @@
       load();
     };
     // 기본 탭 활성 표시 정리(마크업엔 전부 active로 넣어놨으니 최초 진입 시 수학만 강조)
+    if (qpSubject && document.querySelector(`#subjectTabs .tab[data-subject="${qpSubject}"]`)) {
+      state.subject = qpSubject;
+    }
     switchTab(state.subject);
 
     function updateProgress(total, done) {
@@ -230,6 +238,8 @@
             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
             target.classList.add('flash');
             setTimeout(() => target.classList.remove('flash'), 1400);
+            const qbtn = target.querySelector('.quiz-btn');
+            if (qbtn && !qbtn.classList.contains('open')) qbtn.click();
           }
         }
       } catch (e) {
@@ -275,7 +285,7 @@
       }
     }
 
-    load();
+    load(qpTopic);
     loadWeak();
   </script>
 </body>

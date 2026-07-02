@@ -236,6 +236,24 @@ def submit_topic_quiz(topic_id):
         correct = (choice_index == quiz['answer_index'])
         level = QUIZ_CORRECT_LEVEL if correct else QUIZ_WRONG_LEVEL
         _set_understanding(cursor, g.user_id, topic_id, level)
+
+        if correct:
+            # 다시 풀어서 맞혔으면 오답노트에서 자동으로 제거
+            cursor.execute(
+                'DELETE FROM wrong_notes WHERE user_id = %s AND topic_id = %s',
+                (g.user_id, topic_id)
+            )
+        else:
+            # 틀렸으면 오답노트에 자동으로 쌓임(다시 틀리면 횟수만 누적)
+            cursor.execute(
+                '''INSERT INTO wrong_notes (user_id, topic_id, chosen_index, wrong_count, last_wrong_at)
+                   VALUES (%s, %s, %s, 1, NOW())
+                   ON DUPLICATE KEY UPDATE
+                     chosen_index = VALUES(chosen_index),
+                     wrong_count = wrong_count + 1,
+                     last_wrong_at = NOW()''',
+                (g.user_id, topic_id, choice_index)
+            )
         conn.commit()
     finally:
         conn.close()
