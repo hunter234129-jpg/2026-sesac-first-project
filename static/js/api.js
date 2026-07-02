@@ -144,6 +144,65 @@ function renderNav() {
   startLivePolling();
 }
 
+/* ── 상단 경로(breadcrumb) — 로고 바로 오른쪽, 요소 id="breadcrumb" ──
+   items: [{label, href?}, ...] href 없거나 마지막 항목이면 현재 위치로 표시 */
+function renderBreadcrumb(items) {
+  const el = document.getElementById('breadcrumb');
+  if (!el) return;
+  el.innerHTML = items.map((it, i) => {
+    const isLast = i === items.length - 1;
+    const seg = (isLast || !it.href)
+      ? `<span class="bc-current">${escapeHtml(it.label)}</span>`
+      : `<a href="${it.href}">${escapeHtml(it.label)}</a>`;
+    return (i > 0 ? '<span class="bc-sep">›</span>' : '') + seg;
+  }).join('');
+}
+
+/* ── 좌측 아이콘 레일 (대시보드 제외 모든 로그인 후 페이지 공통, 요소 id="appRail") ──
+   activeKey로 현재 페이지에 해당하는 항목을 강조 표시한다. */
+const RAIL_ITEMS = [
+  { key: 'dashboard',    href: '/dashboard',    icon: '🏠', label: '대시보드' },
+  { key: 'board',        href: '/board',        icon: '📝', label: '게시판' },
+  { key: 'wiki',         href: '/wiki',         icon: '📚', label: '위키' },
+  { key: 'clans',        href: '/clans',        icon: '🛡️', label: '클랜' },
+  { key: 'ai',           href: '/chat',         icon: '🛰️', label: 'AI' },
+  { key: 'ocr',          href: '/ocr',          icon: '🔭', label: 'OCR' },
+  { key: 'exam',         href: '/exam',         icon: '🗓️', label: '시험일정' },
+  { key: 'members',      href: '/members',      icon: '👥', label: '멤버' },
+  { key: 'stats',        href: '/stats',        icon: '📊', label: '통계' },
+  { key: 'missions',     href: '/missions',     icon: '🎯', label: '미션' },
+  { key: 'achievements', href: '/achievements', icon: '🏅', label: '업적' },
+  { key: 'planet',       href: '/planet',       icon: '🪐', label: '행성' },
+  { key: 'mypage',       href: '/mypage',       icon: '👤', label: 'MY' },
+  { key: 'admin',        href: '/admin',        icon: '🛸', label: '관리자', adminOnly: true },
+  { key: 'api-docs',     href: '/api-docs',     icon: '🔌', label: 'API', adminOnly: true },
+];
+function renderRail(activeKey) {
+  const rail = document.getElementById('appRail');
+  if (!rail) return;
+  if (!Auth.isLoggedIn) { rail.remove(); return; }
+  const items = RAIL_ITEMS.filter(it => !it.adminOnly || Auth.isAdmin);
+  rail.innerHTML = `
+    <nav class="app-rail-nav">
+      ${items.map(it => `
+        <a class="app-nav-item ${it.key === activeKey ? 'active' : ''}" href="${it.href}">
+          <span class="ic">${it.icon}</span><span class="lb">${it.label}</span>
+        </a>`).join('')}
+    </nav>
+    <div class="app-rail-planet" id="appRailPlanet"></div>`;
+  (async () => {
+    const box = document.getElementById('appRailPlanet');
+    try {
+      const p = await api('/api/study/planet');
+      box.innerHTML = `
+        <div class="arp-em">${p.emoji}</div>
+        <div class="arp-lv">Lv.${p.level}</div>
+        <div class="arp-bar"><i style="width:${Math.round((p.progress || 0) * 100)}%"></i></div>
+        <div class="arp-name">${escapeHtml(p.name)}</div>`;
+    } catch (_) { box.innerHTML = ''; }
+  })();
+}
+
 /* 실시간 채팅 위젯 — socket.io 클라이언트 + chat-widget.js를 필요할 때만 동적 로드 */
 function ensureChatWidget() {
   if (window.__chatWidgetLoading) return;

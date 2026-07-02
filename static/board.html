@@ -12,6 +12,9 @@
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
       <div>
@@ -42,10 +45,13 @@
 
     <div class="pagination" id="pagination"></div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
+    renderRail('board');
 
     const state = { page: 1, size: 10, type: '', q: '', sort: 'latest' };
     const listEl = document.getElementById('postList');

@@ -9,9 +9,13 @@
 <body>
   <nav class="navbar">
     <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <span class="breadcrumb" id="breadcrumb"></span>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:820px;">
     <div class="alert" id="alert"></div>
 
@@ -56,6 +60,8 @@
       </div>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -67,6 +73,7 @@
     // 백그라운드 탭 스로틀링의 영향을 받지 않음), wiki-editor.js 다음에 이 스크립트가
     // 오는 것만으로 window.WikiEditor가 이미 준비돼 있음이 보장된다.
     renderNav();
+    renderRail('wiki');
     const alertEl = document.getElementById('alert');
     const slug    = queryParam('slug');
 
@@ -171,6 +178,7 @@
       try {
         const w = await api('/api/wiki/' + encodeURIComponent(slug), { auth: false });
         curDoc = w;
+        renderBreadcrumb([{ label: '위키 홈', href: '/wiki' }, { label: w.title }]);
         const canEdit = Auth.isLoggedIn;
         const isAdmin = Auth.isAdmin;
         card.innerHTML = `

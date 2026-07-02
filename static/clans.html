@@ -12,6 +12,9 @@
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
       <div>
@@ -50,10 +53,13 @@
       <p class="muted" style="padding:40px 0;">불러오는 중...</p>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
+    renderRail('clans');
     const alertEl = document.getElementById('alert');
 
     function fmtMin(m) {

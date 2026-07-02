@@ -12,6 +12,9 @@
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
       <div>
@@ -27,10 +30,13 @@
       출처: <a href="https://www.q-net.or.kr" target="_blank" rel="noopener">q-net.or.kr</a> · 실제 접수일은 큐넷에서 다시 확인하세요.
     </p>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
+    renderRail('exam');
     const alertEl = document.getElementById('alert');
     const content = document.getElementById('content');
 
