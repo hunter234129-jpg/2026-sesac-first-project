@@ -533,6 +533,31 @@ html { scrollbar-width: thin; scrollbar-color: rgba(120,140,180,.25) transparent
 .roadmap .rm .rm-name { font-size: 12px; font-weight: 600; margin-top: 5px; }
 .roadmap .rm .rm-h { font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
 
+/* ── 공부 로드맵(교육과정) ── */
+.curri-grade-head { display: flex; align-items: center; gap: 10px; margin: 26px 0 12px; }
+.curri-grade-head:first-child { margin-top: 4px; }
+.curri-grade-head .cg-badge { font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 99px;
+  background: rgba(107,168,255,.16); color: var(--cyan); flex-shrink: 0; }
+.curri-grade-head .cg-line { flex: 1; height: 1px; background: var(--border); }
+.curri-track { position: relative; padding-left: 26px; }
+.curri-track::before { content: ''; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 2px;
+  background: var(--border); }
+.curri-item { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; }
+.curri-item::before { content: ''; position: absolute; left: -26px; top: 17px; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--space-1, #0a0e1a); border: 2px solid var(--border); }
+.curri-item.done::before { background: var(--green); border-color: var(--green); }
+.curri-check { flex-shrink: 0; width: 22px; height: 22px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--glass); cursor: pointer; display: grid; place-items: center; font-size: 13px; color: transparent;
+  margin-top: 1px; transition: background .15s, border-color .15s; }
+.curri-item.done .curri-check { background: var(--green); border-color: var(--green); color: #04150f; }
+.curri-item .ci-body { flex: 1; }
+.curri-item .ci-name { font-weight: 600; font-size: 14.5px; }
+.curri-item.done .ci-name { color: var(--muted); text-decoration: line-through; }
+.curri-item .ci-desc { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.curri-subject-prog { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.curri-subject-prog .prog { flex: 1; }
+.curri-subject-prog .csp-num { font-size: 13px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
 /* ── 클랜전 랭킹 ── */
 .battle-row { display: flex; align-items: center; gap: 14px; padding: 12px 6px; border-bottom: 1px solid var(--border); color: var(--text); }
 .battle-row:last-child { border-bottom: none; }

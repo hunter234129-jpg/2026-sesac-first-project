@@ -537,17 +537,6 @@
       } catch (_) {}
     })();
 
-    /* ── 최근 업적 ── */
-    (async () => {
-      const box = document.getElementById('achList');
-      try {
-        const s = await api('/api/roadmap/summary');
-        const total = s.reduce((sum, r) => sum + r.total, 0);
-        const done  = s.reduce((sum, r) => sum + r.done_count, 0);
-        document.getElementById('roadmapTileDesc').textContent = `단원 ${done}/${total} 완료`;
-      } catch (_) {}
-    })();
-
     /* ── AI 미니 챗 ── */
     const aiMsgs = document.getElementById('aiMsgs');
     const aiInput = document.getElementById('aiInput');

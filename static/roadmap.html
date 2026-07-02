@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>공부 로드맵 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header">
+      <h1>공부 로드맵</h1>
+      <p>중1부터 고3까지, 과목별 학습 순서를 따라가 보세요</p>
+    </div>
+
+    <div class="tabs" id="subjectTabs">
+      <button class="tab" data-subject="국어">국어</button>
+      <button class="tab" data-subject="영어">영어</button>
+      <button class="tab active" data-subject="수학">수학</button>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="curri-subject-prog">
+        <span style="font-size:13px; color:var(--muted);">진행률</span>
+        <div class="prog"><i id="progFill" style="width:0%;"></i></div>
+        <span class="csp-num" id="progNum">0 / 0</span>
+      </div>
+    </div>
+
+    <div class="card" id="roadmapBody">
+      <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { /* 로그인 페이지로 이동됨 */ }
+    renderNav();
+
+    let state = { subject: '수학' };
+    const bodyEl = document.getElementById('roadmapBody');
+
+    document.getElementById('subjectTabs').onclick = (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      document.querySelectorAll('#subjectTabs .tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.subject = btn.dataset.subject;
+      load();
+    };
+    // 기본 탭 활성 표시 정리(마크업엔 전부 active로 넣어놨으니 최초 진입 시 수학만 강조)
+    document.querySelectorAll('#subjectTabs .tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.subject === state.subject);
+    });
+
+    function updateProgress(total, done) {
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      document.getElementById('progFill').style.width = pct + '%';
+      document.getElementById('progNum').textContent = `${done} / ${total}`;
+    }
+
+    async function load() {
+      bodyEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>';
+      try {
+        const d = await api('/api/roadmap?subject=' + encodeURIComponent(state.subject));
+        updateProgress(d.total, d.done_count);
+
+        bodyEl.innerHTML = d.grades.map(g => `
+          <div class="curri-grade-head">
+            <span class="cg-badge">${escapeHtml(g.grade)}</span>
+            <span class="cg-line"></span>
+          </div>
+          <div class="curri-track">
+            ${g.topics.map(t => `
+              <div class="curri-item ${t.is_done ? 'done' : ''}" data-id="${t.id}">
+                <button class="curri-check" title="완료 체크">✓</button>
+                <div class="ci-body">
+                  <div class="ci-name">${escapeHtml(t.unit_name)}</div>
+                  <div class="ci-desc">${escapeHtml(t.description || '')}</div>
+                </div>
+              </div>`).join('')}
+          </div>`).join('');
+
+        bodyEl.querySelectorAll('.curri-check').forEach(btn => {
+          btn.onclick = async () => {
+            const item = btn.closest('.curri-item');
+            const id = item.dataset.id;
+            btn.disabled = true;
+            try {
+              const r = await api(`/api/roadmap/topics/${id}/toggle`, { method: 'POST' });
+              item.classList.toggle('done', r.is_done);
+              const total = d.total;
+              const done = bodyEl.querySelectorAll('.curri-item.done').length;
+              updateProgress(total, done);
+            } catch (e) { alert(e.message); }
+            finally { btn.disabled = false; }
+          };
+        });
+      } catch (e) {
+        bodyEl.innerHTML = `<p class="muted text-center" style="padding:40px 0;">불러오지 못했어요: ${escapeHtml(e.message)}</p>`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
