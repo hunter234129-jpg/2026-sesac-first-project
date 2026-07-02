@@ -178,7 +178,9 @@
         const s = await api('/api/roadmap/summary');
         const total = s.reduce((sum, r) => sum + r.total, 0);
         const done  = s.reduce((sum, r) => sum + r.done_count, 0);
-        document.getElementById('roadmapTileDesc').textContent = `단원 ${done}/${total} 완료`;
+        const weak  = s.reduce((sum, r) => sum + r.weak_count, 0);
+        document.getElementById('roadmapTileDesc').textContent =
+          `단원 ${done}/${total} 완료` + (weak > 0 ? ` · 약점 ${weak}개` : '');
       } catch (_) {}
     })();
 
