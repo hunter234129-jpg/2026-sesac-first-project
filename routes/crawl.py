@@ -44,7 +44,11 @@ def crawl_qnet_schedule():
 
         body = table.find('tbody') or table
         for tr in body.find_all('tr'):
-            cells = [td.get_text(strip=True) for td in tr.find_all(['td', 'th'])]
+            cells = []
+            for td in tr.find_all(['td', 'th']):
+                for btn in td.find_all('button'):
+                    btn.extract()
+                cells.append(td.get_text(strip=True))
             cells = [c for c in cells if c]
             if not cells:
                 continue

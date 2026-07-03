@@ -165,7 +165,7 @@ const RAIL_ITEMS = [
   { key: 'board',        href: '/board',        icon: '📝', label: '게시판' },
   { key: 'wiki',         href: '/wiki',         icon: '📚', label: '위키' },
   { key: 'clans',        href: '/clans',        icon: '🛡️', label: '클랜' },
-  { key: 'ai',           href: '/chat',         icon: '🛰️', label: 'AI' },
+  { key: 'ai',           href: '/chat',         icon: '🛰️', label: 'AI 도우미' },
   { key: 'ocr',          href: '/ocr',          icon: '🔭', label: 'OCR' },
   { key: 'exam',         href: '/exam',         icon: '🗓️', label: '시험일정' },
   { key: 'members',      href: '/members',      icon: '👥', label: '멤버' },
