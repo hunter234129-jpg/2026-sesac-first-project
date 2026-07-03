@@ -250,6 +250,44 @@ def study_streak():
     })
 
 
+# ── 하루 목표 공부 시간(잔디/타이머 링 기준) ────────────────────────
+MIN_GOAL_MIN = 10     # 10분
+MAX_GOAL_MIN = 720    # 12시간
+
+
+@study_bp.route('/api/study/goal', methods=['GET'])
+@login_required
+def get_goal():
+    conn   = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT daily_goal_min FROM users WHERE id = %s', (g.user_id,))
+        row = cursor.fetchone()
+    finally:
+        conn.close()
+
+    return ok({'daily_goal_min': row['daily_goal_min'] if row else 240})
+
+
+@study_bp.route('/api/study/goal', methods=['PUT'])
+@login_required
+def set_goal():
+    data    = request.get_json(silent=True) or {}
+    minutes = data.get('daily_goal_min')
+    if not isinstance(minutes, int) or not (MIN_GOAL_MIN <= minutes <= MAX_GOAL_MIN):
+        return err(f'목표 시간은 {MIN_GOAL_MIN}~{MAX_GOAL_MIN}분 사이여야 합니다', 'INVALID_GOAL')
+
+    conn   = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('UPDATE users SET daily_goal_min = %s WHERE id = %s', (minutes, g.user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+    return ok({'daily_goal_min': minutes})
+
+
 # ── 공부 잔디(히트맵) ──────────────────────────────────────────────
 @study_bp.route('/api/study/heatmap', methods=['GET'])
 @login_required
@@ -260,6 +298,9 @@ def study_heatmap():
     conn   = get_db()
     cursor = conn.cursor()
     try:
+        cursor.execute('SELECT daily_goal_min FROM users WHERE id = %s', (g.user_id,))
+        goal_row = cursor.fetchone()
+
         cursor.execute(
             '''SELECT DATE(started_at) AS d,
                       SUM(duration_sec) AS total_sec,
@@ -275,12 +316,13 @@ def study_heatmap():
     finally:
         conn.close()
 
+    daily_goal_min = goal_row['daily_goal_min'] if goal_row else 240
     data = [{
         'date':      str(r['d']),
         'total_sec': int(r['total_sec'] or 0),
         'sessions':  r['sessions'],
     } for r in rows]
-    return ok({'days': data, 'range_days': days})
+    return ok({'days': data, 'range_days': days, 'daily_goal_min': daily_goal_min})
 
 
 # ── 실시간 공부 인원 ───────────────────────────────────────────────

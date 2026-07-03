@@ -173,7 +173,6 @@ const RAIL_ITEMS = [
   { key: 'missions',     href: '/missions',     icon: '🎯', label: '미션' },
   { key: 'quiz',         href: '/roadmap',      icon: '📝', label: '문제풀기' },
   { key: 'achievements', href: '/achievements', icon: '🏅', label: '업적' },
-  { key: 'planet',       href: '/planet',       icon: '🪐', label: '행성' },
   { key: 'mypage',       href: '/mypage',       icon: '👤', label: 'MY' },
   { key: 'admin',        href: '/admin',        icon: '🛸', label: '관리자', adminOnly: true },
   { key: 'api-docs',     href: '/api-docs',     icon: '🔌', label: 'API', adminOnly: true },
@@ -190,7 +189,7 @@ function renderRail(activeKey) {
           <span class="ic">${it.icon}</span><span class="lb">${it.label}</span>
         </a>`).join('')}
     </nav>
-    <div class="app-rail-planet" id="appRailPlanet"></div>`;
+    <a class="app-rail-planet" id="appRailPlanet" href="/planet" title="내 행성 보기"></a>`;
   (async () => {
     const box = document.getElementById('appRailPlanet');
     try {

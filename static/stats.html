@@ -30,16 +30,36 @@
 
     <!-- 연속 공부 + 잔디 -->
     <div class="card section">
-      <div class="section-head"><h2>🔥 연속 공부 &amp; 잔디</h2><span class="muted" id="heatHint" style="font-size:12px;"></span></div>
+      <div class="section-head">
+        <h2>🔥 연속 공부 &amp; 잔디</h2>
+        <span class="muted" id="heatHint" style="font-size:12px;"></span>
+      </div>
+      <div class="goal-row" id="goalRow">
+        <span class="goal-badge" id="goalBadge">🎯 목표: -</span>
+        <button class="btn btn-ghost goal-edit-btn" id="goalEditBtn">수정</button>
+        <div class="goal-edit hidden" id="goalEditWrap">
+          <input type="number" id="goalHoursInput" min="0.5" max="12" step="0.5">
+          <span class="muted" style="font-size:12.5px;">시간 / 하루</span>
+          <button class="btn btn-primary" id="goalSaveBtn">저장</button>
+          <button class="btn btn-ghost" id="goalCancelBtn">취소</button>
+        </div>
+      </div>
+      <p class="goal-explain">🌱 그날 목표 시간을 얼마나 채웠는지에 따라 잔디 색이 정해져요. <b>많이 공부할수록 잔디가 진해져요</b> — 목표를 다 채우면 꽉 찬 초록, 목표를 훌쩍 넘기면 반짝이는 황금빛 잔디가 돼요!</p>
       <div class="streak-grid">
         <div class="streak-cell"><div class="em" id="stFire">🔥</div><div class="v" id="stCur">-</div><div class="k">현재 연속</div></div>
         <div class="streak-cell"><div class="em">🏆</div><div class="v cy" id="stMax">-</div><div class="k">최장 연속</div></div>
         <div class="streak-cell"><div class="em">🪐</div><div class="v gr" id="stDays">-</div><div class="k">공부한 날</div></div>
+        <div class="streak-cell"><div class="em">✅</div><div class="v" id="stGoalDays" style="color:var(--yellow);">-</div><div class="k">목표 달성일</div></div>
       </div>
       <div class="heatmap" id="heatmap"><p class="chart-empty">불러오는 중...</p></div>
-      <div class="heat-legend">적음
-        <span class="heat-cell"></span><span class="heat-cell l1"></span><span class="heat-cell l2"></span><span class="heat-cell l3"></span><span class="heat-cell l4"></span>
-        많음</div>
+      <div class="heat-legend">0%
+        <span class="heat-cell" style="background:rgba(52,211,153,.18);"></span>
+        <span class="heat-cell" style="background:rgba(52,211,153,.36);"></span>
+        <span class="heat-cell" style="background:rgba(52,211,153,.54);"></span>
+        <span class="heat-cell" style="background:rgba(52,211,153,.72);"></span>
+        <span class="heat-cell l-full"></span>
+        <span class="heat-cell l-super"></span>
+        100%+</div>
     </div>
 
     <!-- 차트 -->
@@ -221,25 +241,33 @@
         document.getElementById('stFire').style.opacity = d.studied_today ? '1' : '.35';
       } catch (_) {}
     }
+    let dailyGoalMin = 240;
+
     async function loadHeatmap() {
       const wrap = document.getElementById('heatmap');
       try {
         const d = await api('/api/study/heatmap?days=119');
+        dailyGoalMin = d.daily_goal_min || 240;
+        renderGoalBadge();
+        const goalSec = dailyGoalMin * 60;
+
         const map = {};
         (d.days || []).forEach(x => { map[x.date] = +x.total_sec || 0; });
         const today = new Date(); today.setHours(0,0,0,0);
         const cur = new Date(today);
         cur.setDate(today.getDate() - 118);
         cur.setDate(cur.getDate() - cur.getDay());   // 주 시작(일요일)으로 정렬
-        const lvl = sec => {
-          if (!sec) return '';
-          const h = sec / 3600;
-          if (h < 0.5) return 'l1';
-          if (h < 1.5) return 'l2';
-          if (h < 3)   return 'l3';
-          return 'l4';
+        // 목표(goalSec) 대비 달성률에 정비례해서 잔디 농도가 연속적으로 진해지도록 계산
+        const MIN_OPACITY = 0.16, MAX_OPACITY = 0.9;
+        const heatCell = sec => {
+          if (!sec) return { cls: '', style: '' };
+          const ratio = sec / goalSec;
+          if (ratio >= 1.5) return { cls: 'l-super', style: '' };   // 목표의 150%+ : 특별히 반짝이는 강조
+          if (ratio >= 1)   return { cls: 'l-full',  style: '' };   // 목표 달성
+          const opacity = MIN_OPACITY + Math.min(ratio, 1) * (MAX_OPACITY - MIN_OPACITY);
+          return { cls: '', style: `background:rgba(52,211,153,${opacity.toFixed(2)});` };
         };
-        const weeks = []; let studiedDays = 0;
+        const weeks = []; let studiedDays = 0, goalDays = 0;
         while (cur <= today) {
           const col = [];
           for (let i = 0; i < 7; i++) {
@@ -247,7 +275,11 @@
             else {
               const key = ymd(cur), sec = map[key] || 0;
               if (sec) studiedDays++;
-              col.push(`<div class="heat-cell ${lvl(sec)}" title="${key} · ${sec ? fmtDur(sec) : '기록 없음'}"></div>`);
+              if (sec >= goalSec) goalDays++;
+              const pct = Math.round(sec / goalSec * 100);   // 목표 초과 시 100% 넘게도 표시
+              const title = sec ? `${key} · ${fmtDur(sec)} (목표 대비 ${pct}%)` : `${key} · 기록 없음`;
+              const { cls, style } = heatCell(sec);
+              col.push(`<div class="heat-cell ${cls}" style="${style}" title="${title}"></div>`);
             }
             cur.setDate(cur.getDate() + 1);
           }
@@ -255,10 +287,51 @@
         }
         wrap.innerHTML = weeks.join('');
         document.getElementById('heatHint').textContent = `최근 17주 · 공부한 날 ${studiedDays}일`;
+        document.getElementById('stGoalDays').textContent = goalDays + '일';
       } catch (err) {
         wrap.innerHTML = `<p class="chart-empty">${escapeHtml(err.message)}</p>`;
       }
     }
+
+    /* ── 하루 목표 설정 ── */
+    function renderGoalBadge() {
+      const h = dailyGoalMin / 60;
+      document.getElementById('goalBadge').textContent = `🎯 목표: ${h % 1 === 0 ? h : h.toFixed(1)}시간 / 하루`;
+    }
+
+    const goalEditBtn  = document.getElementById('goalEditBtn');
+    const goalEditWrap = document.getElementById('goalEditWrap');
+    const goalHoursInput = document.getElementById('goalHoursInput');
+
+    goalEditBtn.onclick = () => {
+      goalHoursInput.value = dailyGoalMin / 60;
+      goalEditWrap.classList.remove('hidden');
+      goalEditBtn.classList.add('hidden');
+      goalHoursInput.focus();
+    };
+    document.getElementById('goalCancelBtn').onclick = () => {
+      goalEditWrap.classList.add('hidden');
+      goalEditBtn.classList.remove('hidden');
+    };
+    document.getElementById('goalSaveBtn').onclick = async () => {
+      const hours = parseFloat(goalHoursInput.value);
+      if (!hours || hours < 0.5 || hours > 12) {
+        alert('목표 시간은 0.5시간에서 12시간 사이로 입력해주세요');
+        return;
+      }
+      const btn = document.getElementById('goalSaveBtn');
+      btn.disabled = true;
+      try {
+        await api('/api/study/goal', { method: 'PUT', body: { daily_goal_min: Math.round(hours * 60) } });
+        goalEditWrap.classList.add('hidden');
+        goalEditBtn.classList.remove('hidden');
+        loadHeatmap();
+      } catch (e) {
+        alert(e.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
 
     /* ── 초기 로드 ── */
     loadSummary();
