@@ -81,17 +81,13 @@
     <li><code>PATCH  /api/notifications/read-all</code>       <span class="note">전체 읽음 (JWT)</span></li>
   </ul>
 
-  <h2>Clans</h2>
+  <h2>모임 (스터디 모집글, type=study)</h2>
   <ul>
-    <li><code>GET    /api/clans</code>                        <span class="note">클랜 목록 · 기여도 랭킹</span></li>
-    <li><code>POST   /api/clans</code>                        <span class="note">클랜 생성 (JWT)</span></li>
-    <li><code>GET    /api/clans/:id</code>                    <span class="note">클랜 상세</span></li>
-    <li><code>GET    /api/clans/:id/members</code>            <span class="note">멤버 조회</span></li>
-    <li><code>POST   /api/clans/:id/join</code>               <span class="note">가입 (JWT)</span></li>
-    <li><code>DELETE /api/clans/:id/leave</code>              <span class="note">탈퇴 (JWT)</span></li>
-    <li><code>GET    /api/clans/ranking</code>                <span class="note">클랜전 — 이번 주 합산 공부시간 랭킹</span></li>
-    <li><code>GET    /api/clans/:id/battle</code>             <span class="note">클랜전 현황 · 목표 진행률 · 멤버 기여</span></li>
-    <li><code>PUT    /api/clans/:id/goal</code>               <span class="note">주간 공동 목표 설정 (JWT, 클랜장)</span></li>
+    <li><code>GET    /api/posts/:id/members</code>            <span class="note">멤버 · 기여도 조회 (study 전용)</span></li>
+    <li><code>POST   /api/posts/:id/join</code>               <span class="note">가입 (JWT)</span></li>
+    <li><code>DELETE /api/posts/:id/leave</code>              <span class="note">탈퇴 (JWT, 글쓴이는 불가)</span></li>
+    <li><code>GET    /api/posts/:id/chat</code>                <span class="note">그룹 채팅 기록 (JWT, 멤버만)</span></li>
+    <li><code>POST   /api/posts</code>                        <span class="note">모임 생성 = 글쓰기 (JWT, linked_exam_name 선택)</span></li>
   </ul>
 
   <h2>Wiki</h2>

@@ -24,6 +24,28 @@
       <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
     </div>
 
+    <div class="card section hidden" id="membersCard" style="margin-top:20px;">
+      <div class="section-head"><h2>멤버 <span id="memberCount" class="muted"></span></h2></div>
+      <div class="rank-list" id="memberList"></div>
+    </div>
+
+    <!-- 모임 채팅 — 카카오톡 오픈채팅 방식, 가입한 멤버만 접근·영구 보존 -->
+    <div class="card section clan-chat-card hidden" id="chatCard" style="margin-top:20px;">
+      <div class="section-head"><h2>💬 모임 채팅</h2><span class="live-dot" id="chatLiveDot" title="실시간 연결됨" style="display:none;">●</span></div>
+      <div class="clan-chat-log" id="chatLog">
+        <button type="button" class="btn btn-ghost clan-chat-more hidden" id="loadMoreBtn">이전 메시지 더보기</button>
+      </div>
+      <form class="clan-chat-form" id="chatForm">
+        <button type="button" class="cf-file-btn" id="chatFileBtn" title="파일 첨부">＋</button>
+        <input type="file" id="chatFileInput" hidden>
+        <input type="text" id="chatTextInput" placeholder="메시지를 입력하세요" maxlength="1000" autocomplete="off">
+        <button type="submit" class="btn btn-primary">전송</button>
+      </form>
+      <p class="muted clan-chat-readonly hidden" id="chatReadonlyNote" style="font-size:12px; text-align:center; margin-top:8px;">
+        탈퇴한 모임이라 새 메시지는 보낼 수 없어요. 지난 대화만 볼 수 있어요.
+      </p>
+    </div>
+
     <div class="comments-section" id="commentsSection" style="display:none;">
       <h3>댓글 <span id="commentCount">0</span></h3>
       <div id="commentList"></div>
@@ -41,6 +63,7 @@
   </div>
 
   <script src="/static/js/api.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
     renderNav();
     renderRail('board');
@@ -49,6 +72,7 @@
     if (!postId) { showAlert(alertEl, '잘못된 접근입니다.'); }
 
     const myId = Auth.userId;
+    let amMember = false;
 
     /* ── 게시글 상세 ── */
     async function loadPost() {
@@ -70,9 +94,10 @@
         if (isStudy) {
           recruitHtml = `
             <div class="pd-recruit">
-              <div><div class="label">모집 인원</div>${p.recruit_count || 0}명</div>
+              <div><div class="label">모집 인원</div>${p.recruit_count || 0}명 (현재 ${p.member_count || 0}명)</div>
               <div><div class="label">모집 마감일</div>${p.recruit_deadline || '미정'}</div>
               <div><div class="label">분야</div>${escapeHtml(p.field || '미지정')}</div>
+              ${p.linked_exam_name ? `<div><div class="label">연동 시험</div>🗓️ ${escapeHtml(p.linked_exam_name)}</div>` : ''}
             </div>`;
         }
 
@@ -84,6 +109,12 @@
               <a class="btn btn-ghost" href="/write?id=${p.id}" style="padding:7px 14px;">수정</a>
               <button class="btn btn-danger" id="deleteBtn" style="padding:7px 14px;">삭제</button>
             </div>`;
+        } else if (isStudy) {
+          if (!Auth.isLoggedIn) {
+            ownerActions = `<div class="pd-actions"><a class="btn btn-primary" href="/login?next=${encodeURIComponent('/post?id='+postId)}" style="padding:7px 14px;">로그인 후 참가</a></div>`;
+          } else {
+            ownerActions = `<div class="pd-actions"><button class="btn btn-primary" id="joinBtn" style="padding:7px 14px;">참가하기</button></div>`;
+          }
         }
 
         card.innerHTML = `
@@ -112,9 +143,56 @@
           try { await api(`/api/posts/${postId}/status`, { method: 'PATCH', body: { status: next } }); loadPost(); }
           catch (err) { showAlert(alertEl, err.message); }
         };
+        // 모임 참가
+        const joinBtn = document.getElementById('joinBtn');
+        if (joinBtn) joinBtn.onclick = async () => {
+          setLoading(joinBtn, true);
+          try { await api(`/api/posts/${postId}/join`, { method: 'POST' }); loadPost(); loadMembers(); }
+          catch (err) { showAlert(alertEl, err.message); setLoading(joinBtn, false, '참가하기'); }
+        };
+
+        if (isStudy) {
+          loadMembers(p.user_id);
+          if (Auth.isLoggedIn) initChat();
+        }
       } catch (err) {
         card.innerHTML = `<p class="muted text-center" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
       }
+    }
+
+    /* ── 멤버 목록(스터디 모임) ── */
+    async function loadMembers(ownerId) {
+      try {
+        const members = await api(`/api/posts/${postId}/members`, { auth: false });
+        amMember = Auth.isLoggedIn && members.some(m => m.id === myId);
+        document.getElementById('membersCard').classList.remove('hidden');
+        document.getElementById('memberCount').textContent = `${members.length}명`;
+        const el = document.getElementById('memberList');
+        el.innerHTML = members.map((m, i) => {
+          const isLeader = m.id === ownerId;
+          const isMe = m.id === myId;
+          return `
+            <div class="rank-row ${isMe ? 'me' : ''}">
+              <div class="rank-num">${i + 1}</div>
+              <div class="rank-name">
+                ${isLeader ? '👑 ' : ''}${escapeHtml(m.username)}
+                ${isMe ? '<span class="you">나</span>' : ''}
+              </div>
+              <div class="rank-time">${m.contribution_score}점</div>
+            </div>`;
+        }).join('');
+        if (amMember && ownerId !== myId) {
+          el.insertAdjacentHTML('beforeend', `
+            <div style="margin-top:12px; text-align:right;">
+              <button class="btn btn-ghost" id="leaveBtn" style="padding:6px 14px;">탈퇴하기</button>
+            </div>`);
+          document.getElementById('leaveBtn').onclick = async () => {
+            if (!confirm('모임에서 탈퇴할까요?')) return;
+            try { await api(`/api/posts/${postId}/leave`, { method: 'DELETE' }); loadPost(); }
+            catch (err) { showAlert(alertEl, err.message); }
+          };
+        }
+      } catch (_) {}
     }
 
     /* ── 댓글 ── */
@@ -234,6 +312,151 @@
       document.getElementById('commentForm').style.display = 'none';
       document.getElementById('loginToComment').style.display = 'block';
     }
+
+    /* ══════════ 모임 채팅 — 카카오톡 오픈채팅 방식 ══════════
+       가입 절차 자체가 이미 입장 승인이라 신청/수락 핸드셰이크가 없다.
+       탈퇴해도 대화 기록은 지워지지 않고(영구 보존), 본인이 나간 시점까지만 계속 보인다. */
+    const AVATARS = [
+      { emoji: '🦊', bg: '#FF6B6B' }, { emoji: '🐱', bg: '#FFA94D' }, { emoji: '🐶', bg: '#FFD43B' },
+      { emoji: '🐼', bg: '#94D82D' }, { emoji: '🐨', bg: '#37B24D' }, { emoji: '🦁', bg: '#20C997' },
+      { emoji: '🐯', bg: '#22B8CF' }, { emoji: '🐵', bg: '#4DABF7' }, { emoji: '🐰', bg: '#5C7CFA' },
+      { emoji: '🐺', bg: '#845EF7' }, { emoji: '🐸', bg: '#CC5DE8' }, { emoji: '🐧', bg: '#F783AC' },
+      { emoji: '🦉', bg: '#FF8787' }, { emoji: '🐙', bg: '#FFC078' }, { emoji: '🦋', bg: '#FFE066' },
+      { emoji: '🐹', bg: '#B2F2BB' }, { emoji: '🐭', bg: '#99E9F2' }, { emoji: '🐔', bg: '#91A7FF' },
+      { emoji: '🐮', bg: '#D0BFFF' }, { emoji: '🐷', bg: '#FCC2D7' },
+    ];
+    function avatarChip(avatarId, size) {
+      const a = AVATARS[avatarId] || AVATARS[0];
+      return `<span class="avatar-chip" style="background:${a.bg}; width:${size}px; height:${size}px; font-size:${Math.round(size * 0.58)}px;">${a.emoji}</span>`;
+    }
+
+    let chatSocket = null;
+    let oldestMsgId = null;
+    let chatIsActiveMember = false;
+
+    function chatBubbleHtml(m) {
+      if (m.msg_type === 'system') {
+        return `<div class="clan-chat-sys" data-id="${m.id}">${escapeHtml(m.content)}</div>`;
+      }
+      const mine = m.sender_id === myId;
+      let body;
+      if (m.msg_type === 'file') {
+        const isImage = (m.mime_type || '').startsWith('image/');
+        body = isImage
+          ? `<a href="${m.file_url}" target="_blank" rel="noopener noreferrer"><img class="cf-file-img" src="${m.file_url}" alt="${escapeHtml(m.file_name)}"></a>`
+          : `<a href="${m.file_url}" target="_blank" rel="noopener noreferrer" class="cf-file-link">📎 ${escapeHtml(m.file_name)}</a>`;
+      } else {
+        body = escapeHtml(m.content);
+      }
+      return `
+        <div class="clan-chat-row ${mine ? 'mine' : ''}" data-id="${m.id}">
+          ${!mine ? avatarChip(m.avatar_id, 26) : ''}
+          <div class="ccr-bubble-wrap">
+            ${!mine ? `<div class="ccr-name">${escapeHtml(m.username)}</div>` : ''}
+            <div class="ccr-bubble ${m.msg_type === 'file' ? 'file' : ''}">${body}</div>
+          </div>
+        </div>`;
+    }
+
+    function appendMessages(msgs, prepend) {
+      if (!msgs.length) return;
+      const log = document.getElementById('chatLog');
+      const moreBtn = document.getElementById('loadMoreBtn');
+      const html = msgs.map(chatBubbleHtml).join('');
+      if (prepend) {
+        const beforeHeight = log.scrollHeight;
+        moreBtn.insertAdjacentHTML('afterend', html);
+        log.scrollTop = log.scrollHeight - beforeHeight;
+        oldestMsgId = msgs[0].id;
+      } else {
+        log.insertAdjacentHTML('beforeend', html);
+        log.scrollTop = log.scrollHeight;
+        if (oldestMsgId === null) oldestMsgId = msgs[0].id;
+      }
+    }
+
+    async function loadChatHistory(before) {
+      const qs = before ? `?before=${before}&size=30` : '?size=30';
+      const d = await api(`/api/posts/${postId}/chat${qs}`);
+      chatIsActiveMember = d.is_active_member;
+      document.getElementById('loadMoreBtn').classList.toggle('hidden', !d.has_more);
+      appendMessages(d.messages, !!before);
+      document.getElementById('chatForm').style.display = chatIsActiveMember ? 'flex' : 'none';
+      document.getElementById('chatReadonlyNote').classList.toggle('hidden', chatIsActiveMember);
+    }
+
+    function connectChatSocket() {
+      if (chatSocket || !chatIsActiveMember) return;
+      chatSocket = io({ auth: { token: Auth.token } });
+      const liveDot = document.getElementById('chatLiveDot');
+      chatSocket.on('connect', () => {
+        liveDot.style.display = 'inline';
+        chatSocket.emit('join_post_chat', { post_id: Number(postId) });
+      });
+      chatSocket.on('disconnect', () => { liveDot.style.display = 'none'; });
+      chatSocket.on('post_message', (m) => {
+        if (m.post_id !== Number(postId)) return;
+        appendMessages([m], false);
+      });
+      chatSocket.on('chat_blocked', (d) => {
+        if (d.post_id !== Number(postId)) return;
+        appendMessages([{ id: 'blocked-' + Date.now(), msg_type: 'system', content: d.message }], false);
+      });
+      chatSocket.on('post_kicked', (d) => {
+        if (d.post_id !== Number(postId)) return;
+        chatSocket.emit('leave_post_chat', { post_id: Number(postId) });
+        chatIsActiveMember = false;
+        document.getElementById('chatForm').style.display = 'none';
+        document.getElementById('chatReadonlyNote').classList.remove('hidden');
+      });
+    }
+
+    async function initChat() {
+      try {
+        await loadChatHistory();
+      } catch (err) {
+        if (err.code === 'NOT_MEMBER') return;   // 가입 안 한 사람에겐 그냥 숨김(정상 상태)
+        showAlert(alertEl, err.message);
+        return;
+      }
+      document.getElementById('chatCard').classList.remove('hidden');
+      connectChatSocket();
+    }
+
+    document.getElementById('loadMoreBtn').onclick = () => loadChatHistory(oldestMsgId);
+
+    document.getElementById('chatForm').onsubmit = (e) => {
+      e.preventDefault();
+      const input = document.getElementById('chatTextInput');
+      const text = input.value.trim();
+      if (!text || !chatSocket) return;
+      chatSocket.emit('post_message', { post_id: Number(postId), message: text });
+      input.value = '';
+    };
+
+    const chatFileBtn   = document.getElementById('chatFileBtn');
+    const chatFileInput = document.getElementById('chatFileInput');
+    chatFileBtn.onclick = () => chatFileInput.click();
+    chatFileInput.onchange = async () => {
+      const file = chatFileInput.files[0];
+      chatFileInput.value = '';
+      if (!file || !chatSocket) return;
+      chatFileBtn.disabled = true;
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('ref_type', 'post_chat');
+        const uploaded = await api('/api/upload', { method: 'POST', body: fd, isForm: true });
+        chatSocket.emit('post_file', {
+          post_id: Number(postId), file_url: uploaded.url, file_name: uploaded.original,
+          mime_type: file.type, file_size: file.size,
+        });
+      } catch (err) {
+        showAlert(alertEl, err.message || '파일 업로드에 실패했어요.');
+      } finally {
+        chatFileBtn.disabled = false;
+      }
+    };
 
     if (postId) { loadPost(); loadComments(); }
   </script>

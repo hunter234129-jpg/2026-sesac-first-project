@@ -64,11 +64,13 @@ def end_study():
         cursor.execute('SELECT duration_sec FROM study_sessions WHERE id = %s', (session['id'],))
         duration = cursor.fetchone()['duration_sec']
 
-        # 클랜 기여도 누적 (분 단위) — 가입한 모든 클랜에 반영
+        # 모임 기여도 누적 (분 단위) — 현재 활성 가입 중인 모임에만 반영
+        # (탈퇴한 모임은 left_at이 남아있는 채로 행이 유지되므로 제외해야 함)
         mins = (duration or 0) // 60
         if mins > 0:
             cursor.execute(
-                'UPDATE clan_members SET contribution_score = contribution_score + %s WHERE user_id = %s',
+                'UPDATE post_members SET contribution_score = contribution_score + %s '
+                'WHERE user_id = %s AND left_at IS NULL',
                 (mins, g.user_id)
             )
             conn.commit()

@@ -715,6 +715,64 @@ html { scrollbar-width: thin; scrollbar-color: rgba(120,140,180,.25) transparent
 .battle-vs .bv-side.a .bv-prog > i { background: linear-gradient(90deg, #4deeff, var(--cyan)); box-shadow: 0 0 8px rgba(0,229,255,.5); }
 .battle-vs .bv-side.b .bv-prog > i { background: linear-gradient(90deg, #c084fc, var(--violet)); box-shadow: 0 0 8px rgba(168,85,247,.5); }
 
+/* ── 모임 생성 시 시험명 매칭 피커 ── */
+.exam-match-box {
+  margin: -6px 0 16px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(0,229,255,.05); border: 1px solid rgba(0,229,255,.2);
+}
+.exam-match-title { font-size: 13px; color: var(--text); margin-bottom: 10px; }
+.exam-match-title b { color: var(--cyan); }
+.exam-match-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+.exam-match-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; border-radius: 9px; cursor: pointer;
+  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+  transition: border-color .15s, background .15s;
+}
+.exam-match-item:hover { border-color: rgba(0,229,255,.35); }
+.exam-match-item.selected { border-color: var(--cyan); background: rgba(0,229,255,.1); }
+.exam-match-item .emi-name { font-size: 13.5px; font-weight: 700; }
+.exam-match-item .emi-date { font-size: 11.5px; color: var(--muted); margin-top: 2px; font-family: var(--font-mono); }
+.exam-match-item .emi-check { opacity: 0; color: var(--cyan); font-weight: 800; transition: opacity .15s; }
+.exam-match-item.selected .emi-check { opacity: 1; }
+.exam-match-item.exam-match-skip { justify-content: center; color: var(--faint); font-size: 12.5px; background: transparent; border-style: dashed; }
+.exam-match-item.exam-match-skip:hover { color: var(--muted); }
+
+/* ── 클랜 그룹 채팅(카카오톡 오픈채팅 방식) ── */
+.clan-chat-card { display: flex; flex-direction: column; }
+.clan-chat-log { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; padding: 4px 2px 8px; margin-bottom: 12px; }
+.clan-chat-more { font-size: 12.5px; padding: 7px; margin-bottom: 4px; flex-shrink: 0; }
+.clan-chat-sys { align-self: center; font-size: 12px; color: var(--faint); background: rgba(255,255,255,.03); padding: 4px 12px; border-radius: 99px; }
+.clan-chat-row { display: flex; align-items: flex-end; gap: 8px; max-width: 80%; }
+.clan-chat-row.mine { align-self: flex-end; flex-direction: row-reverse; }
+.ccr-bubble-wrap { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.clan-chat-row.mine .ccr-bubble-wrap { align-items: flex-end; }
+.ccr-name { font-size: 11.5px; color: var(--muted); padding-left: 2px; }
+.ccr-bubble {
+  padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); border-bottom-left-radius: 4px;
+}
+.clan-chat-row.mine .ccr-bubble {
+  background: linear-gradient(135deg, #4deeff, var(--cyan)); color: #04121a; border: none;
+  border-bottom-left-radius: 14px; border-bottom-right-radius: 4px;
+}
+.ccr-bubble.file { padding: 6px; background: none; border: none; }
+.ccr-bubble .cf-file-img { display: block; max-width: 220px; max-height: 200px; border-radius: 10px; }
+.ccr-bubble .cf-file-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); color: var(--text); font-size: 13px; }
+.clan-chat-form { display: flex; gap: 8px; align-items: center; }
+.clan-chat-form input[type="text"] {
+  flex: 1; padding: 10px 13px; background: rgba(5,8,18,.6); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px; font-size: 14px; font-family: var(--font);
+}
+.clan-chat-form input[type="text"]:focus { outline: none; border-color: var(--border-lit); box-shadow: 0 0 0 3px rgba(0,229,255,.15); }
+.clan-chat-form .cf-file-btn {
+  flex-shrink: 0; background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 10px;
+  font-size: 18px; font-weight: 700; color: var(--cyan); padding: 8px 12px; cursor: pointer; line-height: 1;
+}
+.clan-chat-form .cf-file-btn:hover { border-color: var(--border-lit); background: rgba(0,229,255,.08); }
+.clan-chat-form .cf-file-btn:disabled { opacity: .5; cursor: not-allowed; }
+
 /* ── 클랜 기여도 랭킹 테이블 — 메달 + 네온 기여도 바 ── */
 .crt-head, .crt-row { display: grid; grid-template-columns: 40px minmax(0,1.3fr) 56px minmax(0,1fr) 96px; align-items: center; gap: 12px; padding: 10px 12px; }
 .crt-head { font-size: 10.5px; color: var(--faint); font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,.07); padding-top: 2px; padding-bottom: 8px; }

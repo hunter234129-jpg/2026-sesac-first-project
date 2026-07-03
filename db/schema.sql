@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ── 게시판 ───────────────────────────────────────────────────────────
+-- type='study'(스터디 모집) 게시글이 곧 "모임"이다. 예전엔 별도 클랜 시스템이
+-- 있었는데 역할이 거의 겹쳐서 통합했다 — 모임(가입·기여도·그룹채팅)은
+-- post_members/post_chat_messages 테이블로, 아래 CREATE TABLE 참고.
 CREATE TABLE IF NOT EXISTS posts (
     id               INT AUTO_INCREMENT PRIMARY KEY,
     user_id          INT          NOT NULL,
@@ -38,10 +41,42 @@ CREATE TABLE IF NOT EXISTS posts (
     recruit_count    INT  DEFAULT 0,
     recruit_deadline DATE,
     field            VARCHAR(100),
+    linked_exam_name VARCHAR(150) DEFAULT NULL,  -- 특정 시험 준비 모임이면 연결(선택, exams.name)
     deleted_at       DATETIME DEFAULT NULL,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- 스터디 모집(모임) 참가자 — 참가 신청 = 여기에 행 추가. 탈퇴는 소프트 삭제(left_at)라
+-- 나간 시점 이전 채팅 기록은 계속 보이고 그 이후만 비공개 처리할 수 있다.
+CREATE TABLE IF NOT EXISTS post_members (
+    post_id            INT NOT NULL,
+    user_id            INT NOT NULL,
+    contribution_score INT DEFAULT 0,
+    joined_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    left_at            DATETIME DEFAULT NULL,
+    PRIMARY KEY (post_id, user_id),
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 모임 그룹 채팅 — 카카오톡 오픈채팅 방식, 영구 보존. 방 개념은 별도 테이블 없이
+-- post_id를 그대로 room key로 쓴다. 참가 신청 순간부터 채팅이 바로 열린다.
+CREATE TABLE IF NOT EXISTS post_chat_messages (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    post_id    INT NOT NULL,
+    sender_id  INT DEFAULT NULL,        -- 시스템 메시지(참가/탈퇴 알림)는 NULL
+    msg_type   ENUM('text','file','system') DEFAULT 'text',
+    content    TEXT,
+    file_url   VARCHAR(255) DEFAULT NULL,
+    file_name  VARCHAR(255) DEFAULT NULL,
+    file_size  INT          DEFAULT NULL,
+    mime_type  VARCHAR(100) DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id)   REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_post_created (post_id, created_at)
 );
 
 CREATE TABLE IF NOT EXISTS comments (
@@ -122,25 +157,48 @@ CREATE TABLE IF NOT EXISTS study_sessions (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- ── 클랜 ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS clans (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    name            VARCHAR(100) NOT NULL UNIQUE,
-    description     TEXT         DEFAULT NULL,
-    leader_id       INT          NOT NULL,
-    weekly_goal_min INT          DEFAULT 600,   -- 주간 공동 목표(분), 기본 10시간
-    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (leader_id) REFERENCES users(id)
+-- ── 시험 정보(모임-시험 연결용) ──────────────────────────────────────
+-- 크롤링/API로 수집한 시험 일정을 정규화해서 저장한다(exams_unparsed는
+-- 크롤러가 날짜 파싱 등에 실패한 원본 행을 격리하는 검역 테이블).
+CREATE TABLE IF NOT EXISTS exams (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    name           VARCHAR(150) NOT NULL,               -- 시험명(예: 정보처리기사)
+    round          INT          DEFAULT NULL,           -- 회차(예: 3)
+    category       VARCHAR(50)  DEFAULT NULL,           -- 분류(예: IT자격증, 어학)
+    source         VARCHAR(50)  NOT NULL DEFAULT 'qnet', -- 데이터 출처(qnet, toeic 등)
+    apply_start    DATE         DEFAULT NULL,           -- 원서접수 시작일
+    apply_end      DATE         DEFAULT NULL,           -- 원서접수 종료일
+    exam_start     DATE         DEFAULT NULL,           -- 시험일(시작, 당일이면 exam_end와 동일)
+    exam_end       DATE         DEFAULT NULL,           -- 시험일(종료)
+    result_date    DATE         DEFAULT NULL,           -- 합격자 발표일
+    source_url     VARCHAR(255) DEFAULT NULL,           -- 원본 페이지 링크
+    last_synced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    -- (name, round)만으로 유니크 — Q-net 캘린더는 원서접수/시험일/발표일이 서로 다른
+    -- 날짜(=다른 크롤링 행)로 따로 나오는데, exam_start까지 키에 넣으면 그 정보가 아직
+    -- 없는 시점(원서접수만 크롤링된 상태)에 매번 새 행이 생겨버린다.
+    UNIQUE KEY uq_exam_instance (name, round)
 );
 
-CREATE TABLE IF NOT EXISTS clan_members (
-    clan_id            INT NOT NULL,
-    user_id            INT NOT NULL,
-    contribution_score INT DEFAULT 0,
-    joined_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (clan_id, user_id),
-    FOREIGN KEY (clan_id) REFERENCES clans(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS exams_unparsed (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    source     VARCHAR(50)  NOT NULL,
+    raw_data   TEXT         NOT NULL,    -- 크롤링 원본 행(JSON 문자열)
+    reason     VARCHAR(255) DEFAULT NULL, -- 실패 사유(날짜 파싱 실패 등)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Q-net 개별 국가기술자격 종목(jmCd) 추적 목록. Q-net 자체 드롭다운이
+-- 자바스크립트로만 채워져서 "전체 종목+코드" 목록을 한 번에 못 가져오기 때문에,
+-- 크롤링하고 싶은 종목만 여기 하나씩 등록해서 관리한다(코드 배포 없이 행 추가만 하면 됨).
+-- admin_org가 한국산업인력공단이 아니면(예: 정보보안기사는 KCA 시행) Q-net 자체
+-- 일정 API에 데이터가 없어서 schedulable=0으로 두고 정직하게 "일정 없음" 처리한다.
+CREATE TABLE IF NOT EXISTS qnet_jmcd_registry (
+    jmcd        VARCHAR(10)  PRIMARY KEY,
+    cert_name   VARCHAR(100) NOT NULL,
+    admin_org   VARCHAR(100) DEFAULT NULL,
+    schedulable TINYINT(1)   DEFAULT 1,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ── 미션 ─────────────────────────────────────────────────────────────
@@ -182,6 +240,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     msg_type   ENUM('text','file') DEFAULT 'text',
     file_url   VARCHAR(255) DEFAULT NULL,
     file_name  VARCHAR(255) DEFAULT NULL,
+    file_size  INT          DEFAULT NULL,
     mime_type  VARCHAR(100) DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (room_id)   REFERENCES chat_rooms(id) ON DELETE CASCADE,
@@ -423,3 +482,22 @@ CREATE TABLE IF NOT EXISTS ai_quiz_wrong_notes (
 --     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
 --     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 -- );
+--
+-- -- ── 시험 연동 모임(클랜) + 그룹 채팅 — exams/exams_unparsed/clan_chat_messages는
+-- -- CREATE TABLE IF NOT EXISTS라 schema.sql을 다시 실행하면 기존 DB에도 새로 생긴다.
+-- -- 아래는 기존 clans/clan_members/chat_messages 테이블에 컬럼만 추가하는 부분(run_schema.py로 자동 적용됨).
+-- ALTER TABLE clans        ADD COLUMN linked_exam_id INT      DEFAULT NULL AFTER weekly_goal_min;
+-- ALTER TABLE clan_members ADD COLUMN left_at         DATETIME DEFAULT NULL AFTER joined_at;
+-- ALTER TABLE chat_messages ADD COLUMN file_size       INT      DEFAULT NULL AFTER file_name;
+--
+-- -- ── 클랜(clans) 폐지 → 게시판 "스터디 모집" 게시글이 곧 모임으로 통합 ──
+-- -- 클랜과 스터디 모집 게시글이 하는 역할이 거의 같아서(모집→가입→그룹 활동)
+-- -- 하나로 합쳤다. post_members/post_chat_messages는 CREATE TABLE IF NOT EXISTS라
+-- -- 재실행으로 새로 생기고, 기존 clans 계열 테이블은 정리 차원에서 지운다
+-- -- (테스트 데이터뿐이라 마이그레이션 없이 DROP — 실제 운영 데이터가 있다면
+-- --  clan_members/clan_chat_messages를 post_members/post_chat_messages로 옮기는
+-- --  INSERT SELECT를 먼저 실행해야 한다).
+-- ALTER TABLE posts ADD COLUMN linked_exam_name VARCHAR(150) DEFAULT NULL AFTER field;
+-- DROP TABLE IF EXISTS clan_chat_messages;
+-- DROP TABLE IF EXISTS clan_members;
+-- DROP TABLE IF EXISTS clans;
