@@ -18,14 +18,7 @@
   <div class="container">
     <div class="dash-header">
       <h1>❌ 오답노트</h1>
-      <p>로드맵 확인 문제에서 틀린 단원이 자동으로 모여요. 다시 풀어서 맞히면 노트에서 사라져요.</p>
-    </div>
-
-    <div class="tabs" id="subjectTabs">
-      <button class="tab active" data-subject="전체">전체</button>
-      <button class="tab" data-subject="국어">국어</button>
-      <button class="tab" data-subject="영어">영어</button>
-      <button class="tab" data-subject="수학">수학</button>
+      <p>문제풀기에서 틀린 문제가 자동으로 모여요. 필요 없으면 지워도 돼요.</p>
     </div>
 
     <div id="wnBody">
@@ -39,40 +32,26 @@
   <script>
     if (!Auth.require()) { /* 로그인 페이지로 이동됨 */ }
     renderNav();
-    renderRail('roadmap');
+    renderRail('quiz');
 
     const wnBody = document.getElementById('wnBody');
-    let state = { subject: '전체' };
     let allNotes = [];
 
-    document.getElementById('subjectTabs').onclick = (e) => {
-      const btn = e.target.closest('button');
-      if (!btn) return;
-      document.querySelectorAll('#subjectTabs .tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.subject = btn.dataset.subject;
-      render();
-    };
-
     function render() {
-      const notes = state.subject === '전체' ? allNotes : allNotes.filter(n => n.subject === state.subject);
-
-      if (!notes.length) {
+      if (!allNotes.length) {
         wnBody.innerHTML = `
           <div class="card text-center" style="padding:50px 20px;">
             <div style="font-size:36px; margin-bottom:10px;">🎉</div>
-            <p class="muted">${state.subject === '전체' ? '오답노트가 비어 있어요! 지금까지 완벽해요.' : `${escapeHtml(state.subject)} 과목에는 오답이 없어요.`}</p>
+            <p class="muted">오답노트가 비어 있어요! 지금까지 완벽해요.</p>
           </div>`;
         return;
       }
 
-      wnBody.innerHTML = notes.map(n => `
-        <div class="card wn-item">
+      wnBody.innerHTML = allNotes.map(n => `
+        <div class="card wn-item" data-id="${n.id}">
           <div class="wn-head">
-            <span class="weak-subject-badge">${escapeHtml(n.subject)}</span>
-            <span class="weak-grade">${escapeHtml(n.grade)}</span>
-            <span class="wn-name">${escapeHtml(n.unit_name)}</span>
-            <span class="wn-count">${n.wrong_count}번 틀림</span>
+            <span class="weak-subject-badge">${escapeHtml(n.subject_query)}</span>
+            <span class="wn-count">틀린 지 ${new Date(n.created_at).toLocaleDateString('ko-KR')}</span>
           </div>
           <div class="quiz-q">${escapeHtml(n.question)}</div>
           <div class="quiz-choices">
@@ -83,9 +62,24 @@
           </div>
           <div class="quiz-result"><div class="qr-text">${escapeHtml(n.explanation || '')}</div></div>
           <div class="wn-actions">
-            <a class="btn btn-ghost" href="/roadmap?subject=${encodeURIComponent(n.subject)}&topic=${n.topic_id}">↻ 다시 풀기</a>
+            <button class="btn btn-ghost wn-delete" data-id="${n.id}">삭제</button>
+            <a class="btn btn-ghost" href="/roadmap?subject=${encodeURIComponent(n.subject_query)}">↻ 같은 주제로 다시 풀기</a>
           </div>
         </div>`).join('');
+
+      wnBody.querySelectorAll('.wn-delete').forEach(btn => {
+        btn.onclick = async () => {
+          btn.disabled = true;
+          try {
+            await api(`/api/wrongnotes/${btn.dataset.id}`, { method: 'DELETE' });
+            allNotes = allNotes.filter(n => String(n.id) !== btn.dataset.id);
+            render();
+          } catch (e) {
+            alert(e.message);
+            btn.disabled = false;
+          }
+        };
+      });
     }
 
     (async () => {

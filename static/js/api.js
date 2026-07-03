@@ -171,7 +171,7 @@ const RAIL_ITEMS = [
   { key: 'members',      href: '/members',      icon: '👥', label: '멤버' },
   { key: 'stats',        href: '/stats',        icon: '📊', label: '통계' },
   { key: 'missions',     href: '/missions',     icon: '🎯', label: '미션' },
-  { key: 'roadmap',      href: '/roadmap',      icon: '🗺️', label: '학습가이드' },
+  { key: 'quiz',         href: '/roadmap',      icon: '📝', label: '문제풀기' },
   { key: 'achievements', href: '/achievements', icon: '🏅', label: '업적' },
   { key: 'planet',       href: '/planet',       icon: '🪐', label: '행성' },
   { key: 'mypage',       href: '/mypage',       icon: '👤', label: 'MY' },

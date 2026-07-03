@@ -226,55 +226,59 @@ CREATE TABLE IF NOT EXISTS user_achievements (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- ── 공부 로드맵(교육과정 단원 순서) ──────────────────────────────────
--- 콘텐츠(과목별 단원)는 db/seed_curriculum.py로 채움
-CREATE TABLE IF NOT EXISTS curriculum_topics (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    subject     ENUM('국어','영어','수학') NOT NULL,
-    grade       ENUM('중1','중2','중3','고1','고2','고3') NOT NULL,
-    step_order  INT          NOT NULL,   -- 과목 내 전체 학습 순서(학년 관통)
-    unit_name   VARCHAR(100) NOT NULL,
-    description VARCHAR(255) DEFAULT NULL,
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_subject_order (subject, step_order)
+-- ── AI 문제풀기(즉석 문제 생성) ────────────────────────────────────────
+-- 사용자가 자유 텍스트로 요청("중2 수학 이차방정식")하면 Gemini가 그 자리에서
+-- 문제를 만들어낸다. Gemini는 순수 JSON 출제 자판기 역할만 하고, 정답 판정·
+-- 레벨(난이도) 추적·오답노트 적재는 전부 백엔드가 담당한다(상태는 여기 DB에 저장).
+
+-- 사용자별 진행 중인 문제풀기 세션(진단 5문제 → 적응형 문제 반복) 상태
+CREATE TABLE IF NOT EXISTS ai_quiz_state (
+    user_id          INT NOT NULL PRIMARY KEY,
+    subject_query    VARCHAR(300) NOT NULL,           -- 사용자가 입력한 요청 원문
+    phase            ENUM('diagnostic','adaptive') NOT NULL DEFAULT 'diagnostic',
+    level            TINYINT      DEFAULT NULL,        -- 1(하)~5(상), 진단 전엔 NULL
+    correct_streak   INT NOT NULL DEFAULT 0,
+    wrong_streak     INT NOT NULL DEFAULT 0,
+    question_count   INT NOT NULL DEFAULT 0,
+    correct_count    INT NOT NULL DEFAULT 0,           -- 진단 단계에서 맞은 개수
+    diagnostic_total INT NOT NULL DEFAULT 5,
+    updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS user_topic_progress (
+-- AI가 즉석에서 생성한 문제(채점용으로 정답을 서버에 보관, 클라이언트엔 노출 안 함)
+CREATE TABLE IF NOT EXISTS ai_quiz_questions (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
     user_id       INT NOT NULL,
-    topic_id      INT NOT NULL,
-    is_done       TINYINT(1) DEFAULT 0,
-    understanding TINYINT    DEFAULT NULL,  -- 자가진단 이해도 1(어려움)~5(완벽)
-    done_at       DATETIME   DEFAULT NULL,
-    PRIMARY KEY (user_id, topic_id),
-    FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
-    FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
-);
-
--- 단원별 확인 문제(1문제, 4지선다). 콘텐츠는 db/seed_quiz.py로 채움
-CREATE TABLE IF NOT EXISTS curriculum_quiz (
-    id           INT AUTO_INCREMENT PRIMARY KEY,
-    topic_id     INT  NOT NULL UNIQUE,
-    question     TEXT NOT NULL,
-    choices      TEXT NOT NULL,        -- JSON 배열 문자열(보기 4개)
-    answer_index TINYINT NOT NULL,     -- 정답 보기 인덱스(0~3)
-    explanation  VARCHAR(255) DEFAULT NULL,
-    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+    subject_query VARCHAR(300) NOT NULL,
+    phase         ENUM('diagnostic','adaptive') NOT NULL,
+    level         TINYINT NOT NULL,       -- 1(하)~5(상)
+    question      TEXT NOT NULL,
+    choices       TEXT NOT NULL,          -- JSON 배열 문자열(보기 4개)
+    answer_index  TINYINT NOT NULL,       -- 정답 보기 인덱스(0~3)
+    explanation   TEXT,
+    chosen_index  TINYINT DEFAULT NULL,
+    answered      TINYINT(1) NOT NULL DEFAULT 0,
+    correct       TINYINT(1) DEFAULT NULL,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ── 오답노트 ─────────────────────────────────────────────────────────
--- 확인 문제를 틀리면 자동으로 쌓이고, 다시 풀어서 맞히면 자동으로 사라진다.
-CREATE TABLE IF NOT EXISTS wrong_notes (
+-- AI 문제풀기에서 틀리면 자동으로 쌓인다(문제 자체가 매번 새로 생성되므로
+-- 단원 단위가 아니라 틀린 문제 하나하나를 기록으로 남긴다).
+CREATE TABLE IF NOT EXISTS ai_quiz_wrong_notes (
     id            INT AUTO_INCREMENT PRIMARY KEY,
     user_id       INT NOT NULL,
-    topic_id      INT NOT NULL,
-    chosen_index  TINYINT NOT NULL,      -- 마지막으로 고른(틀린) 보기 인덱스
-    wrong_count   INT NOT NULL DEFAULT 1,-- 누적 오답 횟수
-    last_wrong_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    subject_query VARCHAR(300) NOT NULL,
+    level         TINYINT NOT NULL,
+    question      TEXT NOT NULL,
+    choices       TEXT NOT NULL,
+    answer_index  TINYINT NOT NULL,
+    chosen_index  TINYINT NOT NULL,
+    explanation   TEXT,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_user_topic (user_id, topic_id),
-    FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
-    FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ── Migration (기존 DB 보유 시 실행) ─────────────────────────────────
@@ -366,4 +370,56 @@ CREATE TABLE IF NOT EXISTS wrong_notes (
 --     UNIQUE KEY uq_user_topic (user_id, topic_id),
 --     FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
 --     FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+-- );
+--
+-- -- ── "학습가이드"(교육과정 로드맵) → "문제풀기"(AI 즉석 문제 생성)로 전환 ──
+-- -- 기존 커리큘럼 기반 테이블을 걷어내고 AI 문제풀기용 테이블로 교체한다.
+-- DROP TABLE IF EXISTS wrong_notes;
+-- DROP TABLE IF EXISTS curriculum_quiz;
+-- DROP TABLE IF EXISTS user_topic_progress;
+-- DROP TABLE IF EXISTS curriculum_topics;
+--
+-- CREATE TABLE IF NOT EXISTS ai_quiz_state (
+--     user_id          INT NOT NULL PRIMARY KEY,
+--     subject_query    VARCHAR(300) NOT NULL,
+--     phase            ENUM('diagnostic','adaptive') NOT NULL DEFAULT 'diagnostic',
+--     level            TINYINT      DEFAULT NULL,
+--     correct_streak   INT NOT NULL DEFAULT 0,
+--     wrong_streak     INT NOT NULL DEFAULT 0,
+--     question_count   INT NOT NULL DEFAULT 0,
+--     correct_count    INT NOT NULL DEFAULT 0,
+--     diagnostic_total INT NOT NULL DEFAULT 5,
+--     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+-- );
+--
+-- CREATE TABLE IF NOT EXISTS ai_quiz_questions (
+--     id            INT AUTO_INCREMENT PRIMARY KEY,
+--     user_id       INT NOT NULL,
+--     subject_query VARCHAR(300) NOT NULL,
+--     phase         ENUM('diagnostic','adaptive') NOT NULL,
+--     level         TINYINT NOT NULL,
+--     question      TEXT NOT NULL,
+--     choices       TEXT NOT NULL,
+--     answer_index  TINYINT NOT NULL,
+--     explanation   TEXT,
+--     chosen_index  TINYINT DEFAULT NULL,
+--     answered      TINYINT(1) NOT NULL DEFAULT 0,
+--     correct       TINYINT(1) DEFAULT NULL,
+--     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+-- );
+--
+-- CREATE TABLE IF NOT EXISTS ai_quiz_wrong_notes (
+--     id            INT AUTO_INCREMENT PRIMARY KEY,
+--     user_id       INT NOT NULL,
+--     subject_query VARCHAR(300) NOT NULL,
+--     level         TINYINT NOT NULL,
+--     question      TEXT NOT NULL,
+--     choices       TEXT NOT NULL,
+--     answer_index  TINYINT NOT NULL,
+--     chosen_index  TINYINT NOT NULL,
+--     explanation   TEXT,
+--     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 -- );
