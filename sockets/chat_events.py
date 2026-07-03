@@ -1,4 +1,5 @@
 """실시간 1:1 채팅 — 접속 현황 · 채팅 신청/수락 · 실시간 메시지."""
+import datetime
 import itertools
 import threading
 import time
@@ -86,7 +87,7 @@ def _room_history(room_name, limit=200):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            '''SELECT sender_id, content, msg_type, file_url, file_name, mime_type
+            '''SELECT sender_id, content, msg_type, file_url, file_name, mime_type, file_size, created_at
                FROM chat_messages
                WHERE room_id = %s ORDER BY id ASC LIMIT %s''',
             (db_id, limit)
@@ -97,7 +98,9 @@ def _room_history(room_name, limit=200):
     return [{
         'sender_id': r['sender_id'], 'content': r['content'],
         'msg_type': r.get('msg_type') or 'text',
-        'file_url': r.get('file_url'), 'file_name': r.get('file_name'), 'mime_type': r.get('mime_type'),
+        'file_url': r.get('file_url'), 'file_name': r.get('file_name'),
+        'mime_type': r.get('mime_type'), 'file_size': r.get('file_size'),
+        'created_at': (r['created_at'].isoformat() + 'Z') if r.get('created_at') else None,
     } for r in rows]
 
 
@@ -350,7 +353,8 @@ def on_chat_message(data):
 
     socketio.emit('chat_message',
                    {'room': room_name, 'sender_id': sender_id,
-                    'username': online_users[sender_id]['username'], 'content': text, 'msg_type': 'text'},
+                    'username': online_users[sender_id]['username'], 'content': text, 'msg_type': 'text',
+                    'created_at': datetime.datetime.utcnow().isoformat() + 'Z'},
                    room=room_name)
 
 
@@ -362,6 +366,10 @@ def on_chat_file(data):
     file_url = (data.get('file_url') or '').strip()
     file_name = (data.get('file_name') or '').strip()[:255]
     mime_type = (data.get('mime_type') or '').strip()[:100]
+    try:
+        file_size = int(data.get('file_size') or 0)
+    except (ValueError, TypeError):
+        file_size = 0
     if not sender_id or not room_name or not file_url or not file_name:
         return
     if sender_id not in active_rooms.get(room_name, set()):
@@ -377,9 +385,9 @@ def on_chat_file(data):
         cursor = conn.cursor()
         try:
             cursor.execute(
-                '''INSERT INTO chat_messages (room_id, sender_id, content, msg_type, file_url, file_name, mime_type)
-                   VALUES (%s, %s, %s, 'file', %s, %s, %s)''',
-                (db_id, sender_id, content, file_url, file_name, mime_type)
+                '''INSERT INTO chat_messages (room_id, sender_id, content, msg_type, file_url, file_name, mime_type, file_size)
+                   VALUES (%s, %s, %s, 'file', %s, %s, %s, %s)''',
+                (db_id, sender_id, content, file_url, file_name, mime_type, file_size or None)
             )
             conn.commit()
         finally:
@@ -388,7 +396,9 @@ def on_chat_file(data):
     socketio.emit('chat_message',
                    {'room': room_name, 'sender_id': sender_id,
                     'username': online_users[sender_id]['username'], 'content': content,
-                    'msg_type': 'file', 'file_url': file_url, 'file_name': file_name, 'mime_type': mime_type},
+                    'msg_type': 'file', 'file_url': file_url, 'file_name': file_name,
+                    'mime_type': mime_type, 'file_size': file_size,
+                    'created_at': datetime.datetime.utcnow().isoformat() + 'Z'},
                    room=room_name)
 
 

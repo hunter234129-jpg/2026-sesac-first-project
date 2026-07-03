@@ -22,6 +22,23 @@ const AVATARS = [
   { emoji: '🐮', bg: '#D0BFFF' }, { emoji: '🐷', bg: '#FCC2D7' }
 ];
 
+function formatFileSize(bytes) {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+const KO_DOW = ['일', '월', '화', '수', '목', '금', '토'];
+function formatDateLabel(d) {
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${KO_DOW[d.getDay()]}요일`;
+}
+function toDateKey(d) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
+function formatTime(d) {
+  const h = d.getHours(), m = d.getMinutes();
+  return `${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${String(m).padStart(2, '0')}`;
+}
+
 function avatarHtml(avatarId, size) {
   const a = AVATARS[avatarId] || AVATARS[0];
   return `<span class="avatar-chip" style="background:${a.bg}; width:${size}px; height:${size}px; font-size:${Math.round(size * 0.58)}px;">${a.emoji}</span>`;
@@ -100,6 +117,7 @@ window.startChatWidget = function () {
     if (me) myAvatarId = me.avatar_id;
     renderMyAvatarBox();
     document.querySelectorAll('.cf-my-avatar-btn').forEach(btn => { btn.innerHTML = avatarHtml(myAvatarId, 22); });
+    document.querySelectorAll('.cf-my-avatar-head').forEach(el => { el.innerHTML = avatarHtml(myAvatarId, 26); });
 
     const others = users.filter(u => u.user_id !== myId);
     for (const uid in btnByUid) delete btnByUid[uid];
@@ -194,9 +212,8 @@ window.startChatWidget = function () {
     win.dataset.room = room;
     win.innerHTML = `
       <div class="cf-head">
-        <span class="cf-partner">${avatarHtml(partnerAvatarId, 26)}<span>${escapeHtml(partnerName)}님과의 채팅</span></span>
+        <span class="cf-partner" title="내 아바타 변경"><span class="cf-my-avatar-head">${avatarHtml(myAvatarId, 26)}</span><span>${escapeHtml(partnerName)}님과의 채팅</span></span>
         <span class="cf-head-actions">
-          <button class="cf-my-avatar-btn" type="button" title="내 아바타 변경">${avatarHtml(myAvatarId, 22)}</button>
           <button class="cf-leave" type="button">나가기</button>
         </span>
       </div>
@@ -205,8 +222,8 @@ window.startChatWidget = function () {
         <button type="button" class="cf-emoji-btn" title="이모지">😀</button>
         <button type="button" class="cf-file-btn" title="파일 첨부">＋</button>
         <input type="file" class="cf-file-input" hidden>
-        <input type="text" class="cf-text-input" placeholder="메시지를 입력하세요" maxlength="1000" autocomplete="off">
-        <button type="submit" class="btn btn-primary">전송</button>
+        <textarea class="cf-text-input" placeholder="메시지를 입력하세요" maxlength="1000" autocomplete="off" rows="1"></textarea>
+        <button type="submit" class="cf-send-btn">전송</button>
       </form>`;
     floatWrap.appendChild(win);
 
@@ -215,7 +232,7 @@ window.startChatWidget = function () {
     const input        = win.querySelector('.cf-text-input');
     const leaveBtn     = win.querySelector('.cf-leave');
     const emojiBtn     = win.querySelector('.cf-emoji-btn');
-    const myAvatarBtn  = win.querySelector('.cf-my-avatar-btn');
+    const partnerEl    = win.querySelector('.cf-partner');
     const fileBtn      = win.querySelector('.cf-file-btn');
     const fileInput    = win.querySelector('.cf-file-input');
 
@@ -226,12 +243,15 @@ window.startChatWidget = function () {
       input.focus();
       input.selectionStart = input.selectionEnd = start + emoji.length;
     });
-    form.appendChild(picker);
+    win.appendChild(picker);
     emojiBtn.onclick = (e) => { e.stopPropagation(); picker.classList.toggle('hidden'); };
 
     const myAvatarPicker = buildAvatarPicker();
-    win.querySelector('.cf-head').appendChild(myAvatarPicker);
-    myAvatarBtn.onclick = (e) => { e.stopPropagation(); myAvatarPicker.classList.toggle('hidden'); };
+    myAvatarPicker.classList.add('cf-avatar-picker');
+    win.appendChild(myAvatarPicker);
+    myAvatarPicker.style.top = win.querySelector('.cf-head').offsetHeight + 'px';
+    partnerEl.style.cursor = 'pointer';
+    partnerEl.onclick = (e) => { e.stopPropagation(); myAvatarPicker.classList.toggle('hidden'); };
 
     fileBtn.onclick = () => fileInput.click();
     fileInput.onchange = async () => {
@@ -246,7 +266,7 @@ window.startChatWidget = function () {
         fd.append('ref_type', 'chat');
         const uploaded = await api('/api/upload', { method: 'POST', body: fd, isForm: true });
         socket.emit('chat_file', {
-          room, file_url: uploaded.url, file_name: uploaded.original, mime_type: file.type
+          room, file_url: uploaded.url, file_name: uploaded.original, mime_type: file.type, file_size: file.size
         });
       } catch (err) {
         addMsg('blocked', err.message || '파일 업로드에 실패했어요.');
@@ -258,31 +278,81 @@ window.startChatWidget = function () {
 
     document.addEventListener('click', (e) => {
       if (!picker.contains(e.target) && e.target !== emojiBtn) picker.classList.add('hidden');
-      if (!myAvatarPicker.contains(e.target) && e.target !== myAvatarBtn) myAvatarPicker.classList.add('hidden');
+      if (!myAvatarPicker.contains(e.target) && !partnerEl.contains(e.target)) myAvatarPicker.classList.add('hidden');
     });
 
-    function addMsg(cls, text) {
+    let lastMsgDateKey = null;
+    function addDateSep(label) {
       const div = document.createElement('div');
-      div.className = `cf-msg ${cls}`;
-      div.innerHTML = linkify(escapeHtml(text));
+      div.className = 'cf-date-sep';
+      div.innerHTML = `<span>📅 ${label}</span>`;
       log.appendChild(div);
+    }
+    function maybeAddDateSep(isoStr) {
+      const d = isoStr ? new Date(isoStr) : new Date();
+      const key = toDateKey(d);
+      if (key !== lastMsgDateKey) {
+        addDateSep(formatDateLabel(d));
+        lastMsgDateKey = key;
+      }
+    }
+
+    function _msgRow(cls, isoStr) {
+      const d = isoStr ? new Date(isoStr) : new Date();
+      const row = document.createElement('div');
+      row.className = `cf-msg-row ${cls}`;
+      const timeEl = document.createElement('span');
+      timeEl.className = 'cf-msg-time';
+      timeEl.textContent = formatTime(d);
+      return { row, timeEl };
+    }
+
+    function addMsg(cls, text, isoStr) {
+      maybeAddDateSep(isoStr || null);
+      if (cls === 'me' || cls === 'other') {
+        const { row, timeEl } = _msgRow(cls, isoStr);
+        const bubble = document.createElement('div');
+        bubble.className = `cf-msg ${cls}`;
+        bubble.innerHTML = linkify(escapeHtml(text));
+        row.appendChild(bubble);
+        row.appendChild(timeEl);
+        log.appendChild(row);
+      } else {
+        const div = document.createElement('div');
+        div.className = `cf-msg ${cls}`;
+        div.innerHTML = linkify(escapeHtml(text));
+        log.appendChild(div);
+      }
       log.scrollTop = log.scrollHeight;
     }
 
-    function addFileMsg(cls, fileUrl, fileName, mimeType) {
-      const div = document.createElement('div');
-      div.className = `cf-msg ${cls} cf-file`;
+    function addFileMsg(cls, fileUrl, fileName, mimeType, fileSize, isoStr) {
+      maybeAddDateSep(isoStr || null);
+      const bubble = document.createElement('div');
+      bubble.className = `cf-msg ${cls} file`;
       const isImage = (mimeType || '').startsWith('image/');
-      div.innerHTML = isImage
-        ? `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer"><img class="cf-file-img" src="${fileUrl}" alt="${escapeHtml(fileName)}"></a>`
-        : `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer" class="cf-file-link">📎 ${escapeHtml(fileName)}</a>`;
-      log.appendChild(div);
+      const safeName = escapeHtml(fileName || '파일');
+      if (isImage) {
+        bubble.innerHTML = `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer"><img class="cf-file-img" src="${fileUrl}" alt="${safeName}"></a>`;
+      } else {
+        const sizeHtml = fileSize ? `<span class="cf-file-size">용량: ${formatFileSize(fileSize)}</span>` : '';
+        bubble.innerHTML = `<a href="${fileUrl}" target="_blank" rel="noopener noreferrer" class="cf-file-link"><span class="cf-file-dl-icon">↓</span><span class="cf-file-info"><span class="cf-file-name-text">${safeName}</span>${sizeHtml}</span></a>`;
+      }
+      if (cls === 'me' || cls === 'other') {
+        const { row, timeEl } = _msgRow(cls, isoStr);
+        row.appendChild(bubble);
+        row.appendChild(timeEl);
+        log.appendChild(row);
+      } else {
+        log.appendChild(bubble);
+      }
       log.scrollTop = log.scrollHeight;
     }
 
     function addFromPayload(cls, m) {
-      if (m.msg_type === 'file') addFileMsg(cls, m.file_url, m.file_name, m.mime_type);
-      else addMsg(cls, m.content);
+      const isoStr = m.created_at || null;
+      if (m.msg_type === 'file') addFileMsg(cls, m.file_url, m.file_name, m.mime_type, m.file_size, isoStr);
+      else addMsg(cls, m.content, isoStr);
     }
 
     if (history && history.length) {
@@ -291,12 +361,26 @@ window.startChatWidget = function () {
       addMsg('sys', `${partnerName}님과 채팅을 시작했어요.`);
     }
 
+    function autoResize() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 80) + 'px';
+    }
+    input.addEventListener('input', autoResize);
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+    });
+
     form.onsubmit = (e) => {
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
       socket.emit('chat_message', { room, message: text });
       input.value = '';
+      input.style.height = 'auto';
       picker.classList.add('hidden');
     };
 
