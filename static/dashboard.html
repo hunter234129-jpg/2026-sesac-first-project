@@ -567,7 +567,7 @@
       addAiMsg('ai', '생각하는 중...');
       try {
         const d = await api('/api/ai/chat', { method: 'POST', body: { message: msg } });
-        aiMsgs.lastChild.textContent = d.reply;
+        aiMsgs.lastChild.innerHTML = await renderMarkdown(d.reply);
       } catch (e) {
         aiMsgs.lastChild.textContent = '죄송해요, 답변을 가져오지 못했어요: ' + e.message;
       }

@@ -261,6 +261,20 @@ function escapeHtml(s) {
   ));
 }
 
+/* AI 응답(마크다운 텍스트) 렌더링 — chat.html, dashboard.html 미니챗 공용 */
+let _markedLib = null;
+async function loadMarked() {
+  if (_markedLib) return _markedLib;
+  const mod = await import('https://esm.sh/marked@12.0.2');
+  _markedLib = mod.marked;
+  return _markedLib;
+}
+/** raw 텍스트를 먼저 이스케이프해서 원본에 섞인 HTML/스크립트는 무력화한 뒤 마크다운만 파싱한다. */
+async function renderMarkdown(raw) {
+  const marked = await loadMarked();
+  return marked.parse(escapeHtml(raw));
+}
+
 /** ?key=value 쿼리 파라미터 읽기 */
 function queryParam(key) {
   return new URLSearchParams(location.search).get(key);
