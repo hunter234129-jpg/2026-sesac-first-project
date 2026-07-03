@@ -59,13 +59,26 @@
     .db-nav-item.active .ic { filter: drop-shadow(0 0 6px rgba(0,229,255,0.7)); }
     .db-nav-item .lb { font-size: 8.5px; font-weight: 600; letter-spacing: .01em; color: var(--db-text2); }
     .db-nav-item.active .lb { color: var(--db-cyan); }
-    .db-rail-planet { width: 100%; padding-top: 14px; border-top: 1px solid rgba(0,229,255,0.08); flex-shrink: 0; }
+    .db-rail-planet { display: block; width: 100%; padding-top: 14px; border-top: 1px solid rgba(0,229,255,0.08);
+      flex-shrink: 0; text-decoration: none; transition: opacity .15s; }
+    .db-rail-planet:hover { opacity: .8; text-decoration: none; }
 
     /* ── 글래스 카드 공통 ── */
     .gcard { position: relative; border-radius: 16px; background: rgba(14,20,38,0.65); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 4px 32px rgba(0,0,0,0.4); }
     .gcard.cyan { border-color: rgba(0,229,255,0.18); }
     .gcard.purple { border-color: rgba(168,85,247,0.18); }
     .gcard.mixed { border-image: linear-gradient(135deg, rgba(0,229,255,.3), rgba(168,85,247,.3)) 1; }
+    a.gcard { display: block; text-decoration: none; color: inherit; transition: transform .15s, border-color .15s; }
+    a.gcard:hover { transform: translateY(-2px); border-color: rgba(0,229,255,0.4); text-decoration: none; }
+
+    .planet-card-body { display: flex; align-items: center; gap: 14px; }
+    .planet-card-em { font-size: 40px; line-height: 1; flex-shrink: 0; filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
+    .planet-card-info { flex: 1; min-width: 0; }
+    .planet-card-name { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    .planet-card-bar { height: 5px; border-radius: 99px; background: rgba(0,229,255,0.12); overflow: hidden; }
+    .planet-card-bar i { display: block; height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, #5ad1ff, var(--db-cyan)); transition: width .6s; }
+    .planet-card-sub { font-size: 10.5px; color: var(--db-text2); margin-top: 5px; }
 
     /* ── 중앙 메인 ── */
     .db-main { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 26px 40px; display: flex; flex-direction: column; gap: 18px; }
@@ -190,14 +203,13 @@
         <a class="db-nav-item" href="/missions"><span class="ic">🎯</span><span class="lb">미션</span></a>
         <a class="db-nav-item" href="/roadmap"><span class="ic">📝</span><span class="lb">문제풀기</span></a>
         <a class="db-nav-item" href="/achievements"><span class="ic">🏅</span><span class="lb">업적</span></a>
-        <a class="db-nav-item" href="/planet"><span class="ic">🪐</span><span class="lb">행성</span></a>
         <a class="db-nav-item" href="/mypage"><span class="ic">👤</span><span class="lb">MY</span></a>
         <a class="db-nav-item hidden" id="adminNavItem" href="/admin"><span class="ic">🛸</span><span class="lb">관리자</span></a>
         <a class="db-nav-item hidden" id="apiDocsNavItem" href="/api-docs"><span class="ic">🔌</span><span class="lb">API</span></a>
       </nav>
-      <div class="db-rail-planet" id="planetWidget">
+      <a class="db-rail-planet" id="planetWidget" href="/planet" title="내 행성 보기">
         <p class="muted" style="font-size:10px; text-align:center;">불러오는 중...</p>
-      </div>
+      </a>
     </aside>
 
     <!-- ═══ 중앙 메인 ═══ -->
@@ -227,7 +239,7 @@
           <div class="timer-center">
             <span class="t mono" id="timer">00:00:00</span>
             <span class="l">오늘 총 공부 시간</span>
-            <span class="goal">⏰ 목표 4:00:00</span>
+            <span class="goal" id="goalLabel">⏰ 목표 -</span>
           </div>
         </div>
         <div class="timer-info">
@@ -292,6 +304,19 @@
         </div>
       </div>
 
+      <!-- 내 행성 -->
+      <a class="gcard cyan gcard-pad" href="/planet">
+        <div class="gcard-head"><span class="t" style="color:var(--db-cyan);">🪐 내 행성</span><span class="more">자세히 ›</span></div>
+        <div class="planet-card-body">
+          <div class="planet-card-em" id="planetCardEmoji">🌫️</div>
+          <div class="planet-card-info">
+            <div class="planet-card-name" id="planetCardName">불러오는 중...</div>
+            <div class="planet-card-bar"><i id="planetCardBar" style="width:0%"></i></div>
+            <div class="planet-card-sub" id="planetCardSub"></div>
+          </div>
+        </div>
+      </a>
+
       <!-- AI 미니 패널 -->
       <div class="gcard cyan gcard-pad">
         <div class="gcard-head"><span class="t" style="color:var(--db-cyan);">🛰️ AI 도우미 &amp; OCR</span></div>
@@ -355,7 +380,7 @@
     })();
 
     /* ── 스터디 타이머 (원형 링 + 기존 로직) ── */
-    const GOAL_SEC = 4 * 3600;
+    let GOAL_SEC = 4 * 3600;
     const RING_CIRC = 2 * Math.PI * 90;
     const timerEl = document.getElementById('timer');
     const ringEl = document.getElementById('timerRing');
@@ -419,6 +444,14 @@
 
     (async () => {
       try {
+        const g = await api('/api/study/goal');
+        GOAL_SEC = (g.daily_goal_min || 240) * 60;
+        document.getElementById('goalLabel').textContent = `⏰ 목표 ${fmt(GOAL_SEC)}`;
+      } catch (_) {}
+    })();
+
+    (async () => {
+      try {
         const s = await api('/api/study/status');
         if (s.active) runTimer(s.session.elapsed_sec || 0);
       } catch (_) {}
@@ -446,7 +479,7 @@
     }
     loadStreak();
 
-    /* ── 내 행성 (좌측 레일 하단) ── */
+    /* ── 내 행성 (좌측 레일 하단 + 우측 카드) ── */
     (async () => {
       const box = document.getElementById('planetWidget');
       try {
@@ -459,6 +492,13 @@
             <div style="font-size:8px; color:var(--db-text2); margin-top:4px;">${p.name}</div>
           </div>`;
         document.getElementById('userLevelLine').textContent = `${p.emoji} ${p.name} · Lv.${p.level}`;
+
+        document.getElementById('planetCardEmoji').textContent = p.emoji;
+        document.getElementById('planetCardName').textContent  = `${p.name} · Lv.${p.level}`;
+        document.getElementById('planetCardBar').style.width   = Math.round(p.progress * 100) + '%';
+        document.getElementById('planetCardSub').textContent   = p.is_max
+          ? '최종 단계 달성! 🎉'
+          : `${p.next_name}까지 ${p.hours_to_next}시간`;
       } catch (_) { box.innerHTML = ''; }
     })();
 

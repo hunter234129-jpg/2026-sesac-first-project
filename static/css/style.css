@@ -459,7 +459,8 @@ html { scrollbar-width: thin; scrollbar-color: rgba(120,140,180,.25) transparent
 @media (max-width: 640px) { .live-badge .live-word { display: none; } }
 
 /* ── 스트릭(연속 공부) ── */
-.streak-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+.streak-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+@media (max-width: 560px) { .streak-grid { grid-template-columns: repeat(2, 1fr); } }
 .streak-cell { text-align: center; padding: 14px 10px; background: var(--glass); border: 1px solid var(--border);
   border-radius: 14px; box-shadow: var(--elev-1), inset 0 1px 0 var(--glass-hi); }
 .streak-cell .em { font-size: 24px; line-height: 1; filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
@@ -469,6 +470,18 @@ html { scrollbar-width: thin; scrollbar-color: rgba(120,140,180,.25) transparent
 .streak-cell .v.gr { color: var(--green); text-shadow: 0 0 18px rgba(52,211,153,.35); }
 .streak-cell .k  { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
+.goal-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.goal-badge { font-size: 12.5px; font-weight: 800; padding: 4px 12px; border-radius: 99px;
+  background: rgba(255,209,102,.16); color: var(--yellow); }
+.goal-edit-btn { padding: 5px 12px; font-size: 12px; }
+.goal-edit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.goal-edit.hidden { display: none; }
+.goal-edit input[type="number"] { width: 72px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--border);
+  background: rgba(5,8,18,.6); color: var(--text); font-size: 13px; font-family: var(--font); }
+.goal-edit input[type="number"]:focus { outline: none; border-color: var(--cyan); }
+.goal-explain { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 0 0 14px; }
+.goal-explain b { color: var(--green); }
+
 /* ── 공부 잔디(히트맵) ── */
 .heatmap { display: flex; gap: 4px; overflow-x: auto; padding: 6px 2px 10px; }
 .heat-week { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
@@ -477,10 +490,9 @@ html { scrollbar-width: thin; scrollbar-color: rgba(120,140,180,.25) transparent
   background: rgba(130,155,230,.10); border: 1px solid rgba(130,155,230,.07);
 }
 .heat-cell.future { background: transparent; border-color: transparent; }
-.heat-cell.l1 { background: rgba(52,211,153,.28); }
-.heat-cell.l2 { background: rgba(52,211,153,.48); }
-.heat-cell.l3 { background: rgba(52,211,153,.72); }
-.heat-cell.l4 { background: var(--green); box-shadow: 0 0 8px rgba(52,211,153,.6); }
+.heat-cell.l-full { background: var(--green); box-shadow: 0 0 8px rgba(52,211,153,.6); }
+.heat-cell.l-super { background: var(--green); box-shadow: 0 0 14px rgba(255,209,102,.85), 0 0 4px rgba(52,211,153,.9);
+  border-color: rgba(255,209,102,.6); }
 .heat-legend { display: flex; align-items: center; gap: 6px; justify-content: flex-end;
   font-size: 11px; color: var(--muted); margin-top: 2px; }
 .heat-legend .heat-cell { width: 12px; height: 12px; }
@@ -1175,7 +1187,9 @@ table.data { font-family: var(--font-mono); }
 .app-nav-item.active .ic { filter: drop-shadow(0 0 6px rgba(0,229,255,0.7)); }
 .app-nav-item .lb { font-size: 10.5px; font-weight: 600; letter-spacing: .01em; color: var(--muted); line-height: 1.1; white-space: nowrap; }
 .app-nav-item.active .lb { color: var(--cyan); }
-.app-rail-planet { width: 100%; flex-shrink: 0; padding-top: 12px; margin-top: 8px; border-top: 1px solid var(--border); text-align: center; }
+.app-rail-planet { display: block; width: 100%; flex-shrink: 0; padding-top: 12px; margin-top: 8px; border-top: 1px solid var(--border);
+  text-align: center; text-decoration: none; transition: opacity .15s; }
+.app-rail-planet:hover { opacity: .8; text-decoration: none; }
 .app-rail-planet .arp-em { font-size: 27px; line-height: 1; }
 .app-rail-planet .arp-lv { font-size: 11px; font-weight: 700; color: var(--cyan); margin-top: 4px; font-family: var(--font-mono); }
 .app-rail-planet .arp-bar { height: 4px; border-radius: 99px; background: rgba(255,255,255,.08); margin-top: 5px; overflow: hidden; }

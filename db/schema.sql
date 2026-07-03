@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     real_name         VARCHAR(50)  DEFAULT NULL,
     interest_keywords TEXT         DEFAULT NULL,
     avatar_id         SMALLINT     NOT NULL DEFAULT 0,
+    daily_goal_min    INT          NOT NULL DEFAULT 240,  -- 하루 목표 공부 시간(분), 잔디/타이머 링 기준
     is_admin          TINYINT(1)   DEFAULT 0,
     is_verified       TINYINT(1)   DEFAULT 0,
     is_deleted        TINYINT(1)   DEFAULT 0,
@@ -350,6 +351,10 @@ CREATE TABLE IF NOT EXISTS ai_quiz_wrong_notes (
 --
 -- ALTER TABLE users
 --   ADD COLUMN avatar_id SMALLINT NOT NULL DEFAULT 0 AFTER interest_keywords;
+--
+-- -- 잔디/타이머 링 하루 목표 공부 시간(분) 설정 기능 추가
+-- ALTER TABLE users
+--   ADD COLUMN daily_goal_min INT NOT NULL DEFAULT 240 AFTER avatar_id;
 --
 -- ALTER TABLE posts
 --   ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER field;
