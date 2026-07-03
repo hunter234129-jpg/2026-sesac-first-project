@@ -24,6 +24,7 @@ from routes.ocr          import ocr_bp
 from routes.ai           import ai_bp
 from routes.achievement  import achievement_bp
 from routes.roadmap      import roadmap_bp
+from routes.wrongnote    import wrongnote_bp
 import routes.wiki_sync      # noqa: F401 — 위키 실시간 협업 SocketIO 핸들러 등록
 import sockets.chat_events   # noqa: F401 — 채팅 SocketIO 핸들러 등록
 sockets.chat_events.init_app(app)
@@ -43,6 +44,7 @@ app.register_blueprint(ocr_bp)
 app.register_blueprint(ai_bp)
 app.register_blueprint(achievement_bp)
 app.register_blueprint(roadmap_bp)
+app.register_blueprint(wrongnote_bp)
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 

@@ -558,6 +558,76 @@ html { scrollbar-width: thin; scrollbar-color: rgba(120,140,180,.25) transparent
 .curri-subject-prog .prog { flex: 1; }
 .curri-subject-prog .csp-num { font-size: 13px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+/* 이해도 자가진단 별점 */
+.ci-rate-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+.ci-stars { display: flex; align-items: center; gap: 2px; }
+.ci-stars .star { background: none; border: none; cursor: pointer; font-size: 15px; line-height: 1; padding: 2px;
+  color: var(--border); transition: transform .1s, color .15s; }
+.ci-stars .star:hover { transform: scale(1.15); }
+.ci-stars .star.filled { color: var(--yellow); }
+.ci-stars .ci-under-label { font-size: 11.5px; color: var(--faint); margin-left: 6px; }
+
+/* 단원 확인 문제(퀴즈) */
+.quiz-btn { flex-shrink: 0; font-size: 11.5px; padding: 5px 12px; border-radius: 99px; border: 1px solid var(--border);
+  background: var(--glass); color: var(--cyan); cursor: pointer; font-weight: 700; transition: background .15s; }
+.quiz-btn:hover { background: rgba(107,168,255,.14); }
+.quiz-btn.open { background: rgba(107,168,255,.2); }
+.quiz-panel { margin-top: 10px; padding: 14px; border-radius: 12px; background: rgba(20,26,46,.5);
+  border: 1px solid var(--border); }
+.quiz-panel.hidden { display: none; }
+.quiz-q { font-size: 13.5px; font-weight: 600; margin-bottom: 10px; line-height: 1.5; }
+.quiz-choices { display: flex; flex-direction: column; gap: 7px; }
+.quiz-choice { text-align: left; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--glass); color: var(--text); font-size: 13px; cursor: pointer; transition: border-color .15s, background .15s; }
+.quiz-choice:hover:not(:disabled) { border-color: var(--cyan); }
+.quiz-choice:disabled { cursor: default; }
+.quiz-choice.chosen-correct { border-color: var(--green); background: rgba(63,224,176,.14); color: var(--green); font-weight: 700; }
+.quiz-choice.chosen-wrong { border-color: var(--red); background: rgba(255,107,107,.14); color: var(--red); font-weight: 700; }
+.quiz-choice.reveal-correct { border-color: var(--green); background: rgba(63,224,176,.1); }
+.quiz-result { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; }
+.quiz-result .qr-text { flex: 1; font-size: 12.5px; color: var(--muted); }
+.mark-svg { width: 44px; height: 44px; flex-shrink: 0; }
+.mark-o circle { fill: none; stroke: var(--green); stroke-width: 9; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: markDraw .55s ease forwards; }
+.mark-x line { stroke: var(--red); stroke-width: 9; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: markDraw .4s ease forwards; }
+.mark-x line:nth-child(2) { animation-delay: .3s; }
+@keyframes markDraw { to { stroke-dashoffset: 0; } }
+
+/* 오답노트 */
+.wn-entry { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; text-decoration: none; transition: transform .15s, border-color .15s; }
+.wn-entry:hover { transform: translateY(-3px); border-color: var(--border-lit); text-decoration: none; }
+.wn-entry-icon { font-size: 26px; flex-shrink: 0; filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
+.wn-entry-body { flex: 1; }
+.wn-entry-title { font-size: 15.5px; font-weight: 800; color: var(--text); }
+.wn-entry-desc { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.wn-entry-arrow { font-size: 18px; color: var(--muted); flex-shrink: 0; }
+.wn-item { margin-bottom: 16px; }
+.wn-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.wn-name { font-weight: 700; font-size: 14px; flex: 1; }
+.wn-count { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.wn-actions { margin-top: 12px; text-align: right; }
+.quiz-choice:disabled { opacity: .9; }
+.curri-item.flash { animation: curriFlash 1.4s ease; }
+@keyframes curriFlash {
+  0%   { background: rgba(255,209,102,.22); border-radius: 10px; }
+  100% { background: transparent; }
+}
+
+/* 약점 복습 추천 */
+.weak-card { margin-bottom: 20px; }
+.weak-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.weak-head .wh-title { font-size: 15px; font-weight: 700; }
+.weak-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.weak-item:last-child { border-bottom: none; }
+.weak-subject-badge { font-size: 11.5px; font-weight: 800; padding: 3px 10px; border-radius: 99px;
+  background: rgba(107,168,255,.16); color: var(--cyan); flex-shrink: 0; }
+.weak-grade { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+.weak-name { font-weight: 600; font-size: 13.5px; flex: 1; min-width: 120px; }
+.weak-stars { color: var(--yellow); font-size: 13px; letter-spacing: 1px; white-space: nowrap; }
+.weak-goto { flex-shrink: 0; padding: 6px 14px; font-size: 12.5px; }
+
 /* ── 클랜전 랭킹 ── */
 .battle-row { display: flex; align-items: center; gap: 14px; padding: 12px 6px; border-bottom: 1px solid var(--border); color: var(--text); }
 .battle-row:last-child { border-bottom: none; }

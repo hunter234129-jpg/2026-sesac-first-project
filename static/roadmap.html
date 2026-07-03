@@ -12,10 +12,30 @@
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header">
       <h1>공부 로드맵</h1>
-      <p>중1부터 고3까지, 과목별 학습 순서를 따라가 보세요</p>
+      <p>중1부터 고3까지, 과목별 학습 순서를 따라가고 이해도를 스스로 진단해 보세요</p>
+    </div>
+
+    <a href="/wrongnote" class="card wn-entry" id="wnEntry">
+      <div class="wn-entry-icon">❌</div>
+      <div class="wn-entry-body">
+        <div class="wn-entry-title">오답노트</div>
+        <div class="wn-entry-desc" id="wnEntryDesc">불러오는 중...</div>
+      </div>
+      <div class="wn-entry-arrow">→</div>
+    </a>
+
+    <div class="card weak-card" id="weakCard">
+      <div class="weak-head">
+        <span class="wh-title">🧠 약점 복습 추천</span>
+        <span class="muted" style="font-size:12.5px;">완료했지만 이해도를 낮게 평가한 단원이에요</span>
+      </div>
+      <div id="weakBody"><p class="muted" style="font-size:13.5px;">불러오는 중...</p></div>
     </div>
 
     <div class="tabs" id="subjectTabs">
@@ -36,27 +56,43 @@
       <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { /* 로그인 페이지로 이동됨 */ }
     renderNav();
+    renderRail('roadmap');
 
     let state = { subject: '수학' };
     const bodyEl = document.getElementById('roadmapBody');
+    const weakBodyEl = document.getElementById('weakBody');
+
+    const UNDER_LABEL = { 1: '많이 어려워요', 2: '어려워요', 3: '보통이에요', 4: '이해했어요', 5: '완벽해요' };
+
+    // 오답노트 등 외부에서 ?subject=수학&topic=5 형태로 들어오면 해당 단원으로 바로 이동
+    const qpTopic = queryParam('topic');
+    const qpSubject = queryParam('subject');
+
+    function switchTab(subject) {
+      state.subject = subject;
+      document.querySelectorAll('#subjectTabs .tab').forEach(b => {
+        b.classList.toggle('active', b.dataset.subject === subject);
+      });
+    }
 
     document.getElementById('subjectTabs').onclick = (e) => {
       const btn = e.target.closest('button');
       if (!btn) return;
-      document.querySelectorAll('#subjectTabs .tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.subject = btn.dataset.subject;
+      switchTab(btn.dataset.subject);
       load();
     };
     // 기본 탭 활성 표시 정리(마크업엔 전부 active로 넣어놨으니 최초 진입 시 수학만 강조)
-    document.querySelectorAll('#subjectTabs .tab').forEach(b => {
-      b.classList.toggle('active', b.dataset.subject === state.subject);
-    });
+    if (qpSubject && document.querySelector(`#subjectTabs .tab[data-subject="${qpSubject}"]`)) {
+      state.subject = qpSubject;
+    }
+    switchTab(state.subject);
 
     function updateProgress(total, done) {
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -64,7 +100,39 @@
       document.getElementById('progNum').textContent = `${done} / ${total}`;
     }
 
-    async function load() {
+    function starsHtml(id, understanding) {
+      return [1, 2, 3, 4, 5].map(n => `
+        <button class="star ${understanding && n <= understanding ? 'filled' : ''}" data-id="${id}" data-level="${n}" title="이해도 ${n}점">★</button>
+      `).join('') + `<span class="ci-under-label">${understanding ? UNDER_LABEL[understanding] : '이해도 평가하기'}</span>`;
+    }
+
+    function bindStars(scopeEl, onRated) {
+      scopeEl.querySelectorAll('.ci-stars .star').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+          const level = Number(btn.dataset.level);
+          const starsWrap = btn.closest('.ci-stars');
+          starsWrap.querySelectorAll('.star').forEach(s => {
+            s.disabled = true;
+            s.classList.toggle('filled', Number(s.dataset.level) <= level);
+          });
+          try {
+            await api(`/api/roadmap/topics/${id}/rate`, {
+              method: 'POST',
+              body: { level }
+            });
+            starsWrap.querySelector('.ci-under-label').textContent = UNDER_LABEL[level];
+            const item = btn.closest('.curri-item');
+            if (item) item.classList.add('done');
+            if (onRated) onRated();
+            loadWeak();
+          } catch (e) { alert(e.message); }
+          finally { starsWrap.querySelectorAll('.star').forEach(s => { s.disabled = false; }); }
+        };
+      });
+    }
+
+    async function load(focusTopicId) {
       bodyEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>';
       try {
         const d = await api('/api/roadmap?subject=' + encodeURIComponent(state.subject));
@@ -82,6 +150,11 @@
                 <div class="ci-body">
                   <div class="ci-name">${escapeHtml(t.unit_name)}</div>
                   <div class="ci-desc">${escapeHtml(t.description || '')}</div>
+                  <div class="ci-rate-row">
+                    <div class="ci-stars">${starsHtml(t.id, t.understanding)}</div>
+                    <button class="quiz-btn" data-id="${t.id}">📝 문제풀기</button>
+                  </div>
+                  <div class="quiz-panel hidden" data-id="${t.id}"></div>
                 </div>
               </div>`).join('')}
           </div>`).join('');
@@ -97,16 +170,150 @@
               const total = d.total;
               const done = bodyEl.querySelectorAll('.curri-item.done').length;
               updateProgress(total, done);
+              loadWeak();
             } catch (e) { alert(e.message); }
             finally { btn.disabled = false; }
           };
         });
+
+        bindStars(bodyEl);
+
+        function refreshDoneProgress() {
+          updateProgress(d.total, bodyEl.querySelectorAll('.curri-item.done').length);
+        }
+
+        async function loadQuiz(id, panel) {
+          panel.innerHTML = '<p class="muted" style="font-size:12.5px;">문제를 불러오는 중...</p>';
+          try {
+            const q = await api(`/api/roadmap/topics/${id}/quiz`);
+            panel.dataset.loaded = '1';
+            panel.innerHTML = `
+              <div class="quiz-q">${escapeHtml(q.question)}</div>
+              <div class="quiz-choices">
+                ${q.choices.map((c, i) => `<button class="quiz-choice" data-index="${i}">${escapeHtml(c)}</button>`).join('')}
+              </div>`;
+            panel.querySelectorAll('.quiz-choice').forEach(cbtn => {
+              cbtn.onclick = () => submitQuiz(id, panel, Number(cbtn.dataset.index));
+            });
+          } catch (e) {
+            panel.innerHTML = `<p class="muted" style="font-size:12.5px;">${escapeHtml(e.message)}</p>`;
+          }
+        }
+
+        async function submitQuiz(id, panel, choiceIndex) {
+          const choiceButtons = [...panel.querySelectorAll('.quiz-choice')];
+          choiceButtons.forEach(b => { b.disabled = true; });
+          try {
+            const r = await api(`/api/roadmap/topics/${id}/quiz/submit`, {
+              method: 'POST',
+              body: { choice_index: choiceIndex }
+            });
+            choiceButtons.forEach((b, i) => {
+              if (i === choiceIndex) b.classList.add(r.correct ? 'chosen-correct' : 'chosen-wrong');
+              else if (i === r.answer_index) b.classList.add('reveal-correct');
+            });
+            const markSvg = r.correct
+              ? '<svg class="mark-svg mark-o" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" pathLength="1"/></svg>'
+              : '<svg class="mark-svg mark-x" viewBox="0 0 100 100"><line x1="22" y1="22" x2="78" y2="78" pathLength="1"/><line x1="78" y1="22" x2="22" y2="78" pathLength="1"/></svg>';
+            const resultEl = document.createElement('div');
+            resultEl.className = 'quiz-result';
+            resultEl.innerHTML = `${markSvg}<div class="qr-text">${r.correct ? '정답이에요! 🎉' : '아쉬워요, 정답을 확인해보세요.'} ${escapeHtml(r.explanation || '')}</div>`;
+            panel.appendChild(resultEl);
+
+            const item = panel.closest('.curri-item');
+            if (item) {
+              item.classList.add('done');
+              const starsWrap = item.querySelector('.ci-stars');
+              starsWrap.innerHTML = starsHtml(id, r.understanding);
+              bindStars(item);
+              refreshDoneProgress();
+            }
+            loadWeak();
+          } catch (e) {
+            alert(e.message);
+            choiceButtons.forEach(b => { b.disabled = false; });
+          }
+        }
+
+        bodyEl.querySelectorAll('.quiz-btn').forEach(btn => {
+          btn.onclick = async () => {
+            const id = btn.dataset.id;
+            const panel = bodyEl.querySelector(`.quiz-panel[data-id="${id}"]`);
+            const opening = panel.classList.contains('hidden');
+            panel.classList.toggle('hidden', !opening);
+            btn.classList.toggle('open', opening);
+            if (opening && !panel.dataset.loaded) await loadQuiz(id, panel);
+          };
+        });
+
+        if (focusTopicId) {
+          const target = bodyEl.querySelector(`.curri-item[data-id="${focusTopicId}"]`);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('flash');
+            setTimeout(() => target.classList.remove('flash'), 1400);
+            const qbtn = target.querySelector('.quiz-btn');
+            if (qbtn && !qbtn.classList.contains('open')) qbtn.click();
+          }
+        }
       } catch (e) {
         bodyEl.innerHTML = `<p class="muted text-center" style="padding:40px 0;">불러오지 못했어요: ${escapeHtml(e.message)}</p>`;
       }
     }
 
-    load();
+    async function loadWeak() {
+      try {
+        const weak = await api('/api/roadmap/weak');
+        if (!weak.length) {
+          weakBodyEl.innerHTML = '<p class="muted" style="font-size:13.5px;">아직 약점으로 표시된 단원이 없어요. 단원을 완료하며 이해도를 평가해 보세요 👍</p>';
+          return;
+        }
+        weakBodyEl.innerHTML = weak.map(w => `
+          <div class="weak-item">
+            <span class="weak-subject-badge">${escapeHtml(w.subject)}</span>
+            <span class="weak-grade">${escapeHtml(w.grade)}</span>
+            <span class="weak-name">${escapeHtml(w.unit_name)}</span>
+            <span class="weak-stars">${'★'.repeat(w.understanding)}${'☆'.repeat(5 - w.understanding)}</span>
+            <button class="btn btn-ghost weak-goto" data-subject="${escapeHtml(w.subject)}" data-id="${w.id}">복습하기</button>
+          </div>`).join('');
+
+        weakBodyEl.querySelectorAll('.weak-goto').forEach(btn => {
+          btn.onclick = () => {
+            const subject = btn.dataset.subject;
+            const topicId = btn.dataset.id;
+            if (state.subject !== subject) {
+              switchTab(subject);
+              load(topicId);
+            } else {
+              const target = bodyEl.querySelector(`.curri-item[data-id="${topicId}"]`);
+              if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.classList.add('flash');
+                setTimeout(() => target.classList.remove('flash'), 1400);
+              }
+            }
+          };
+        });
+      } catch (e) {
+        weakBodyEl.innerHTML = `<p class="muted" style="font-size:13.5px;">약점 목록을 불러오지 못했어요.</p>`;
+      }
+    }
+
+    async function loadWrongNoteEntry() {
+      const el = document.getElementById('wnEntryDesc');
+      try {
+        const notes = await api('/api/wrongnotes');
+        el.textContent = notes.length > 0
+          ? `틀린 연습문제 ${notes.length}개를 다시 풀어보세요`
+          : '틀린 문제가 없어요 👍';
+      } catch (e) {
+        el.textContent = '불러오지 못했어요';
+      }
+    }
+
+    load(qpTopic);
+    loadWeak();
+    loadWrongNoteEntry();
   </script>
 </body>
 </html>

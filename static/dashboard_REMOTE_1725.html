@@ -171,7 +171,7 @@
   <div class="db-stars" id="dbStars"></div>
 
   <nav class="navbar">
-    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
@@ -535,17 +535,6 @@
           chip.textContent = `📈 주간 랭킹 #${idx + 1}`;
           chip.style.display = 'inline-flex';
         }
-      } catch (_) {}
-    })();
-
-    /* ── 최근 업적 ── */
-    (async () => {
-      const box = document.getElementById('achList');
-      try {
-        const s = await api('/api/roadmap/summary');
-        const total = s.reduce((sum, r) => sum + r.total, 0);
-        const done  = s.reduce((sum, r) => sum + r.done_count, 0);
-        document.getElementById('roadmapTileDesc').textContent = `단원 ${done}/${total} 완료`;
       } catch (_) {}
     })();
 

@@ -240,11 +240,39 @@ CREATE TABLE IF NOT EXISTS curriculum_topics (
 );
 
 CREATE TABLE IF NOT EXISTS user_topic_progress (
-    user_id    INT NOT NULL,
-    topic_id   INT NOT NULL,
-    is_done    TINYINT(1) DEFAULT 0,
-    done_at    DATETIME   DEFAULT NULL,
+    user_id       INT NOT NULL,
+    topic_id      INT NOT NULL,
+    is_done       TINYINT(1) DEFAULT 0,
+    understanding TINYINT    DEFAULT NULL,  -- 자가진단 이해도 1(어려움)~5(완벽)
+    done_at       DATETIME   DEFAULT NULL,
     PRIMARY KEY (user_id, topic_id),
+    FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+);
+
+-- 단원별 확인 문제(1문제, 4지선다). 콘텐츠는 db/seed_quiz.py로 채움
+CREATE TABLE IF NOT EXISTS curriculum_quiz (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    topic_id     INT  NOT NULL UNIQUE,
+    question     TEXT NOT NULL,
+    choices      TEXT NOT NULL,        -- JSON 배열 문자열(보기 4개)
+    answer_index TINYINT NOT NULL,     -- 정답 보기 인덱스(0~3)
+    explanation  VARCHAR(255) DEFAULT NULL,
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+);
+
+-- ── 오답노트 ─────────────────────────────────────────────────────────
+-- 확인 문제를 틀리면 자동으로 쌓이고, 다시 풀어서 맞히면 자동으로 사라진다.
+CREATE TABLE IF NOT EXISTS wrong_notes (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    user_id       INT NOT NULL,
+    topic_id      INT NOT NULL,
+    chosen_index  TINYINT NOT NULL,      -- 마지막으로 고른(틀린) 보기 인덱스
+    wrong_count   INT NOT NULL DEFAULT 1,-- 누적 오답 횟수
+    last_wrong_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_topic (user_id, topic_id),
     FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
     FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
 );
@@ -306,6 +334,36 @@ CREATE TABLE IF NOT EXISTS user_topic_progress (
 --     is_done    TINYINT(1) DEFAULT 0,
 --     done_at    DATETIME   DEFAULT NULL,
 --     PRIMARY KEY (user_id, topic_id),
+--     FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
+--     FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+-- );
+--
+-- -- 이해도 자가진단(약점 추천 기능) 컬럼 추가
+-- ALTER TABLE user_topic_progress
+--   ADD COLUMN understanding TINYINT DEFAULT NULL AFTER is_done;
+--
+-- -- 단원별 확인 문제(1문제, 4지선다) 테이블 추가
+-- CREATE TABLE IF NOT EXISTS curriculum_quiz (
+--     id           INT AUTO_INCREMENT PRIMARY KEY,
+--     topic_id     INT  NOT NULL UNIQUE,
+--     question     TEXT NOT NULL,
+--     choices      TEXT NOT NULL,
+--     answer_index TINYINT NOT NULL,
+--     explanation  VARCHAR(255) DEFAULT NULL,
+--     created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
+-- );
+--
+-- -- 오답노트 테이블 추가
+-- CREATE TABLE IF NOT EXISTS wrong_notes (
+--     id            INT AUTO_INCREMENT PRIMARY KEY,
+--     user_id       INT NOT NULL,
+--     topic_id      INT NOT NULL,
+--     chosen_index  TINYINT NOT NULL,
+--     wrong_count   INT NOT NULL DEFAULT 1,
+--     last_wrong_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+--     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+--     UNIQUE KEY uq_user_topic (user_id, topic_id),
 --     FOREIGN KEY (user_id)  REFERENCES users(id)             ON DELETE CASCADE,
 --     FOREIGN KEY (topic_id) REFERENCES curriculum_topics(id) ON DELETE CASCADE
 -- );
