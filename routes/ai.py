@@ -26,8 +26,11 @@ def _client():
     return genai.Client(api_key=GEMINI_API_KEY)
 
 
-def call_gemini(messages, system=SYSTEM, max_tokens=8192):
-    """Gemini 호출 → 텍스트 반환. 키 없으면 RuntimeError('NO_KEY')."""
+def call_gemini(messages, system=SYSTEM, max_tokens=8192, json_mode=False, temperature=None):
+    """Gemini 호출 → 텍스트 반환. 키 없으면 RuntimeError('NO_KEY').
+
+    json_mode=True면 모델이 순수 JSON 문자열만 응답하도록 강제한다(출제 자판기 용도).
+    """
     client = _client()
     if client is None:
         raise RuntimeError('NO_KEY')
@@ -43,13 +46,19 @@ def call_gemini(messages, system=SYSTEM, max_tokens=8192):
         for m in messages
     ]
 
+    config_kwargs = {
+        'system_instruction': system,
+        'max_output_tokens': max_tokens,
+    }
+    if json_mode:
+        config_kwargs['response_mime_type'] = 'application/json'
+    if temperature is not None:
+        config_kwargs['temperature'] = temperature
+
     resp = client.models.generate_content(
         model=GEMINI_MODEL,
         contents=contents,
-        config=types.GenerateContentConfig(
-            system_instruction=system,
-            max_output_tokens=max_tokens,
-        ),
+        config=types.GenerateContentConfig(**config_kwargs),
     )
     return resp.text.strip()
 

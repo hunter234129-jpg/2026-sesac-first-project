@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>공부 로드맵 · 스터디 플랫폼</title>
+  <title>문제풀기 · 스터디 플랫폼</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -17,8 +17,8 @@
   <div class="app-content">
   <div class="container">
     <div class="dash-header">
-      <h1>공부 로드맵</h1>
-      <p>중1부터 고3까지, 과목별 학습 순서를 따라가고 이해도를 스스로 진단해 보세요</p>
+      <h1>문제풀기</h1>
+      <p>원하는 주제를 입력하면 AI가 그 자리에서 문제를 만들어줘요. 5문제로 실력을 진단한 뒤, 정답률에 맞춰 난이도를 조절하며 계속 풀 수 있어요</p>
     </div>
 
     <a href="/wrongnote" class="card wn-entry" id="wnEntry">
@@ -30,31 +30,28 @@
       <div class="wn-entry-arrow">→</div>
     </a>
 
-    <div class="card weak-card" id="weakCard">
-      <div class="weak-head">
-        <span class="wh-title">🧠 약점 복습 추천</span>
-        <span class="muted" style="font-size:12.5px;">완료했지만 이해도를 낮게 평가한 단원이에요</span>
+    <div class="card" id="startCard">
+      <div class="qz-start-row">
+        <input type="text" id="subjectInput" placeholder="예: 중2 수학 이차방정식 문제" maxlength="100">
+        <button class="btn btn-primary" id="startBtn">진단 시작</button>
       </div>
-      <div id="weakBody"><p class="muted" style="font-size:13.5px;">불러오는 중...</p></div>
+      <div class="qz-hint">과목·학년·단원·난이도 등 원하는 대로 자유롭게 적어주세요. 처음엔 실력 진단을 위한 5문제가 나와요.</div>
     </div>
 
-    <div class="tabs" id="subjectTabs">
-      <button class="tab" data-subject="국어">국어</button>
-      <button class="tab" data-subject="영어">영어</button>
-      <button class="tab active" data-subject="수학">수학</button>
-    </div>
-
-    <div class="card" style="margin-bottom:20px;">
-      <div class="curri-subject-prog">
-        <span style="font-size:13px; color:var(--muted);">진행률</span>
-        <div class="prog"><i id="progFill" style="width:0%;"></i></div>
-        <span class="csp-num" id="progNum">0 / 0</span>
+    <div class="card hidden" id="statusCard">
+      <div class="qz-status">
+        <span class="qz-subject" id="qzSubjectLabel"></span>
+        <span class="qz-level-badge hidden" id="qzLevelBadge"></span>
+        <button class="btn btn-ghost qz-restart" id="restartBtn">↻ 새 주제로 다시 시작</button>
+      </div>
+      <div class="curri-subject-prog hidden" id="diagProgWrap">
+        <span style="font-size:13px; color:var(--muted);">진단 진행률</span>
+        <div class="prog"><i id="diagProgFill" style="width:0%;"></i></div>
+        <span class="csp-num" id="diagProgNum">0 / 0</span>
       </div>
     </div>
 
-    <div class="card" id="roadmapBody">
-      <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
-    </div>
+    <div class="card hidden" id="quizCard"></div>
   </div>
   </div>
   </div>
@@ -63,256 +60,176 @@
   <script>
     if (!Auth.require()) { /* 로그인 페이지로 이동됨 */ }
     renderNav();
-    renderRail('roadmap');
+    renderRail('quiz');
 
-    let state = { subject: '수학' };
-    const bodyEl = document.getElementById('roadmapBody');
-    const weakBodyEl = document.getElementById('weakBody');
+    const startCard    = document.getElementById('startCard');
+    const statusCard   = document.getElementById('statusCard');
+    const quizCard     = document.getElementById('quizCard');
+    const subjectInput = document.getElementById('subjectInput');
+    const startBtn     = document.getElementById('startBtn');
 
-    const UNDER_LABEL = { 1: '많이 어려워요', 2: '어려워요', 3: '보통이에요', 4: '이해했어요', 5: '완벽해요' };
+    let state = { subjectQuery: '', phase: null, level: null };
 
-    // 오답노트 등 외부에서 ?subject=수학&topic=5 형태로 들어오면 해당 단원으로 바로 이동
-    const qpTopic = queryParam('topic');
-    const qpSubject = queryParam('subject');
-
-    function switchTab(subject) {
-      state.subject = subject;
-      document.querySelectorAll('#subjectTabs .tab').forEach(b => {
-        b.classList.toggle('active', b.dataset.subject === subject);
-      });
+    function setStatus() {
+      statusCard.classList.remove('hidden');
+      document.getElementById('qzSubjectLabel').textContent = state.subjectQuery;
+      const levelBadge = document.getElementById('qzLevelBadge');
+      if (state.level) {
+        levelBadge.textContent = `레벨: ${state.level}`;
+        levelBadge.classList.remove('hidden');
+      } else {
+        levelBadge.classList.add('hidden');
+      }
     }
 
-    document.getElementById('subjectTabs').onclick = (e) => {
-      const btn = e.target.closest('button');
-      if (!btn) return;
-      switchTab(btn.dataset.subject);
-      load();
-    };
-    // 기본 탭 활성 표시 정리(마크업엔 전부 active로 넣어놨으니 최초 진입 시 수학만 강조)
-    if (qpSubject && document.querySelector(`#subjectTabs .tab[data-subject="${qpSubject}"]`)) {
-      state.subject = qpSubject;
-    }
-    switchTab(state.subject);
-
-    function updateProgress(total, done) {
+    function setDiagProgress(done, total) {
+      const wrap = document.getElementById('diagProgWrap');
+      if (done == null) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-      document.getElementById('progFill').style.width = pct + '%';
-      document.getElementById('progNum').textContent = `${done} / ${total}`;
+      document.getElementById('diagProgFill').style.width = pct + '%';
+      document.getElementById('diagProgNum').textContent = `${done} / ${total}`;
     }
 
-    function starsHtml(id, understanding) {
-      return [1, 2, 3, 4, 5].map(n => `
-        <button class="star ${understanding && n <= understanding ? 'filled' : ''}" data-id="${id}" data-level="${n}" title="이해도 ${n}점">★</button>
-      `).join('') + `<span class="ci-under-label">${understanding ? UNDER_LABEL[understanding] : '이해도 평가하기'}</span>`;
-    }
-
-    function bindStars(scopeEl, onRated) {
-      scopeEl.querySelectorAll('.ci-stars .star').forEach(btn => {
-        btn.onclick = async () => {
-          const id = btn.dataset.id;
-          const level = Number(btn.dataset.level);
-          const starsWrap = btn.closest('.ci-stars');
-          starsWrap.querySelectorAll('.star').forEach(s => {
-            s.disabled = true;
-            s.classList.toggle('filled', Number(s.dataset.level) <= level);
-          });
-          try {
-            await api(`/api/roadmap/topics/${id}/rate`, {
-              method: 'POST',
-              body: { level }
-            });
-            starsWrap.querySelector('.ci-under-label').textContent = UNDER_LABEL[level];
-            const item = btn.closest('.curri-item');
-            if (item) item.classList.add('done');
-            if (onRated) onRated();
-            loadWeak();
-          } catch (e) { alert(e.message); }
-          finally { starsWrap.querySelectorAll('.star').forEach(s => { s.disabled = false; }); }
-        };
+    function renderQuestion(q) {
+      quizCard.classList.remove('hidden');
+      quizCard.innerHTML = `
+        <div class="quiz-q">${escapeHtml(q.question)}</div>
+        <div class="quiz-choices">
+          ${q.choices.map((c, i) => `<button class="quiz-choice" data-index="${i}">${escapeHtml(c)}</button>`).join('')}
+        </div>`;
+      quizCard.querySelectorAll('.quiz-choice').forEach(btn => {
+        btn.onclick = () => submitAnswer(q.id, Number(btn.dataset.index));
       });
     }
 
-    async function load(focusTopicId) {
-      bodyEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>';
+    function renderMessage(html) {
+      quizCard.classList.remove('hidden');
+      quizCard.innerHTML = html;
+    }
+
+    async function startQuiz(subjectQuery) {
+      startBtn.disabled = true;
+      renderMessage('<p class="muted text-center" style="padding:30px 0;">AI가 진단 문제 5개를 만드는 중...</p>');
       try {
-        const d = await api('/api/roadmap?subject=' + encodeURIComponent(state.subject));
-        updateProgress(d.total, d.done_count);
-
-        bodyEl.innerHTML = d.grades.map(g => `
-          <div class="curri-grade-head">
-            <span class="cg-badge">${escapeHtml(g.grade)}</span>
-            <span class="cg-line"></span>
-          </div>
-          <div class="curri-track">
-            ${g.topics.map(t => `
-              <div class="curri-item ${t.is_done ? 'done' : ''}" data-id="${t.id}">
-                <button class="curri-check" title="완료 체크">✓</button>
-                <div class="ci-body">
-                  <div class="ci-name">${escapeHtml(t.unit_name)}</div>
-                  <div class="ci-desc">${escapeHtml(t.description || '')}</div>
-                  <div class="ci-rate-row">
-                    <div class="ci-stars">${starsHtml(t.id, t.understanding)}</div>
-                    <button class="quiz-btn" data-id="${t.id}">📝 문제풀기</button>
-                  </div>
-                  <div class="quiz-panel hidden" data-id="${t.id}"></div>
-                </div>
-              </div>`).join('')}
-          </div>`).join('');
-
-        bodyEl.querySelectorAll('.curri-check').forEach(btn => {
-          btn.onclick = async () => {
-            const item = btn.closest('.curri-item');
-            const id = item.dataset.id;
-            btn.disabled = true;
-            try {
-              const r = await api(`/api/roadmap/topics/${id}/toggle`, { method: 'POST' });
-              item.classList.toggle('done', r.is_done);
-              const total = d.total;
-              const done = bodyEl.querySelectorAll('.curri-item.done').length;
-              updateProgress(total, done);
-              loadWeak();
-            } catch (e) { alert(e.message); }
-            finally { btn.disabled = false; }
-          };
-        });
-
-        bindStars(bodyEl);
-
-        function refreshDoneProgress() {
-          updateProgress(d.total, bodyEl.querySelectorAll('.curri-item.done').length);
-        }
-
-        async function loadQuiz(id, panel) {
-          panel.innerHTML = '<p class="muted" style="font-size:12.5px;">문제를 불러오는 중...</p>';
-          try {
-            const q = await api(`/api/roadmap/topics/${id}/quiz`);
-            panel.dataset.loaded = '1';
-            panel.innerHTML = `
-              <div class="quiz-q">${escapeHtml(q.question)}</div>
-              <div class="quiz-choices">
-                ${q.choices.map((c, i) => `<button class="quiz-choice" data-index="${i}">${escapeHtml(c)}</button>`).join('')}
-              </div>`;
-            panel.querySelectorAll('.quiz-choice').forEach(cbtn => {
-              cbtn.onclick = () => submitQuiz(id, panel, Number(cbtn.dataset.index));
-            });
-          } catch (e) {
-            panel.innerHTML = `<p class="muted" style="font-size:12.5px;">${escapeHtml(e.message)}</p>`;
-          }
-        }
-
-        async function submitQuiz(id, panel, choiceIndex) {
-          const choiceButtons = [...panel.querySelectorAll('.quiz-choice')];
-          choiceButtons.forEach(b => { b.disabled = true; });
-          try {
-            const r = await api(`/api/roadmap/topics/${id}/quiz/submit`, {
-              method: 'POST',
-              body: { choice_index: choiceIndex }
-            });
-            choiceButtons.forEach((b, i) => {
-              if (i === choiceIndex) b.classList.add(r.correct ? 'chosen-correct' : 'chosen-wrong');
-              else if (i === r.answer_index) b.classList.add('reveal-correct');
-            });
-            const markSvg = r.correct
-              ? '<svg class="mark-svg mark-o" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" pathLength="1"/></svg>'
-              : '<svg class="mark-svg mark-x" viewBox="0 0 100 100"><line x1="22" y1="22" x2="78" y2="78" pathLength="1"/><line x1="78" y1="22" x2="22" y2="78" pathLength="1"/></svg>';
-            const resultEl = document.createElement('div');
-            resultEl.className = 'quiz-result';
-            resultEl.innerHTML = `${markSvg}<div class="qr-text">${r.correct ? '정답이에요! 🎉' : '아쉬워요, 정답을 확인해보세요.'} ${escapeHtml(r.explanation || '')}</div>`;
-            panel.appendChild(resultEl);
-
-            const item = panel.closest('.curri-item');
-            if (item) {
-              item.classList.add('done');
-              const starsWrap = item.querySelector('.ci-stars');
-              starsWrap.innerHTML = starsHtml(id, r.understanding);
-              bindStars(item);
-              refreshDoneProgress();
-            }
-            loadWeak();
-          } catch (e) {
-            alert(e.message);
-            choiceButtons.forEach(b => { b.disabled = false; });
-          }
-        }
-
-        bodyEl.querySelectorAll('.quiz-btn').forEach(btn => {
-          btn.onclick = async () => {
-            const id = btn.dataset.id;
-            const panel = bodyEl.querySelector(`.quiz-panel[data-id="${id}"]`);
-            const opening = panel.classList.contains('hidden');
-            panel.classList.toggle('hidden', !opening);
-            btn.classList.toggle('open', opening);
-            if (opening && !panel.dataset.loaded) await loadQuiz(id, panel);
-          };
-        });
-
-        if (focusTopicId) {
-          const target = bodyEl.querySelector(`.curri-item[data-id="${focusTopicId}"]`);
-          if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            target.classList.add('flash');
-            setTimeout(() => target.classList.remove('flash'), 1400);
-            const qbtn = target.querySelector('.quiz-btn');
-            if (qbtn && !qbtn.classList.contains('open')) qbtn.click();
-          }
-        }
+        const d = await api('/api/quiz/start', { method: 'POST', body: { subject_query: subjectQuery } });
+        state = { subjectQuery: d.subject_query, phase: 'diagnostic', level: null };
+        setStatus();
+        setDiagProgress(0, d.questions.length);
+        state.questions = d.questions;
+        state.qIndex = 0;
+        renderQuestion(state.questions[0]);
+        loadWrongNoteEntry();
       } catch (e) {
-        bodyEl.innerHTML = `<p class="muted text-center" style="padding:40px 0;">불러오지 못했어요: ${escapeHtml(e.message)}</p>`;
+        renderMessage(`<p class="muted text-center" style="padding:30px 0;">${escapeHtml(e.message)}</p>`);
+      } finally {
+        startBtn.disabled = false;
       }
     }
 
-    async function loadWeak() {
+    async function submitAnswer(id, choiceIndex) {
+      const buttons = [...quizCard.querySelectorAll('.quiz-choice')];
+      buttons.forEach(b => { b.disabled = true; });
       try {
-        const weak = await api('/api/roadmap/weak');
-        if (!weak.length) {
-          weakBodyEl.innerHTML = '<p class="muted" style="font-size:13.5px;">아직 약점으로 표시된 단원이 없어요. 단원을 완료하며 이해도를 평가해 보세요 👍</p>';
-          return;
-        }
-        weakBodyEl.innerHTML = weak.map(w => `
-          <div class="weak-item">
-            <span class="weak-subject-badge">${escapeHtml(w.subject)}</span>
-            <span class="weak-grade">${escapeHtml(w.grade)}</span>
-            <span class="weak-name">${escapeHtml(w.unit_name)}</span>
-            <span class="weak-stars">${'★'.repeat(w.understanding)}${'☆'.repeat(5 - w.understanding)}</span>
-            <button class="btn btn-ghost weak-goto" data-subject="${escapeHtml(w.subject)}" data-id="${w.id}">복습하기</button>
-          </div>`).join('');
-
-        weakBodyEl.querySelectorAll('.weak-goto').forEach(btn => {
-          btn.onclick = () => {
-            const subject = btn.dataset.subject;
-            const topicId = btn.dataset.id;
-            if (state.subject !== subject) {
-              switchTab(subject);
-              load(topicId);
-            } else {
-              const target = bodyEl.querySelector(`.curri-item[data-id="${topicId}"]`);
-              if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                target.classList.add('flash');
-                setTimeout(() => target.classList.remove('flash'), 1400);
-              }
-            }
-          };
+        const r = await api(`/api/quiz/questions/${id}/submit`, { method: 'POST', body: { choice_index: choiceIndex } });
+        buttons.forEach((b, i) => {
+          if (i === choiceIndex) b.classList.add(r.correct ? 'chosen-correct' : 'chosen-wrong');
+          else if (i === r.answer_index) b.classList.add('reveal-correct');
         });
+        const markSvg = r.correct
+          ? '<svg class="mark-svg mark-o" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" pathLength="1"/></svg>'
+          : '<svg class="mark-svg mark-x" viewBox="0 0 100 100"><line x1="22" y1="22" x2="78" y2="78" pathLength="1"/><line x1="78" y1="22" x2="22" y2="78" pathLength="1"/></svg>';
+        const resultEl = document.createElement('div');
+        resultEl.className = 'quiz-result';
+        resultEl.innerHTML = `${markSvg}<div class="qr-text">${r.correct ? '정답이에요! 🎉' : '아쉬워요, 정답을 확인해보세요.'} ${escapeHtml(r.explanation || '')}</div>`;
+        quizCard.appendChild(resultEl);
+
+        if (r.diagnostic_progress) setDiagProgress(r.diagnostic_progress.done, r.diagnostic_progress.total);
+
+        if (r.phase === 'adaptive' && r.diagnostic_progress) {
+          // 방금 진단 5문제가 끝나고 레벨이 막 산정된 순간
+          state.phase = 'adaptive';
+          state.level = r.level;
+          setStatus();
+          const nextRow = document.createElement('div');
+          nextRow.className = 'qz-diag-done';
+          nextRow.innerHTML = `
+            <div class="qdd-emoji">🎯</div>
+            <p>진단 완료! 측정된 레벨은 <b>${escapeHtml(r.level)}</b>이에요.</p>
+            <button class="btn btn-primary" id="continueBtn">이 레벨로 계속 풀기 →</button>`;
+          quizCard.appendChild(nextRow);
+          document.getElementById('continueBtn').onclick = fetchNext;
+        } else if (r.diagnostic_progress) {
+          // 진단 문제 중간 — 다음 진단 문제로
+          state.qIndex += 1;
+          const nextBtn = document.createElement('div');
+          nextBtn.className = 'qz-next-row';
+          nextBtn.innerHTML = `<button class="btn btn-primary" id="nextBtn">다음 문제 →</button>`;
+          quizCard.appendChild(nextBtn);
+          document.getElementById('nextBtn').onclick = () => renderQuestion(state.questions[state.qIndex]);
+        } else {
+          // 적응형 단계
+          if (r.level) state.level = r.level;
+          setStatus();
+          const nextRow = document.createElement('div');
+          nextRow.className = 'qz-next-row';
+          nextRow.innerHTML = `
+            ${r.level_changed ? `<p class="muted" style="font-size:12.5px; margin-bottom:8px;">레벨이 <b>${escapeHtml(r.level)}</b>(으)로 조정됐어요</p>` : ''}
+            <button class="btn btn-primary" id="nextBtn">다음 문제 →</button>`;
+          quizCard.appendChild(nextRow);
+          document.getElementById('nextBtn').onclick = fetchNext;
+        }
       } catch (e) {
-        weakBodyEl.innerHTML = `<p class="muted" style="font-size:13.5px;">약점 목록을 불러오지 못했어요.</p>`;
+        alert(e.message);
+        buttons.forEach(b => { b.disabled = false; });
       }
     }
+
+    async function fetchNext() {
+      renderMessage('<p class="muted text-center" style="padding:30px 0;">AI가 다음 문제를 만드는 중...</p>');
+      try {
+        const q = await api('/api/quiz/next', { method: 'POST' });
+        renderQuestion(q);
+      } catch (e) {
+        renderMessage(`
+          <p class="muted text-center" style="padding:20px 0;">${escapeHtml(e.message)}</p>
+          <div class="qz-next-row"><button class="btn btn-primary" id="retryBtn">다시 시도</button></div>`);
+        document.getElementById('retryBtn').onclick = fetchNext;
+      }
+    }
+
+    startBtn.onclick = () => {
+      const q = subjectInput.value.trim();
+      if (!q) { subjectInput.focus(); return; }
+      startQuiz(q);
+    };
+    subjectInput.onkeydown = (e) => { if (e.key === 'Enter') startBtn.click(); };
+
+    document.getElementById('restartBtn').onclick = () => {
+      statusCard.classList.add('hidden');
+      quizCard.classList.add('hidden');
+      quizCard.innerHTML = '';
+      subjectInput.value = '';
+      subjectInput.focus();
+    };
 
     async function loadWrongNoteEntry() {
       const el = document.getElementById('wnEntryDesc');
       try {
         const notes = await api('/api/wrongnotes');
         el.textContent = notes.length > 0
-          ? `틀린 연습문제 ${notes.length}개를 다시 풀어보세요`
+          ? `틀린 문제 ${notes.length}개를 다시 풀어보세요`
           : '틀린 문제가 없어요 👍';
       } catch (e) {
         el.textContent = '불러오지 못했어요';
       }
     }
 
-    load(qpTopic);
-    loadWeak();
+    const qpSubject = queryParam('subject');
+    if (qpSubject) {
+      subjectInput.value = qpSubject;
+      startQuiz(qpSubject);
+    }
     loadWrongNoteEntry();
   </script>
 </body>
