@@ -155,7 +155,6 @@
           recruitHtml = `
             <div class="pd-recruit">
               <div><div class="label">모집 인원</div>${p.recruit_count || 0}명 (현재 ${p.member_count || 0}명)</div>
-              <div><div class="label">모집 마감일</div>${fmtDate(p.recruit_deadline)}</div>
               ${p.study_start ? `<div><div class="label">스터디 시작일</div>${fmtDate(p.study_start)}</div>` : ''}
               ${p.study_end   ? `<div><div class="label">스터디 종료일</div>${fmtDate(p.study_end)}</div>` : ''}
               <div><div class="label">가입 방식</div>${p.join_mode === 'approval' ? '모임장 승인 필요' : '바로 참가'}</div>
@@ -201,7 +200,9 @@
             <span>✍️ ${escapeHtml(p.author)}</span>
             <span>👁 조회 ${p.view_count}</span>
             ${p.category ? `<span>🏷️ ${escapeHtml(p.category)}</span>` : ''}
-            <span>🕒 ${(p.created_at || '').replace('T',' ').slice(0,16)}</span>
+            ${isStudy && p.recruit_deadline
+              ? `<span>🕒 마감 ${fmtDate(p.recruit_deadline)}</span>`
+              : `<span>🕒 ${fmtDate(p.created_at)}</span>`}
             ${ownerActions}
           </div>
           ${recruitHtml}

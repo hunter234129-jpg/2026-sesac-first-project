@@ -4,6 +4,33 @@
    window.startChatWidget()을 호출해서 초기화한다 (모든 페이지 공통).
    ───────────────────────────────────────────── */
 
+const BLOCKED_EXTS = new Set(['.exe', '.bat', '.scr', '.dll', '.msi']);
+
+function showChatDialog(icon, title, body) {
+  document.getElementById('__chatFileDlg')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = '__chatFileDlg';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#1b2340;border-radius:16px;padding:32px 36px;max-width:340px;width:90%;
+                box-shadow:0 8px 40px rgba(0,0,0,.7);text-align:center;">
+      <div style="font-size:40px;margin-bottom:14px;">${icon}</div>
+      <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:10px;">${title}</div>
+      <div style="font-size:13px;color:#94a3b8;line-height:1.6;margin-bottom:22px;">${body}</div>
+      <button style="padding:9px 28px;background:#4f46e5;color:#fff;border:none;border-radius:8px;
+                     font-size:14px;font-weight:600;cursor:pointer;" id="__chatFileDlgClose">확인</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  document.getElementById('__chatFileDlgClose').onclick = close;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+}
+
+function showBlockedExtDialog(ext) {
+  showChatDialog('🚫', '파일 전송 불가',
+    `<span style="color:#f87171;font-weight:600;">${escapeHtml(ext)}</span> 확장자 파일은<br>보안상 전송할 수 없어요.<br><span style="font-size:12px;opacity:.7;">(.exe · .bat · .scr · .dll · .msi)</span>`);
+}
+
 const EMOJIS = [
   '😀','😁','😂','🤣','😊','😍','😘','😎','🤔','🙄','😴','😢','😭','😡','🥳','😱',
   '👍','👎','👏','🙏','💪','🤝','👋','✌️',
@@ -58,9 +85,10 @@ window.startChatWidget = function () {
 
   const myId = Auth.userId;
   let socket = null;
-  let myAvatarId = 0;
+  let myAvatarId = null;
   const btnByUid = {};           // uid -> [신청 버튼 엘리먼트, ...] (드롭다운 + 전체보기 페이지에 각각 존재 가능)
   const pendingOutgoing = new Set();   // 응답 대기 중인 채팅 신청 대상 uid (online_users 재렌더에도 유지)
+  const partnerAvatarCache = new Map(); // user_id -> avatar_id (파트너 아바타 변경 감지용)
 
   /* ── 플로팅 채팅창 컨테이너 ── */
   const floatWrap = document.createElement('div');
@@ -114,12 +142,29 @@ window.startChatWidget = function () {
 
   function renderOnlineList(users) {
     const me = users.find(u => u.user_id === myId);
-    if (me) myAvatarId = me.avatar_id;
+    if (me && me.avatar_id !== myAvatarId) {
+      myAvatarId = me.avatar_id;
+      window.dispatchEvent(new CustomEvent('avatar-changed', { detail: { avatar_id: myAvatarId } }));
+    } else if (me) {
+      myAvatarId = me.avatar_id;
+    }
     renderMyAvatarBox();
     document.querySelectorAll('.cf-my-avatar-btn').forEach(btn => { btn.innerHTML = avatarHtml(myAvatarId, 22); });
     document.querySelectorAll('.cf-my-avatar-head').forEach(el => { el.innerHTML = avatarHtml(myAvatarId, 26); });
 
     const others = users.filter(u => u.user_id !== myId);
+
+    // 파트너 아바타 변경 감지 → 열린 채팅창 실시간 업데이트
+    others.forEach(u => {
+      const cached = partnerAvatarCache.get(u.user_id);
+      if (cached !== undefined && cached !== u.avatar_id) {
+        document.querySelectorAll(`.chat-float[data-partner-id="${u.user_id}"]`).forEach(w => {
+          if (w._updatePartnerAvatar) w._updatePartnerAvatar(u.avatar_id);
+        });
+      }
+      partnerAvatarCache.set(u.user_id, u.avatar_id);
+    });
+
     for (const uid in btnByUid) delete btnByUid[uid];
 
     const dropdownList = document.getElementById('onlineDropdownList');
@@ -204,12 +249,21 @@ window.startChatWidget = function () {
 
   /* ── 플로팅 채팅창 ──
      history가 주어지면(새로고침/페이지 이동 후 복원) 인사말 대신 지난 대화를 그대로 보여준다. */
-  function openChatWindow(room, partnerName, partnerAvatarId, history) {
+  function openChatWindow(room, partnerName, partnerAvatarId, partnerId, history) {
     if (document.querySelector(`.chat-float[data-room="${room}"]`)) return;
+
+    let pAvId = partnerAvatarId;  // 가변 참조 — 파트너 아바타 변경 시 _updatePartnerAvatar로 갱신
 
     const win = document.createElement('div');
     win.className = 'chat-float';
     win.dataset.room = room;
+    if (partnerId) win.dataset.partnerId = String(partnerId);
+    win._updatePartnerAvatar = (newId) => {
+      pAvId = newId;
+      win.querySelectorAll('.cf-partner-avatar').forEach(span => {
+        span.innerHTML = avatarHtml(newId, 28);
+      });
+    };
     win.innerHTML = `
       <div class="cf-head">
         <span class="cf-partner" title="내 아바타 변경"><span class="cf-my-avatar-head">${avatarHtml(myAvatarId, 26)}</span><span>${escapeHtml(partnerName)}님과의 채팅</span></span>
@@ -258,6 +312,13 @@ window.startChatWidget = function () {
       const file = fileInput.files[0];
       fileInput.value = '';
       if (!file) return;
+      const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')).toLowerCase() : '';
+      if (BLOCKED_EXTS.has(ext)) { showBlockedExtDialog(ext || file.name); return; }
+      if (file.size > 300 * 1024 * 1024) {
+        showChatDialog('⚠️', '최대 용량 초과',
+          '최대용량 <span style="color:#f87171;font-weight:600;">(300MB)</span>을 초과하였습니다.<br>더 작은 파일을 선택해 주세요.');
+        return;
+      }
       fileBtn.disabled = true;
       fileBtn.textContent = '⏳';
       try {
@@ -301,6 +362,12 @@ window.startChatWidget = function () {
       const d = isoStr ? new Date(isoStr) : new Date();
       const row = document.createElement('div');
       row.className = `cf-msg-row ${cls}`;
+      if (cls === 'other') {
+        const avatarEl = document.createElement('span');
+        avatarEl.className = 'cf-partner-avatar';
+        avatarEl.innerHTML = avatarHtml(pAvId, 28);
+        row.appendChild(avatarEl);
+      }
       const timeEl = document.createElement('span');
       timeEl.className = 'cf-msg-time';
       timeEl.textContent = formatTime(d);
@@ -412,7 +479,7 @@ window.startChatWidget = function () {
 
     socket.on('restore_rooms', (d) => {
       (d.rooms || []).forEach(r => {
-        openChatWindow(r.room, r.partner_username, r.partner_avatar_id, r.history);
+        openChatWindow(r.room, r.partner_username, r.partner_avatar_id, r.partner_id, r.history);
       });
     });
 
@@ -450,7 +517,7 @@ window.startChatWidget = function () {
     });
 
     socket.on('chat_accepted', (d) => {
-      openChatWindow(d.room, d.partner_username, d.partner_avatar_id);
+      openChatWindow(d.room, d.partner_username, d.partner_avatar_id, d.partner_id);
       pendingOutgoing.delete(d.partner_id);
       setBtnState(d.partner_id, false, '💬 채팅 신청');
     });

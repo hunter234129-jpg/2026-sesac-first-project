@@ -115,14 +115,52 @@
     const alertEl = document.getElementById('alert');
     let me = null;
 
+    const AVATARS = [
+      { emoji: '🦊', bg: '#FF6B6B' }, { emoji: '🐱', bg: '#FFA94D' }, { emoji: '🐶', bg: '#FFD43B' },
+      { emoji: '🐼', bg: '#94D82D' }, { emoji: '🐨', bg: '#37B24D' }, { emoji: '🦁', bg: '#20C997' },
+      { emoji: '🐯', bg: '#22B8CF' }, { emoji: '🐵', bg: '#4DABF7' }, { emoji: '🐰', bg: '#5C7CFA' },
+      { emoji: '🐺', bg: '#845EF7' }, { emoji: '🐸', bg: '#CC5DE8' }, { emoji: '🐧', bg: '#F783AC' },
+      { emoji: '🦉', bg: '#FF8787' }, { emoji: '🐙', bg: '#FFC078' }, { emoji: '🦋', bg: '#FFE066' },
+      { emoji: '🐹', bg: '#B2F2BB' }, { emoji: '🐭', bg: '#99E9F2' }, { emoji: '🐔', bg: '#91A7FF' },
+      { emoji: '🐮', bg: '#D0BFFF' }, { emoji: '🐷', bg: '#FCC2D7' },
+    ];
+
+    function fmtDate(str) {
+      if (!str) return '-';
+      let d;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const [y, m, day] = str.split('T')[0].split('-').map(Number);
+        d = new Date(y, m - 1, day);
+      } else {
+        d = new Date(str);
+      }
+      if (isNaN(d)) return str;
+      const KO_DOW = ['일','월','화','수','목','금','토'];
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}(${KO_DOW[d.getDay()]})`;
+    }
+
+    function applyAvatar(id) {
+      const av = AVATARS[id] || AVATARS[0];
+      const avatarEl = document.getElementById('avatar');
+      avatarEl.textContent = av.emoji;
+      avatarEl.style.background = av.bg;
+      avatarEl.style.fontSize = '28px';
+    }
+
+    window.addEventListener('avatar-changed', (e) => {
+      const id = e.detail.avatar_id;
+      if (me) me.avatar_id = id;
+      applyAvatar(id);
+    });
+
     /* ── 프로필 로드 ── */
     async function loadProfile() {
       me = await api('/api/auth/me');
-      document.getElementById('avatar').textContent = (me.username || '?')[0].toUpperCase();
+      applyAvatar(me.avatar_id);
       document.getElementById('pName').textContent  = me.username;
       document.getElementById('pEmail').textContent = me.email;
       document.getElementById('pReal').textContent  = me.real_name || '미등록';
-      document.getElementById('pJoined').textContent = (me.created_at || '').replace('T', ' ').slice(0, 16);
+      document.getElementById('pJoined').textContent = fmtDate(me.created_at);
       document.getElementById('verifyBadge').innerHTML = me.is_verified
         ? '<span class="badge">✓ 실명 인증됨</span>'
         : '<span class="muted" style="font-size:13px;">미인증</span>';
