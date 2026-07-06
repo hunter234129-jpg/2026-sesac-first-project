@@ -71,6 +71,9 @@ MIGRATIONS = [
     "ALTER TABLE post_members ADD COLUMN status ENUM('active','pending') NOT NULL DEFAULT 'active' AFTER user_id",
     # study_sessions (이 세션 공부 시간을 어느 모임 기여도로 반영할지 선택)
     "ALTER TABLE study_sessions ADD COLUMN post_id INT DEFAULT NULL AFTER user_id",
+    # posts (스터디 기간 시작/종료일)
+    "ALTER TABLE posts ADD COLUMN study_start DATE DEFAULT NULL AFTER join_mode",
+    "ALTER TABLE posts ADD COLUMN study_end   DATE DEFAULT NULL AFTER study_start",
 ]
 
 # 클랜 시스템 폐지(스터디 모집 게시글로 역할 통합) — 실제 운영 데이터가 있다면 이

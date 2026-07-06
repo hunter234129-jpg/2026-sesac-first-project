@@ -89,6 +89,24 @@
 
     const myId = Auth.userId;
 
+    /* ── 날짜 포맷: "2026-07-06(월)" ── */
+    function fmtDate(str) {
+      if (!str) return '미정';
+      let d;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const [y, m, day] = str.split('T')[0].split('-').map(Number);
+        d = new Date(y, m - 1, day);
+      } else {
+        d = new Date(str);
+      }
+      if (isNaN(d)) return str;
+      const yy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dow = ['일','월','화','수','목','금','토'][d.getDay()];
+      return `${yy}-${mm}-${dd}(${dow})`;
+    }
+
     /* ── 시험 D-day ── */
     function ddayLabel(dateStr) {
       if (!dateStr) return null;
@@ -137,10 +155,12 @@
           recruitHtml = `
             <div class="pd-recruit">
               <div><div class="label">모집 인원</div>${p.recruit_count || 0}명 (현재 ${p.member_count || 0}명)</div>
-              <div><div class="label">모집 마감일</div>${p.recruit_deadline || '미정'}</div>
-              <div><div class="label">분야</div>${escapeHtml(p.field || '미지정')}</div>
-              ${p.linked_exam_name ? `<div><div class="label">연동 시험</div>🗓️ ${escapeHtml(p.linked_exam_name)}</div>` : ''}
+              <div><div class="label">모집 마감일</div>${fmtDate(p.recruit_deadline)}</div>
+              ${p.study_start ? `<div><div class="label">스터디 시작일</div>${fmtDate(p.study_start)}</div>` : ''}
+              ${p.study_end   ? `<div><div class="label">스터디 종료일</div>${fmtDate(p.study_end)}</div>` : ''}
               <div><div class="label">가입 방식</div>${p.join_mode === 'approval' ? '모임장 승인 필요' : '바로 참가'}</div>
+              ${p.linked_exam_name ? `<div><div class="label">연동 시험</div>🗓️ ${escapeHtml(p.linked_exam_name)}</div>` : ''}
+              <div><div class="label">분야</div>${escapeHtml(p.field || '미지정')}</div>
             </div>
             ${examDdayHtml(p.exam_info)}`;
         }

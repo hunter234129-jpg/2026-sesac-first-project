@@ -20,9 +20,10 @@ def get_posts():
     size     = max(1, min(50, int(request.args.get('size', 10))))
     category = request.args.get('category', '')
     q        = request.args.get('q', '')
-    sort     = request.args.get('sort', 'latest')   # latest | views
-    type_    = request.args.get('type', '')          # post | study
-    offset   = (page - 1) * size
+    sort      = request.args.get('sort', 'latest')   # latest | views
+    type_     = request.args.get('type', '')          # post | study
+    author_id = request.args.get('author_id', '', type=str).strip()
+    offset    = (page - 1) * size
 
     wheres, params = ['p.deleted_at IS NULL'], []
     if category:
@@ -34,6 +35,9 @@ def get_posts():
     if type_:
         wheres.append('p.type = %s')
         params.append(type_)
+    if author_id.isdigit():
+        wheres.append('p.user_id = %s')
+        params.append(int(author_id))
 
     where_sql = 'WHERE ' + ' AND '.join(wheres)
     order_sql = 'ORDER BY p.view_count DESC' if sort == 'views' else 'ORDER BY p.created_at DESC'
@@ -50,7 +54,7 @@ def get_posts():
         cursor.execute(
             f'''SELECT p.id, p.title, p.type, p.category, p.status,
                        p.view_count, p.recruit_count, p.field, p.linked_exam_name, p.join_mode,
-                       p.recruit_deadline, p.created_at,
+                       p.recruit_deadline, p.study_start, p.study_end, p.created_at,
                        u.username AS author,
                        (SELECT COUNT(*) FROM post_members pm
                          WHERE pm.post_id = p.id AND pm.status = 'active' AND pm.left_at IS NULL) AS member_count
@@ -71,6 +75,32 @@ def get_posts():
         'size':        size,
         'total_pages': (total + size - 1) // size
     })
+
+
+@post_bp.route('/api/posts/my-schedule', methods=['GET'])
+@login_required
+def my_schedule():
+    """내가 참여 중인 스터디 모임의 달력 일정 데이터 — 모집 마감일을 이벤트 날짜로 사용."""
+    conn   = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            '''SELECT p.id, p.title, p.category, p.field, p.status AS post_status,
+                      p.recruit_deadline, p.study_start, p.study_end,
+                      (SELECT COUNT(*) FROM post_members pm2
+                        WHERE pm2.post_id = p.id AND pm2.left_at IS NULL AND pm2.status = 'active') AS member_count,
+                      (p.user_id = %s) AS is_owner
+               FROM posts p
+               JOIN post_members pm ON pm.post_id = p.id
+               WHERE pm.user_id = %s AND pm.status = 'active' AND pm.left_at IS NULL
+                 AND p.deleted_at IS NULL AND p.type = 'study'
+               ORDER BY p.study_start IS NULL, p.study_start ASC''',
+            (g.user_id, g.user_id)
+        )
+        studies = cursor.fetchall()
+    finally:
+        conn.close()
+    return ok(studies)
 
 
 @post_bp.route('/api/posts/joined', methods=['GET'])
@@ -106,6 +136,8 @@ def create_post():
     category         = data.get('category', '')
     recruit_count    = data.get('recruit_count', 0)
     recruit_deadline = data.get('recruit_deadline')
+    study_start      = data.get('study_start') or None
+    study_end        = data.get('study_end') or None
     field            = data.get('field', '')
     join_mode        = data.get('join_mode', 'open')
 
@@ -132,11 +164,11 @@ def create_post():
         cursor.execute(
             '''INSERT INTO posts
                (user_id, title, content, type, category, recruit_count, recruit_deadline,
-                field, linked_exam_name, join_mode)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                study_start, study_end, field, linked_exam_name, join_mode)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
             (g.user_id, title, content, type_, category,
-             recruit_count, recruit_deadline, field, linked_exam_name,
-             join_mode if type_ == 'study' else 'open')
+             recruit_count, recruit_deadline, study_start, study_end,
+             field, linked_exam_name, join_mode if type_ == 'study' else 'open')
         )
         new_id = cursor.lastrowid
 
@@ -214,6 +246,12 @@ def update_post(id):
         if 'recruit_deadline' in data:
             updates.append('recruit_deadline = %s')
             params.append(data['recruit_deadline'] or None)
+        if 'study_start' in data:
+            updates.append('study_start = %s')
+            params.append(data['study_start'] or None)
+        if 'study_end' in data:
+            updates.append('study_end = %s')
+            params.append(data['study_end'] or None)
         if 'field' in data:
             updates.append('field = %s')
             params.append(data['field'] or None)

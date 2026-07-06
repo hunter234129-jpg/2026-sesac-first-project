@@ -5,6 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>게시판 · 스터디 플랫폼</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .btn-my-posts {
+      display: none;
+      padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05);
+      color: var(--muted); cursor: pointer; transition: all .15s; white-space: nowrap;
+    }
+    .btn-my-posts.visible { display: inline-flex; align-items: center; gap: 6px; }
+    .btn-my-posts.active {
+      background: rgba(0,229,255,0.12); border-color: rgba(0,229,255,0.4);
+      color: #00e5ff;
+    }
+    .btn-my-posts:hover { border-color: rgba(0,229,255,0.3); color: #00e5ff; }
+  </style>
 </head>
 <body>
   <nav class="navbar">
@@ -21,7 +35,10 @@
         <h1>게시판</h1>
         <p>스터디 모집과 정보 공유</p>
       </div>
-      <button class="btn btn-primary" id="writeBtn">✏️ 글쓰기</button>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button class="btn-my-posts" id="myPostsBtn">✍️ 내가 쓴 글</button>
+        <button class="btn btn-primary" id="writeBtn">✏️ 글쓰기</button>
+      </div>
     </div>
 
     <div class="toolbar">
@@ -53,13 +70,25 @@
     renderNav();
     renderRail('board');
 
-    const state = { page: 1, size: 10, type: queryParam('type') || '', q: '', sort: 'latest' };
-    const listEl = document.getElementById('postList');
-    const pagEl  = document.getElementById('pagination');
+    const state = { page: 1, size: 10, type: queryParam('type') || '', q: '', sort: 'latest', myOnly: false };
+    const listEl     = document.getElementById('postList');
+    const pagEl      = document.getElementById('pagination');
+    const myPostsBtn = document.getElementById('myPostsBtn');
+
     if (state.type) {
       document.querySelectorAll('#typeSeg button').forEach(b =>
         b.classList.toggle('active', b.dataset.type === state.type));
     }
+
+    // 로그인 상태면 버튼 노출
+    if (Auth.isLoggedIn) myPostsBtn.classList.add('visible');
+
+    myPostsBtn.onclick = () => {
+      state.myOnly = !state.myOnly;
+      myPostsBtn.classList.toggle('active', state.myOnly);
+      myPostsBtn.textContent = state.myOnly ? '✍️ 내가 쓴 글 ✓' : '✍️ 내가 쓴 글';
+      state.page = 1; load();
+    };
 
     document.getElementById('writeBtn').onclick = () => {
       if (!Auth.isLoggedIn) { location.href = '/login?next=/write'; return; }
@@ -101,8 +130,9 @@
       const qs = new URLSearchParams({
         page: state.page, size: state.size, sort: state.sort,
       });
-      if (state.type) qs.set('type', state.type);
-      if (state.q)    qs.set('q', state.q);
+      if (state.type)   qs.set('type', state.type);
+      if (state.q)      qs.set('q', state.q);
+      if (state.myOnly && Auth.userId) qs.set('author_id', Auth.userId);
 
       try {
         const d = await api('/api/posts?' + qs.toString(), { auth: false });
