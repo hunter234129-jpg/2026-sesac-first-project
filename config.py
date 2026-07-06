@@ -24,8 +24,13 @@ JWT_EXPIRE_HOURS = 24
 
 # 파일 업로드
 UPLOAD_DIR         = os.getenv('UPLOAD_DIR', os.path.join(os.path.dirname(__file__), 'uploads'))
-MAX_UPLOAD_BYTES   = 10 * 1024 * 1024   # 10MB
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'docx', 'xlsx', 'pptx', 'zip'}
+MAX_UPLOAD_BYTES   = 300 * 1024 * 1024  # 300MB
+ALLOWED_EXTENSIONS = {
+    'png', 'jpg', 'jpeg', 'gif', 'webp',          # 이미지
+    'pdf', 'docx', 'xlsx', 'pptx',                # 문서
+    'txt', 'html', 'css', 'js', 'py', 'java',     # 텍스트/코드
+    'zip',                                         # 압축
+}
 
 # OCR (PaddleOCR)
 OCR_LANG = os.getenv('OCR_LANG', 'korean')   # PaddleOCR 언어코드: korean, en, ch 등

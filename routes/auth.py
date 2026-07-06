@@ -97,7 +97,7 @@ def get_me():
     try:
         cursor.execute(
             '''SELECT id, username, email, real_name, interest_keywords,
-                      is_verified, is_admin, created_at
+                      avatar_id, is_verified, is_admin, created_at
                FROM users
                WHERE id = %s AND is_deleted = 0''',
             (g.user_id,)
