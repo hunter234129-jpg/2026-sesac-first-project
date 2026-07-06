@@ -18,6 +18,12 @@
       color: #00e5ff;
     }
     .btn-my-posts:hover { border-color: rgba(0,229,255,0.3); color: #00e5ff; }
+    .pi-recruit {
+      margin-left: auto;
+      font-size: 12px; color: var(--muted, #9aa4c2);
+      white-space: nowrap;
+    }
+    .pi-recruit b { color: var(--text, #e8edf8); }
   </style>
 </head>
 <body>
@@ -144,6 +150,13 @@
       return `<span class="pi-dday">${label}</span>`;
     }
 
+    function recruitBadge(p) {
+      if (p.type !== 'study') return '';
+      const total   = p.recruit_count || 0;
+      const current = p.member_count  || 0;
+      return `<span class="pi-recruit">모집 <b>${total}</b>명 (현재 <b>${current}</b>명)</span>`;
+    }
+
     function typeBadge(t) {
       return t === 'study'
         ? '<span class="tbadge study">스터디</span>'
@@ -166,7 +179,8 @@
           deadlinePassed = dl < today;
         }
       }
-      return (p.status === 'closed' || deadlinePassed)
+      const isFull = p.recruit_count > 0 && (p.member_count || 0) >= p.recruit_count;
+      return (p.status === 'closed' || deadlinePassed || isFull)
         ? '<span class="tbadge closed">모집 마감</span>'
         : '<span class="tbadge open">모집중</span>';
     }
@@ -181,17 +195,36 @@
       if (state.myOnly && Auth.userId) qs.set('author_id', Auth.userId);
 
       try {
-        const d = await api('/api/posts?' + qs.toString(), { auth: false });
+        const d = await api('/api/posts?' + qs.toString());
         const posts = d.posts || [];
         if (!posts.length) {
           listEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">게시글이 없어요. 첫 글을 작성해보세요!</p>';
           pagEl.innerHTML = '';
           return;
         }
-        listEl.innerHTML = posts.map(p => `
-          <a class="post-item" href="/post?id=${p.id}">
+        listEl.innerHTML = posts.map(p => {
+          const isClosed = (() => {
+            if (p.type !== 'study') return false;
+            if (p.status === 'closed') return true;
+            if (p.recruit_count > 0 && (p.member_count || 0) >= p.recruit_count) return true;
+            if (!p.recruit_deadline) return false;
+            const str = p.recruit_deadline;
+            let dl;
+            if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+              const [y, m, d] = str.split('T')[0].split('-').map(Number);
+              dl = new Date(y, m - 1, d);
+            } else { dl = new Date(str); }
+            if (isNaN(dl)) return false;
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            return dl < today;
+          })();
+          const isAuthor = Auth.isLoggedIn && p.author_id === Auth.userId;
+          const isMember = !!p.is_member;   // 작성자 포함, 활성 멤버
+          const blocked = isClosed && !isMember;
+
+          const inner = `
             <div class="pi-top">
-              ${dDayBadge(p)}${typeBadge(p.type)}${statusBadge(p)}
+              ${dDayBadge(p)}${typeBadge(p.type)}${statusBadge(p)}${recruitBadge(p)}
               <span class="pi-views"><strong>${p.view_count}</strong> 조회</span>
             </div>
             <div class="pi-title">${escapeHtml(p.title)}</div>
@@ -205,7 +238,12 @@
                   : fmtDate(p.created_at)
               }</span>
             </div>
-          </a>`).join('');
+            ${blocked ? '<div style="position:absolute;inset:0;border-radius:inherit;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;"><span style="font-size:12px;font-weight:700;color:rgba(255,255,255,.5);letter-spacing:.03em;">모집 마감 · 조회 불가</span></div>' : ''}`;
+
+          return blocked
+            ? `<div class="post-item" style="position:relative;cursor:not-allowed;opacity:.55;">${inner}</div>`
+            : `<a class="post-item" href="/post?id=${p.id}" style="position:relative;">${inner}</a>`;
+        }).join('');
         renderPagination(d.page, d.total_pages);
       } catch (err) {
         listEl.innerHTML = `<p class="muted text-center" style="padding:40px 0;">불러오지 못했어요: ${escapeHtml(err.message)}</p>`;

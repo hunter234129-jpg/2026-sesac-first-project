@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, g
 from db.connection import get_db
-from utils.auth import login_required
+from utils.auth import login_required, get_optional_user_id
 from utils.notify import notify_keyword_match
 from routes.exams import get_best_exam_by_name
 
@@ -16,6 +16,7 @@ def err(msg, code, status=400):
 
 @post_bp.route('/api/posts', methods=['GET'])
 def get_posts():
+    viewer_id = get_optional_user_id()   # 로그인 중이면 user_id, 아니면 None
     page     = max(1, int(request.args.get('page', 1)))
     size     = max(1, min(50, int(request.args.get('size', 10))))
     category = request.args.get('category', '')
@@ -55,14 +56,28 @@ def get_posts():
             f'''SELECT p.id, p.title, p.type, p.category, p.status,
                        p.view_count, p.recruit_count, p.field, p.linked_exam_name, p.join_mode,
                        p.recruit_deadline, p.study_start, p.study_end, p.created_at,
+                       p.user_id AS author_id,
                        u.username AS author,
                        (SELECT COUNT(*) FROM post_members pm
-                         WHERE pm.post_id = p.id AND pm.status = 'active' AND pm.left_at IS NULL) AS member_count
+                         WHERE pm.post_id = p.id AND pm.status = 'active' AND pm.left_at IS NULL)
+                       + CASE WHEN NOT EXISTS (
+                           SELECT 1 FROM post_members pm2
+                           WHERE pm2.post_id = p.id AND pm2.user_id = p.user_id
+                             AND pm2.status = 'active' AND pm2.left_at IS NULL
+                         ) THEN 1 ELSE 0 END AS member_count,
+                       CASE WHEN %s IS NOT NULL AND (
+                         p.user_id = %s
+                         OR EXISTS (
+                           SELECT 1 FROM post_members pm3
+                           WHERE pm3.post_id = p.id AND pm3.user_id = %s
+                             AND pm3.status = 'active' AND pm3.left_at IS NULL
+                         )
+                       ) THEN 1 ELSE 0 END AS is_member
                 FROM posts p
                 JOIN users u ON p.user_id = u.id
                 {where_sql} {order_sql}
                 LIMIT %s OFFSET %s''',
-            params + [size, offset]
+            [viewer_id, viewer_id, viewer_id] + params + [size, offset]
         )
         posts = cursor.fetchall()
     finally:
@@ -91,11 +106,14 @@ def my_schedule():
                         WHERE pm2.post_id = p.id AND pm2.left_at IS NULL AND pm2.status = 'active') AS member_count,
                       (p.user_id = %s) AS is_owner
                FROM posts p
-               JOIN post_members pm ON pm.post_id = p.id
-               WHERE pm.user_id = %s AND pm.status = 'active' AND pm.left_at IS NULL
-                 AND p.deleted_at IS NULL AND p.type = 'study'
+               LEFT JOIN post_members pm ON pm.post_id = p.id
+                                        AND pm.user_id = %s
+                                        AND pm.status = 'active'
+                                        AND pm.left_at IS NULL
+               WHERE p.deleted_at IS NULL AND p.type = 'study'
+                 AND (pm.user_id IS NOT NULL OR p.user_id = %s)
                ORDER BY p.study_start IS NULL, p.study_start ASC''',
-            (g.user_id, g.user_id)
+            (g.user_id, g.user_id, g.user_id)
         )
         studies = cursor.fetchall()
     finally:
@@ -198,7 +216,12 @@ def get_post(id):
         cursor.execute(
             '''SELECT p.*, u.username AS author,
                       (SELECT COUNT(*) FROM post_members pm
-                        WHERE pm.post_id = p.id AND pm.status = 'active' AND pm.left_at IS NULL) AS member_count
+                        WHERE pm.post_id = p.id AND pm.status = 'active' AND pm.left_at IS NULL)
+                      + CASE WHEN NOT EXISTS (
+                          SELECT 1 FROM post_members pm2
+                          WHERE pm2.post_id = p.id AND pm2.user_id = p.user_id
+                            AND pm2.status = 'active' AND pm2.left_at IS NULL
+                        ) THEN 1 ELSE 0 END AS member_count
                FROM posts p
                JOIN users u ON p.user_id = u.id
                WHERE p.id = %s AND p.deleted_at IS NULL''',
@@ -343,22 +366,44 @@ def get_post_members(id):
     conn   = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute('SELECT id, type FROM posts WHERE id = %s AND deleted_at IS NULL', (id,))
+        cursor.execute(
+            'SELECT id, type, user_id FROM posts WHERE id = %s AND deleted_at IS NULL', (id,)
+        )
         post = cursor.fetchone()
         if not post:
             return err('게시글을 찾을 수 없습니다', 'NOT_FOUND', 404)
         if post['type'] != 'study':
             return err('스터디 모집글에만 사용 가능합니다', 'INVALID_TYPE')
 
+        author_id = post['user_id']
+
+        # 작성자 정보 (post_members에 없어도 항상 포함)
+        cursor.execute(
+            '''SELECT u.id, u.username,
+                      COALESCE(pm.contribution_score, 0) AS contribution_score,
+                      pm.joined_at
+               FROM users u
+               LEFT JOIN post_members pm ON pm.post_id = %s
+                                        AND pm.user_id = u.id
+                                        AND pm.status = 'active'
+                                        AND pm.left_at IS NULL
+               WHERE u.id = %s AND u.is_deleted = 0''',
+            (id, author_id)
+        )
+        author = cursor.fetchone()
+
+        # 작성자 외 활성 멤버
         cursor.execute(
             '''SELECT u.id, u.username, pm.contribution_score, pm.joined_at
                FROM post_members pm
                JOIN users u ON pm.user_id = u.id
-               WHERE pm.post_id = %s AND pm.status = 'active' AND pm.left_at IS NULL AND u.is_deleted = 0
+               WHERE pm.post_id = %s AND pm.status = 'active' AND pm.left_at IS NULL
+                 AND u.is_deleted = 0 AND u.id != %s
                ORDER BY pm.contribution_score DESC''',
-            (id,)
+            (id, author_id)
         )
-        members = cursor.fetchall()
+        others = cursor.fetchall()
+        members = ([author] if author else []) + list(others)
     finally:
         conn.close()
 

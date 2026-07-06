@@ -143,18 +143,37 @@
         const isOwner = Auth.isLoggedIn && p.user_id === myId;
         const isStudy = p.type === 'study';
 
+        // 실질적 마감 여부 (status, 마감일, 정원 초과 모두 고려)
+        const isEffectivelyClosed = isStudy && (() => {
+          if (p.status === 'closed') return true;
+          if (p.recruit_count > 0 && (p.member_count || 0) >= p.recruit_count) return true;
+          if (p.recruit_deadline) {
+            const str = p.recruit_deadline;
+            let dl;
+            if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+              const [y, m, d] = str.split('T')[0].split('-').map(Number);
+              dl = new Date(y, m - 1, d);
+            } else { dl = new Date(str); }
+            if (!isNaN(dl)) {
+              const today = new Date(); today.setHours(0, 0, 0, 0);
+              if (dl < today) return true;
+            }
+          }
+          return false;
+        })();
+
         const typeBadge = isStudy
           ? '<span class="tbadge study">스터디</span>'
           : '<span class="tbadge post">게시글</span>';
         const statusBadge = isStudy
-          ? (p.status === 'closed' ? '<span class="tbadge closed">마감</span>' : '<span class="tbadge open">모집중</span>')
+          ? (isEffectivelyClosed ? '<span class="tbadge closed">모집 마감</span>' : '<span class="tbadge open">모집중</span>')
           : '';
 
         let recruitHtml = '';
         if (isStudy) {
           recruitHtml = `
             <div class="pd-recruit">
-              <div><div class="label">모집 인원</div>${p.recruit_count || 0}명 (현재 ${p.member_count || 0}명)</div>
+              <div><div class="label">모집 인원</div>${p.recruit_count || 0}명 (현재 <span id="currentMemberCount">${p.member_count || 0}</span>명)</div>
               ${p.study_start ? `<div><div class="label">스터디 시작일</div>${fmtDate(p.study_start)}</div>` : ''}
               ${p.study_end   ? `<div><div class="label">스터디 종료일</div>${fmtDate(p.study_end)}</div>` : ''}
               <div><div class="label">가입 방식</div>${p.join_mode === 'approval' ? '모임장 승인 필요' : '바로 참가'}</div>
@@ -173,7 +192,12 @@
         if (isOwner) {
           ownerActions = `
             <div class="pd-actions">
-              ${isStudy ? `<button class="btn btn-ghost" id="toggleStatusBtn" style="padding:7px 14px;">${p.status === 'open' ? '모집 마감' : '다시 모집'}</button>` : ''}
+              ${isStudy ? (() => {
+                const toggleDisabled = isEffectivelyClosed && p.status === 'open';
+                const label = p.status === 'open' ? '모집 마감' : '다시 모집';
+                const disabledStyle = toggleDisabled ? 'opacity:.35;cursor:not-allowed;pointer-events:none;' : '';
+                return `<button class="btn btn-ghost" id="toggleStatusBtn" style="padding:7px 14px;${disabledStyle}" ${toggleDisabled ? 'disabled' : ''}>${label}</button>`;
+              })() : ''}
               <a class="btn btn-ghost" href="/write?id=${p.id}" style="padding:7px 14px;">수정</a>
               <button class="btn btn-danger" id="deleteBtn" style="padding:7px 14px;">삭제</button>
             </div>`;
@@ -245,9 +269,8 @@
         };
 
         if (isStudy) {
-          loadMembers(p.user_id);
-          if (isOwner && p.join_mode === 'approval') loadRequests();
-          else document.getElementById('requestsCard').classList.add('hidden');
+          loadMembers(p.user_id, isOwner && p.join_mode === 'approval');
+          document.getElementById('requestsCard').classList.add('hidden');
           if (Auth.isLoggedIn) initChat();
         }
       } catch (err) {
@@ -256,25 +279,64 @@
     }
 
     /* ── 멤버 목록(스터디 모임) ── */
-    async function loadMembers(ownerId) {
+    async function loadMembers(ownerId, showRequests) {
       try {
-        const members = await api(`/api/posts/${postId}/members`, { auth: false });
+        const [members, requests] = await Promise.all([
+          api(`/api/posts/${postId}/members`, { auth: false }),
+          showRequests ? api(`/api/posts/${postId}/requests`).catch(() => []) : Promise.resolve([]),
+        ]);
+
         document.getElementById('membersCard').classList.remove('hidden');
         document.getElementById('memberCount').textContent = `${members.length}명`;
+        const curEl = document.getElementById('currentMemberCount');
+        if (curEl) curEl.textContent = members.length;
+
         const el = document.getElementById('memberList');
-        el.innerHTML = members.map((m, i) => {
+
+        const memberRows = members.map((m, i) => {
           const isLeader = m.id === ownerId;
           const isMe = m.id === myId;
           return `
             <div class="rank-row ${isMe ? 'me' : ''}">
               <div class="rank-num">${i + 1}</div>
               <div class="rank-name">
-                ${isLeader ? '👑 ' : ''}${escapeHtml(m.username)}
-                ${isMe ? '<span class="you">나</span>' : ''}
+                ${isLeader ? '👑 ' : ''}${escapeHtml(m.username)}${isMe ? ' <span style="font-size:11px;color:var(--muted,#9aa4c2);">(본인)</span>' : ''}
               </div>
               <div class="rank-time">${m.contribution_score}점</div>
             </div>`;
         }).join('');
+
+        const requestRows = requests.map(r => `
+          <div class="rank-row" data-uid="${r.id}" style="opacity:.8;">
+            <div class="rank-num" style="font-size:14px;">⏳</div>
+            <div class="rank-name" style="color:var(--muted,#9aa4c2);">
+              ${escapeHtml(r.username)}
+              <span style="font-size:11px; margin-left:4px;">(승인 대기)</span>
+            </div>
+            <div style="display:flex; gap:6px; margin-left:auto;">
+              <button class="btn btn-primary" data-act="accept" style="padding:4px 12px; font-size:12px;">승인</button>
+              <button class="btn btn-ghost"   data-act="reject" style="padding:4px 12px; font-size:12px;">취소</button>
+            </div>
+          </div>`).join('');
+
+        el.innerHTML = memberRows + (requests.length
+          ? `<div style="border-top:1px solid rgba(255,255,255,.06); margin-top:6px; padding-top:6px;">${requestRows}</div>`
+          : '');
+
+        el.querySelectorAll('[data-act]').forEach(btn => {
+          btn.onclick = async () => {
+            const uid = btn.closest('[data-uid]').dataset.uid;
+            btn.disabled = true;
+            try {
+              if (btn.dataset.act === 'accept') {
+                await api(`/api/posts/${postId}/requests/${uid}/accept`, { method: 'POST' });
+              } else {
+                await api(`/api/posts/${postId}/requests/${uid}`, { method: 'DELETE' });
+              }
+              loadPost();
+            } catch (err) { showAlert(alertEl, err.message); btn.disabled = false; }
+          };
+        });
       } catch (_) {}
     }
 
