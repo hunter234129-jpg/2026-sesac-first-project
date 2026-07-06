@@ -539,5 +539,7 @@ window.startChatWidget = function () {
     });
   }
 
+  window.changeMyAvatar = (id) => { if (socket) socket.emit('update_avatar', { avatar_id: id }); };
+
   connectSocket();
 };

@@ -442,9 +442,52 @@
     document.getElementById('greeting').innerHTML = `안녕하세요, <span>${escapeHtml(Auth.username)}</span> 님 👋`;
     document.getElementById('userName').textContent = Auth.username;
     document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
-    const initial = (Auth.username || '?').charAt(0).toUpperCase();
-    document.getElementById('avatarInitial').textContent = initial;
-    document.getElementById('avatarInitial2').textContent = initial;
+
+    const DB_AVATARS = [
+      { emoji: '🦊', bg: '#FF6B6B' }, { emoji: '🐱', bg: '#FFA94D' }, { emoji: '🐶', bg: '#FFD43B' },
+      { emoji: '🐼', bg: '#94D82D' }, { emoji: '🐨', bg: '#37B24D' }, { emoji: '🦁', bg: '#20C997' },
+      { emoji: '🐯', bg: '#22B8CF' }, { emoji: '🐵', bg: '#4DABF7' }, { emoji: '🐰', bg: '#5C7CFA' },
+      { emoji: '🐺', bg: '#845EF7' }, { emoji: '🐸', bg: '#CC5DE8' }, { emoji: '🐧', bg: '#F783AC' },
+      { emoji: '🦉', bg: '#FF8787' }, { emoji: '🐙', bg: '#FFC078' }, { emoji: '🦋', bg: '#FFE066' },
+      { emoji: '🐹', bg: '#B2F2BB' }, { emoji: '🐭', bg: '#99E9F2' }, { emoji: '🐔', bg: '#91A7FF' },
+      { emoji: '🐮', bg: '#D0BFFF' }, { emoji: '🐷', bg: '#FCC2D7' },
+    ];
+    function applyDashboardAvatar(id) {
+      const av = DB_AVATARS[id] || DB_AVATARS[0];
+      ['avatarInitial', 'avatarInitial2'].forEach(elId => {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        el.textContent = av.emoji;
+        el.style.background = av.bg;
+        el.style.fontSize = '20px';
+      });
+    }
+    // localStorage에 저장된 값 즉시 반영 (MY탭에서 변경 직후 빠른 적용)
+    const _initAvId = localStorage.getItem('sb_avatar_id');
+    if (_initAvId !== null) applyDashboardAvatar(Number(_initAvId));
+
+    // API로 DB 최신값 확인 — REST PUT으로 DB가 업데이트된 값을 가져옴
+    (async () => {
+      try {
+        const me = await api('/api/auth/me');
+        const id = me.avatar_id ?? 0;
+        localStorage.setItem('sb_avatar_id', String(id));
+        applyDashboardAvatar(id);
+      } catch (_) {}
+    })();
+
+    // 같은 탭: chat-widget 소켓을 통해 실시간 반영
+    window.addEventListener('avatar-changed', (e) => {
+      const id = e.detail.avatar_id;
+      localStorage.setItem('sb_avatar_id', String(id));
+      applyDashboardAvatar(id);
+    });
+
+    // 다른 탭(MY탭 등)에서 변경 시 localStorage storage 이벤트로 실시간 반영
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'sb_avatar_id' && e.newValue !== null) applyDashboardAvatar(Number(e.newValue));
+    });
+
     if (Auth.isAdmin) {
       document.getElementById('adminNavItem').classList.remove('hidden');
       document.getElementById('apiDocsNavItem').classList.remove('hidden');

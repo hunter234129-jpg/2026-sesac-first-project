@@ -88,6 +88,21 @@
     // 오는 것만으로 window.WikiEditor가 이미 준비돼 있음이 보장된다.
     renderNav();
     renderRail('wiki');
+
+    function fmtDate(str) {
+      if (!str) return '';
+      let d;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const [y, m, day] = str.split('T')[0].split('-').map(Number);
+        d = new Date(y, m - 1, day);
+      } else {
+        d = new Date(str);
+      }
+      if (isNaN(d)) return str;
+      const KO_DOW = ['일','월','화','수','목','금','토'];
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}(${KO_DOW[d.getDay()]})`;
+    }
+
     const alertEl = document.getElementById('alert');
     const slug    = queryParam('slug');
 
@@ -165,7 +180,7 @@
           el.innerHTML = items.length ? items.map(w => `
             <div class="wiki-recent-row">
               <a class="wr-title" href="/wiki?slug=${encodeURIComponent(w.slug)}" style="flex:1;">${escapeHtml(w.title)}</a>
-              <span class="wr-views" style="color:var(--muted); font-size:13px;">${(w.created_at||'').slice(0,10)}</span>
+              <span class="wr-views" style="color:var(--muted); font-size:13px;">${fmtDate(w.created_at)}</span>
             </div>`).join('')
             : '<p class="muted" style="font-size:14px;">아직 위키가 없어요.</p>';
         } catch (_) {}
