@@ -82,6 +82,17 @@ MIGRATIONS = [
 # (지금은 테스트 데이터뿐이라 바로 DROP한다). 순서 중요 — FK 참조 역순으로 지운다.
 DROP_TABLES = ['clan_chat_messages', 'clan_members', 'clans']
 
+# qnet_jmcd_registry 시드 데이터 — Q-net 국가기술자격 종목별 jmCd.
+# schedulable=1인 것만 crawl_qnet_technical()이 수집한다.
+# 중복 삽입을 막기 위해 INSERT IGNORE를 사용한다.
+JMCD_SEEDS = [
+    ('1320', '정보처리기사',       '한국산업인력공단', 1),
+    ('2251', '정보처리산업기사',   '한국산업인력공단', 1),
+    ('1085', '정보보안산업기사',   '한국산업인력공단', 1),
+    ('1111', '빅데이터분석기사',   '한국산업인력공단', 1),
+    ('1034', '네트워크관리사',     '한국산업인력공단', 0),  # 민간자격, Q-net 일정 없음
+]
+
 conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
 try:
     for sql in CREATE_TABLES:
@@ -107,6 +118,15 @@ try:
             cursor.execute(f'DROP TABLE IF EXISTS {table}')
             conn.commit()
             print('삭제(있었다면):', table)
+
+    for jmcd, name, org, schedulable in JMCD_SEEDS:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                'INSERT IGNORE INTO qnet_jmcd_registry (jmcd, cert_name, admin_org, schedulable) VALUES (%s, %s, %s, %s)',
+                (jmcd, name, org, schedulable)
+            )
+            conn.commit()
+            print(f'jmcd 시드: {jmcd} {name} (schedulable={schedulable})')
 
     # study_sessions.post_id FK — ALTER ADD COLUMN에는 못 끼워넣어서 따로 시도.
     # 이미 걸려 있으면 MySQL이 에러를 던지는데 버전마다 에러코드가 달라서 그냥 통째로 건너뛴다.
