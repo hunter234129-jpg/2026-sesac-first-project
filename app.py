@@ -86,3 +86,4 @@ if __name__ == '__main__':
     # PORT 환경변수로 포트 변경 가능(기본 5000) — 여러 인스턴스를 나란히 띄울 때 사용.
     socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', '5000')),
                  debug=True, allow_unsafe_werkzeug=True)
+    
