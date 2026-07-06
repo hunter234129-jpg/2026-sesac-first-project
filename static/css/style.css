@@ -230,6 +230,14 @@ html { scrollbar-width: thin; scrollbar-color: rgba(120,140,180,.25) transparent
 .dash-header { margin-bottom: 16px; }
 .dash-header h1 { font-size: 24px; letter-spacing: -.5px; }
 .dash-header p { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+
+/* 문제풀기 헤더 장식 — 연필로 시험지를 푸는 듯한 일러스트 (오른쪽 위) */
+.dash-header--quiz { position: relative; padding-right: 120px; min-height: 92px; }
+.qz-pencil-art { position: absolute; top: -16px; right: -8px; width: 116px; height: 116px; overflow: visible; pointer-events: none; }
+@media (max-width: 640px) {
+  .qz-pencil-art { display: none; }
+  .dash-header--quiz { padding-right: 0; }
+}
 .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 
 /* 타일 (3D 원근 + 떠오름) */

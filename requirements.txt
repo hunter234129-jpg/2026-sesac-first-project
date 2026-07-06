@@ -11,3 +11,4 @@ pytesseract
 pillow
 anthropic
 google-genai
+pytest

@@ -1,7 +1,12 @@
+import time
+
 from flask import Blueprint, jsonify, request, g
 from db.connection import get_db
 from utils.auth import login_required
 from config import GEMINI_API_KEY, GEMINI_MODEL
+
+RETRYABLE_STATUS_CODES = {429, 500, 503}   # 레이트리밋/서버과부하 — 잠깐 기다리면 풀리는 오류
+RETRY_DELAYS_SEC       = [1.5, 3]          # 재시도 사이 대기 시간(초), 순서대로 사용
 
 ai_bp = Blueprint('ai', __name__)
 
@@ -30,12 +35,14 @@ def call_gemini(messages, system=SYSTEM, max_tokens=8192, json_mode=False, tempe
     """Gemini 호출 → 텍스트 반환. 키 없으면 RuntimeError('NO_KEY').
 
     json_mode=True면 모델이 순수 JSON 문자열만 응답하도록 강제한다(출제 자판기 용도).
+    503(서버 과부하)·429(레이트리밋)처럼 잠깐 기다리면 풀리는 오류는 짧게 재시도한 뒤
+    그래도 실패하면 원래 예외를 그대로 올려서 _guard가 처리하게 한다.
     """
     client = _client()
     if client is None:
         raise RuntimeError('NO_KEY')
 
-    from google.genai import types
+    from google.genai import errors, types
 
     # Anthropic 형식(role: assistant) → Gemini 형식(role: model) 변환
     contents = [
@@ -55,12 +62,20 @@ def call_gemini(messages, system=SYSTEM, max_tokens=8192, json_mode=False, tempe
     if temperature is not None:
         config_kwargs['temperature'] = temperature
 
-    resp = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=contents,
-        config=types.GenerateContentConfig(**config_kwargs),
-    )
-    return resp.text.strip()
+    config = types.GenerateContentConfig(**config_kwargs)
+
+    attempts = len(RETRY_DELAYS_SEC) + 1
+    for attempt in range(attempts):
+        try:
+            resp = client.models.generate_content(
+                model=GEMINI_MODEL, contents=contents, config=config,
+            )
+            return resp.text.strip()
+        except errors.APIError as e:
+            is_last = attempt == attempts - 1
+            if is_last or e.code not in RETRYABLE_STATUS_CODES:
+                raise
+            time.sleep(RETRY_DELAYS_SEC[attempt])
 
 
 def _guard(fn):
@@ -76,6 +91,9 @@ def _guard(fn):
         name = type(e).__name__
         if name == 'ModuleNotFoundError':
             return err('google-genai 패키지가 필요합니다 (pip install google-genai)', 'MISSING_DEPENDENCY', 500)
+        if getattr(e, 'code', None) in RETRYABLE_STATUS_CODES:
+            return err('AI 서버가 지금 많이 몰려서 응답을 만들지 못했어요. 잠시 후 다시 시도해주세요',
+                       'AI_OVERLOADED', 503)
         return err(f'AI 응답 생성 실패: {e}', 'AI_FAILED', 502)
 
 
