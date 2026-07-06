@@ -21,6 +21,15 @@
       <p>문제풀기에서 틀린 문제가 자동으로 모여요. 필요 없으면 지워도 돼요.</p>
     </div>
 
+    <div class="card" id="weaknessCard" style="margin-bottom:20px;">
+      <div class="wn-head">
+        <span style="font-weight:800;">🧠 AI 약점 분석</span>
+        <button type="button" class="btn btn-primary" id="analyzeBtn" style="margin-left:auto;">오답노트로 약점 분석하기</button>
+      </div>
+      <p class="muted" style="font-size:13px; margin-top:4px;">지금까지 쌓인 오답노트를 AI가 훑어보고 자주 틀리는 개념과 다음 공부 방향을 짚어줘요.</p>
+      <div id="weaknessResult"></div>
+    </div>
+
     <div id="wnBody">
       <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
     </div>
@@ -34,8 +43,26 @@
     renderNav();
     renderRail('quiz');
 
-    const wnBody = document.getElementById('wnBody');
+    const wnBody          = document.getElementById('wnBody');
+    const analyzeBtn      = document.getElementById('analyzeBtn');
+    const weaknessResult  = document.getElementById('weaknessResult');
     let allNotes = [];
+
+    analyzeBtn.onclick = async () => {
+      setLoading(analyzeBtn, true);
+      weaknessResult.innerHTML = '';
+      try {
+        const d = await api('/api/wrongnotes/analysis');
+        weaknessResult.innerHTML = `<div class="wiki-content" style="margin-top:14px;">${await renderMarkdown(d.analysis)}</div>`;
+      } catch (e) {
+        const msg = e.code === 'NOT_ENOUGH_DATA'
+          ? e.message
+          : (e.code === 'NO_API_KEY' ? 'AI 약점 분석 기능이 아직 설정되지 않았어요.' : (e.message || '분석에 실패했어요.'));
+        weaknessResult.innerHTML = `<p class="muted" style="margin-top:14px;">${escapeHtml(msg)}</p>`;
+      } finally {
+        setLoading(analyzeBtn, false, '오답노트로 약점 분석하기');
+      }
+    };
 
     function render() {
       if (!allNotes.length) {
