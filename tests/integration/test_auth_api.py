@@ -66,6 +66,21 @@ def test_update_me_changes_real_name(client, user):
     assert r.get_json()['data']['real_name'] == '변경된이름'
 
 
+def test_update_me_duplicate_username_rejected(client, user, other_user):
+    r = client.put('/api/auth/me', headers=other_user['headers'], json={'username': user['username']})
+    assert r.status_code == 409
+    assert r.get_json()['code'] == 'DUPLICATE'
+
+    # 거부됐으니 other_user의 닉네임은 그대로여야 함
+    r = client.get('/api/auth/me', headers=other_user['headers'])
+    assert r.get_json()['data']['username'] == other_user['username']
+
+
+def test_update_me_same_username_as_self_allowed(client, user):
+    r = client.put('/api/auth/me', headers=user['headers'], json={'username': user['username']})
+    assert r.status_code == 200
+
+
 def test_update_me_nothing_to_update(client, user):
     r = client.put('/api/auth/me', headers=user['headers'], json={})
     assert r.status_code == 400

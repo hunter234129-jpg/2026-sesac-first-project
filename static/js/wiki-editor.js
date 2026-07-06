@@ -77,7 +77,9 @@ function makeDrawingBlock({ Node, mergeAttributes }) {
 
         const empty = document.createElement('div');
         empty.className = 'wdb-empty';
-        empty.textContent = '🎨 빈 그림 — "편집"을 눌러 그려보세요';
+        empty.textContent = editor.isEditable
+          ? '🎨 빈 그림 — 눌러서 그려보세요'
+          : '🎨 빈 그림';
 
         const img = document.createElement('img');
         img.className = 'wdb-img';
@@ -101,7 +103,7 @@ function makeDrawingBlock({ Node, mergeAttributes }) {
         }
         render();
 
-        editBtn.addEventListener('click', (e) => {
+        function openDrawingBoard(e) {
           e.preventDefault();
           window.ExcalidrawModal && window.ExcalidrawModal.open({
             slug: window.__wikiEditorSlug,
@@ -113,7 +115,18 @@ function makeDrawingBlock({ Node, mergeAttributes }) {
               }));
             },
           });
-        });
+        }
+
+        editBtn.addEventListener('click', openDrawingBoard);
+        // 편집 가능할 때는 작은 편집 버튼뿐 아니라 그림(또는 빈 그림 안내)을 직접
+        // 클릭해도 그림판이 열려야 자연스럽다 — 버튼을 정확히 못 맞추면 반응이
+        // 없어 보이는 문제가 있었다.
+        if (editor.isEditable) {
+          img.style.cursor   = 'pointer';
+          empty.style.cursor = 'pointer';
+          img.addEventListener('click', openDrawingBoard);
+          empty.addEventListener('click', openDrawingBoard);
+        }
 
         const onPresence = (e) => {
           const p = e.detail;
@@ -390,7 +403,7 @@ async function mount({ container, slug, initialContent, username, editable, titl
   // ── 실시간 동기화: 서버는 Yjs 업데이트를 해석하지 않고 방(room) 안에서만 릴레이한다 ──
   // 뷰어도 같은 방에 join하므로 편집 화면을 열지 않아도 남의 변경이 바로 보인다.
   let receivedRemoteSync = false;
-  socket = window.io({ query: { token: (window.Auth && Auth.token) || '' } });
+  socket = window.io({ query: { token: (window.Auth && window.Auth.token) || '' } });
 
   socket.on('connect', () => {
     socket.emit('join_wiki', { slug });
@@ -466,13 +479,22 @@ async function destroy() {
   ydoc = null;
 }
 
+// crypto.randomUUID()는 보안 컨텍스트(HTTPS 또는 localhost)에서만 존재한다. 이 프로젝트는
+// 0.0.0.0에 서버를 띄워 LAN IP(예: http://192.168.x.x:5000)로도 접속하는 경우가 흔한데,
+// 그런 일반 HTTP 환경에서는 crypto.randomUUID가 없어서 그냥 호출하면 예외가 나 그림 삽입이
+// 통째로 멈춰버린다. block id는 문서 안에서만 고유하면 되므로 안전한 대체 구현을 쓴다.
+function genBlockId() {
+  if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return 'blk-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
 // atom 노드(그림/차트) 삽입 직후에는 ProseMirror가 그 노드를 NodeSelection으로 선택된
 // 상태로 두는데, 그 상태에서 다음 insertContent를 호출하면 방금 넣은 블록을 "대체"해버린다.
 // 뒤에 빈 문단을 함께 넣어 커서를 텍스트 선택으로 옮겨두면 연속 삽입이 서로 덮어쓰지 않는다.
 function insertDrawing() {
   if (!editor) return;
   editor.chain().focus().insertContent([
-    { type: 'drawingBlock', attrs: { blockId: crypto.randomUUID(), imageUrl: null, version: 0 } },
+    { type: 'drawingBlock', attrs: { blockId: genBlockId(), imageUrl: null, version: 0 } },
     { type: 'paragraph' },
   ]).run();
 }

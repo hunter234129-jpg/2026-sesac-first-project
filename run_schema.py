@@ -41,6 +41,59 @@ CREATE_TABLES = [
         FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL,
         INDEX idx_post_created (post_id, created_at)
     )""",
+    # 시험 정보(모임-시험 연결용) — db/schema.sql에는 있었지만 이 스크립트엔 누락돼 있던 테이블들
+    """CREATE TABLE IF NOT EXISTS exams (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        name           VARCHAR(150) NOT NULL,
+        round          INT          DEFAULT NULL,
+        category       VARCHAR(50)  DEFAULT NULL,
+        source         VARCHAR(50)  NOT NULL DEFAULT 'qnet',
+        apply_start    DATE         DEFAULT NULL,
+        apply_end      DATE         DEFAULT NULL,
+        exam_start     DATE         DEFAULT NULL,
+        exam_end       DATE         DEFAULT NULL,
+        result_date    DATE         DEFAULT NULL,
+        source_url     VARCHAR(255) DEFAULT NULL,
+        last_synced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_exam_instance (name, round)
+    )""",
+    """CREATE TABLE IF NOT EXISTS exams_unparsed (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        source     VARCHAR(50)  NOT NULL,
+        raw_data   TEXT         NOT NULL,
+        reason     VARCHAR(255) DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    """CREATE TABLE IF NOT EXISTS qnet_jmcd_registry (
+        jmcd        VARCHAR(10)  PRIMARY KEY,
+        cert_name   VARCHAR(100) NOT NULL,
+        admin_org   VARCHAR(100) DEFAULT NULL,
+        schedulable TINYINT(1)   DEFAULT 1,
+        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""",
+    # 위키 드로잉(Excalidraw) — 마찬가지로 db/schema.sql에는 있었지만 이 스크립트엔 누락됨
+    """CREATE TABLE IF NOT EXISTS wiki_drawings (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        wiki_id     INT          NOT NULL,
+        block_id    VARCHAR(64)  NOT NULL,
+        scene_json  LONGTEXT,
+        png_file_id INT          DEFAULT NULL,
+        updated_by  INT          NOT NULL,
+        updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_wiki_block (wiki_id, block_id),
+        FOREIGN KEY (wiki_id)     REFERENCES wiki_pages(id) ON DELETE CASCADE,
+        FOREIGN KEY (png_file_id) REFERENCES files(id)      ON DELETE SET NULL,
+        FOREIGN KEY (updated_by)  REFERENCES users(id)
+    )""",
+    # 업적(뱃지) — 위와 동일한 사유로 누락됨
+    """CREATE TABLE IF NOT EXISTS user_achievements (
+        user_id         INT         NOT NULL,
+        achievement_key VARCHAR(50) NOT NULL,
+        unlocked_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, achievement_key),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )""",
 ]
 
 MIGRATIONS = [
