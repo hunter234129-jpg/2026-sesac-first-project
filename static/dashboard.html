@@ -118,6 +118,13 @@
     }
     .study-post-select:focus { border-color: rgba(0,229,255,0.4); }
     .study-post-select:disabled { opacity: .6; }
+    /* 드롭다운 펼쳤을 때 옵션 목록은 브라우저가 따로 렌더링해서(대부분 흰 배경)
+       select 자체의 밝은 글자색만 물려받으면 흰 바탕에 흰 글씨가 되어버린다.
+       option에 배경·글자색을 직접 지정해서 선택 안 된 항목도 잘 보이게 한다. */
+    .study-post-select option {
+      background-color: #121729;
+      color: var(--db-text);
+    }
 
     /* 미니 달력 */
     .db-mini-cal {
