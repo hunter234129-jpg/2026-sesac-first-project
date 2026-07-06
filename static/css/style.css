@@ -50,7 +50,11 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+/* 전체 화면이 요소가 촘촘해서 브라우저 100% 배율에서는 작게 느껴진다.
+   transform: scale()는 안 쓴다 — select/달력 같은 네이티브 UI가 안 커지고,
+   position:fixed 자식(채팅 위젯 등)의 기준점이 흐트러지고, vh 계산도 어긋난다.
+   zoom은 브라우저 자체 확대(Ctrl + +)와 동일하게 동작해서 이런 부작용이 없다. */
+html { scroll-behavior: smooth; zoom: 1.25; }
 
 body {
   font-family: var(--font);
