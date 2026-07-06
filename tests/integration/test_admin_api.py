@@ -89,3 +89,10 @@ def test_admin_can_list_posts_and_soft_delete(client, admin_user, user):
 def test_admin_delete_unknown_post_returns_404(client, admin_user):
     r = client.delete('/api/admin/posts/999999999', headers=admin_user['headers'])
     assert r.status_code == 404
+
+
+def test_non_admin_blocked_from_crawl_trigger(client, user):
+    # 관리자 성공 경로는 실제 q-net/KAIT 크롤링을 수행하므로(routes/admin.py의
+    # trigger_exam_crawl → crawlers.run_all) 통합테스트에서는 가드만 확인한다.
+    r = client.post('/api/admin/crawl-exams', headers=user['headers'])
+    assert r.status_code == 403
