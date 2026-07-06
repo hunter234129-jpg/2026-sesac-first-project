@@ -376,6 +376,7 @@ html { scrollbar-width: thin; scrollbar-color: rgba(120,140,180,.25) transparent
 .tbadge.post  { background: rgba(139,147,184,.16); color: var(--muted); }
 .tbadge.open  { background: rgba(52,211,153,.16); color: var(--green); }
 .tbadge.closed{ background: rgba(255,68,102,.14); color: #ff9b9b; }
+.post-item .pi-dday { font-size: 12px; font-weight: 800; color: #ff4466; flex-shrink: 0; letter-spacing: -0.3px; }
 
 /* 페이지네이션 */
 .pagination { display: flex; justify-content: center; gap: 6px; margin-top: 24px; flex-wrap: wrap; }

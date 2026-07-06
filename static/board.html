@@ -113,6 +113,37 @@
       state.sort = e.target.value; state.page = 1; load();
     };
 
+    function fmtDate(str) {
+      if (!str) return '';
+      let d;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const [y, m, day] = str.split('T')[0].split('-').map(Number);
+        d = new Date(y, m - 1, day);
+      } else {
+        d = new Date(str);
+      }
+      if (isNaN(d)) return '';
+      const KO_DOW = ['일','월','화','수','목','금','토'];
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}(${KO_DOW[d.getDay()]})`;
+    }
+
+    function dDayBadge(p) {
+      if (p.type !== 'study' || !p.recruit_deadline) return '';
+      const str = p.recruit_deadline;
+      let deadline;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const [y, m, d] = str.split('T')[0].split('-').map(Number);
+        deadline = new Date(y, m - 1, d);
+      } else {
+        deadline = new Date(str);
+      }
+      if (isNaN(deadline)) return '';
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const diff = Math.round((deadline - today) / 86400000);
+      const label = diff > 0 ? `D-${diff}` : diff === 0 ? 'D-DAY' : `D+${Math.abs(diff)}`;
+      return `<span class="pi-dday">${label}</span>`;
+    }
+
     function typeBadge(t) {
       return t === 'study'
         ? '<span class="tbadge study">스터디</span>'
@@ -120,8 +151,23 @@
     }
     function statusBadge(p) {
       if (p.type !== 'study') return '';
-      return p.status === 'closed'
-        ? '<span class="tbadge closed">마감</span>'
+      let deadlinePassed = false;
+      if (p.recruit_deadline) {
+        const str = p.recruit_deadline;
+        let dl;
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+          const [y, m, d] = str.split('T')[0].split('-').map(Number);
+          dl = new Date(y, m - 1, d);
+        } else {
+          dl = new Date(str);
+        }
+        if (!isNaN(dl)) {
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          deadlinePassed = dl < today;
+        }
+      }
+      return (p.status === 'closed' || deadlinePassed)
+        ? '<span class="tbadge closed">모집 마감</span>'
         : '<span class="tbadge open">모집중</span>';
     }
 
@@ -145,7 +191,7 @@
         listEl.innerHTML = posts.map(p => `
           <a class="post-item" href="/post?id=${p.id}">
             <div class="pi-top">
-              ${typeBadge(p.type)}${statusBadge(p)}
+              ${dDayBadge(p)}${typeBadge(p.type)}${statusBadge(p)}
               <span class="pi-views"><strong>${p.view_count}</strong> 조회</span>
             </div>
             <div class="pi-title">${escapeHtml(p.title)}</div>
@@ -153,7 +199,11 @@
               <span class="pi-avatar">${escapeHtml((p.author || '?')[0].toUpperCase())}</span>
               <span class="pi-author">${escapeHtml(p.author)}</span>
               ${p.category ? `<span class="pi-cat">· ${escapeHtml(p.category)}</span>` : ''}
-              <span class="pi-date">${(p.created_at || '').slice(0, 10)}</span>
+              <span class="pi-date">${
+                p.type === 'study' && (p.study_start || p.study_end)
+                  ? `${fmtDate(p.study_start) || '미정'}~${fmtDate(p.study_end) || '미정'}`
+                  : fmtDate(p.created_at)
+              }</span>
             </div>
           </a>`).join('');
         renderPagination(d.page, d.total_pages);
