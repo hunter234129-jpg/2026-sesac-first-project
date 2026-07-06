@@ -47,9 +47,23 @@ def _level_from_label(label):
 
 
 def _strip_json_fence(text):
+    """AI 응답에서 순수 JSON만 뽑아낸다. json_mode=True로 요청해도 모델이 가끔
+    코드블록이나 앞뒤 설명 문장을 덧붙이는 경우가 있어서 여러 단계로 관대하게 처리한다."""
     text = text.strip()
     m = re.match(r'^```(?:json)?\s*(.*?)\s*```$', text, re.DOTALL)
-    return m.group(1) if m else text
+    if m:
+        return m.group(1)
+    # 앞뒤에 다른 텍스트가 섞여 있어도 코드블록 부분만 있으면 그걸 사용
+    m = re.search(r'```(?:json)?\s*(.*?)\s*```', text, re.DOTALL)
+    if m:
+        return m.group(1)
+    # 코드블록이 없으면 첫 '[' 또는 '{' 부터 마지막 ']' 또는 '}' 까지만 잘라낸다
+    # (예: "네, 문제를 만들어봤어요:\n[...]" 처럼 설명이 앞에 붙는 경우 대응)
+    start = min((i for i in (text.find('['), text.find('{')) if i != -1), default=-1)
+    end = max(text.rfind(']'), text.rfind('}'))
+    if start != -1 and end != -1 and end > start:
+        return text[start:end + 1]
+    return text
 
 
 def _validate_question(item):
@@ -76,10 +90,22 @@ def _validate_question(item):
     }
 
 
+def _unwrap_list(data):
+    """가끔 배열을 바로 안 주고 {"questions": [...]} 처럼 객체로 한 번 더 감싸서 주는
+    경우가 있다 — 값들 중 첫 번째 리스트를 찾아 꺼낸다."""
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        for v in data.values():
+            if isinstance(v, list):
+                return v
+    raise ValueError('expected a JSON array')
+
+
 def _parse_diagnostic(text):
-    data = json.loads(_strip_json_fence(text))
-    if not isinstance(data, list) or not data:
-        raise ValueError('expected a JSON array')
+    data = _unwrap_list(json.loads(_strip_json_fence(text)))
+    if not data:
+        raise ValueError('expected a non-empty JSON array')
     return [_validate_question(item) for item in data[:DIAGNOSTIC_SIZE]]
 
 
@@ -87,16 +113,21 @@ def _parse_single(text):
     data = json.loads(_strip_json_fence(text))
     if isinstance(data, list):
         data = data[0]
+    elif isinstance(data, dict) and 'question' not in data:
+        data = next((v[0] for v in data.values() if isinstance(v, list) and v), data)
     return _validate_question(data)
 
 
 def _diagnostic_prompt(subject_query):
     return (
         f'사용자 요청: "{subject_query}"\n\n'
-        f'위 요청에 맞는 진단 테스트 문제 {DIAGNOSTIC_SIZE}개를 만들어줘.\n'
-        '- 난이도를 하, 중하, 중, 중상, 상 순서로 하나씩 고르게 배치해줘.\n'
+        f'위 요청의 과목/주제/단원만 참고해서 진단 테스트 문제 {DIAGNOSTIC_SIZE}개를 만들어줘.\n'
+        '- 이건 실력을 처음 측정하는 진단 테스트라서, 요청 문구에 특정 난이도(예: "어려운",'
+        ' "쉬운")가 들어있어도 그건 무시하고 반드시 하, 중하, 중, 중상, 상 순서로 난이도를'
+        ' 하나씩 고르게 배치해줘. 실제 난이도 조절은 진단이 끝난 뒤 정답률에 맞춰 이뤄져.\n'
         '- 각 문제는 4지선다형이야.\n'
-        '- 반드시 아래 JSON 배열 형식으로만 응답해:\n'
+        '- 반드시 아래 JSON 배열 형식으로만 응답해. 배열 앞뒤에 설명 문장이나 코드블록 표시를'
+        ' 절대 붙이지 마:\n'
         '[{"level": "하", "question": "...", "choices": ["...", "...", "...", "..."], '
         '"answer_index": 0, "explanation": "..."}, ...]\n'
         '- answer_index는 정답 보기의 0부터 시작하는 인덱스(0~3)야.\n'
@@ -117,6 +148,19 @@ def _adaptive_prompt(subject_query, level_label, history_text):
         '- answer_index는 정답 보기의 0부터 시작하는 인덱스(0~3)야.\n'
         '- JSON 이외의 다른 텍스트는 절대 출력하지 마.'
     )
+
+
+def _call_and_parse(messages, parse_fn, system, max_tokens, temperature, attempts=2):
+    """call_gemini 호출 + 파싱을 한 번에 처리하고, 형식이 깨지면 한 번 더 시도한다.
+    같은 프롬프트라도 모델 출력이 비결정적이라 재시도만으로 넘어가는 경우가 많다."""
+    last_err = None
+    for _ in range(attempts):
+        text = call_gemini(messages, system=system, max_tokens=max_tokens, json_mode=True, temperature=temperature)
+        try:
+            return parse_fn(text)
+        except (ValueError, json.JSONDecodeError) as e:
+            last_err = e
+    raise last_err
 
 
 def _get_state(cursor, user_id):
@@ -146,12 +190,11 @@ def start_quiz():
         return err(f'요청은 {MAX_SUBJECT_LEN}자 이내로 입력해주세요', 'SUBJECT_TOO_LONG')
 
     def run():
-        text = call_gemini(
-            [{'role': 'user', 'content': _diagnostic_prompt(subject_query)}],
-            system=DIAGNOSTIC_SYSTEM, max_tokens=4096, json_mode=True, temperature=0.6,
-        )
         try:
-            questions = _parse_diagnostic(text)
+            questions = _call_and_parse(
+                [{'role': 'user', 'content': _diagnostic_prompt(subject_query)}],
+                _parse_diagnostic, DIAGNOSTIC_SYSTEM, 4096, 0.6,
+            )
         except (ValueError, json.JSONDecodeError):
             return err('AI가 문제를 올바른 형식으로 만들지 못했어요. 다시 시도해주세요', 'AI_BAD_FORMAT', 502)
 
@@ -206,12 +249,11 @@ def next_question():
         history_text = '특이사항 없음'
 
     def run():
-        text = call_gemini(
-            [{'role': 'user', 'content': _adaptive_prompt(state['subject_query'], level_label, history_text)}],
-            system=ADAPTIVE_SYSTEM, max_tokens=2048, json_mode=True, temperature=0.7,
-        )
         try:
-            q = _parse_single(text)
+            q = _call_and_parse(
+                [{'role': 'user', 'content': _adaptive_prompt(state['subject_query'], level_label, history_text)}],
+                _parse_single, ADAPTIVE_SYSTEM, 2048, 0.7,
+            )
         except (ValueError, json.JSONDecodeError):
             return err('AI가 문제를 올바른 형식으로 만들지 못했어요. 다시 시도해주세요', 'AI_BAD_FORMAT', 502)
 
