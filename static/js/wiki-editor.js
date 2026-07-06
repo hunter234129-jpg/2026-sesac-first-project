@@ -403,7 +403,7 @@ async function mount({ container, slug, initialContent, username, editable, titl
   // ── 실시간 동기화: 서버는 Yjs 업데이트를 해석하지 않고 방(room) 안에서만 릴레이한다 ──
   // 뷰어도 같은 방에 join하므로 편집 화면을 열지 않아도 남의 변경이 바로 보인다.
   let receivedRemoteSync = false;
-  socket = window.io({ query: { token: (window.Auth && Auth.token) || '' } });
+  socket = window.io({ query: { token: (window.Auth && window.Auth.token) || '' } });
 
   socket.on('connect', () => {
     socket.emit('join_wiki', { slug });

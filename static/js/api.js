@@ -41,6 +41,11 @@ const Auth = {
     location.href = '/';
   }
 };
+// classic <script>의 최상위 const/let은 window에 자동으로 붙지 않는다(함수 선언과 다름).
+// wiki-editor.js(type="module")처럼 별도 스코프에서 window.Auth로 접근하는 코드가 있어서
+// 명시적으로 붙여줘야 한다 — 안 붙어있으면 항상 undefined 취급돼 토큰 없이 소켓 연결을 시도하다
+// 서버(on_connect)에 거부당하는 문제로 이어진다.
+window.Auth = Auth;
 
 /**
  * API 호출. 성공 시 응답 JSON의 data를 반환, 실패 시 Error throw.
