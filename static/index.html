@@ -231,7 +231,7 @@
           <div class="ld-preview-cell"><div class="lbl">⏱ Today Focus</div><div class="val" style="color:#00D9C0;">3h 24m</div></div>
           <div class="ld-preview-cell"><div class="lbl">🔥 Streak</div><div class="val" style="color:#F59E0B;">27 Days</div></div>
           <div class="ld-preview-cell"><div class="lbl">🪐 Planet XP</div><div class="val" style="color:#C4B5FD;">+840</div></div>
-          <div class="ld-preview-cell"><div class="lbl">⚔️ Clan Rank</div><div class="val" style="color:#39FF14;" id="clanRankPreview">#3 / 428</div></div>
+          <div class="ld-preview-cell"><div class="lbl">🙋 Open Meetups</div><div class="val" style="color:#39FF14;" id="meetupPreview">12 Groups</div></div>
         </div>
       </div>
     </div>
@@ -305,9 +305,9 @@
         desc:'포모도로 타이머, 집중 세션 트래킹, 연속 공부 스트릭으로 꾸준한 학습 루틴을 만들어 드립니다.',
         subs:['🔥 최장 스트릭 기록', '⚡ 집중 세션 트래킹'] },
       { icon:'🪐', color:'#C4B5FD', glow:'rgba(139,92,246,0.15)', border:'rgba(139,92,246,0.2)', badge:'UNIQUE',
-        title:'행성 성장 & 클랜전', titleEn:'Planet Growth & Clan War',
-        desc:'공부 시간이 쌓일수록 나만의 행성이 성장합니다. 클랜을 만들어 친구들과 공부 경쟁을 펼치세요.',
-        subs:['⚔️ 주간 클랜 랭킹', '⭐ 행성 레벨 시스템'] },
+        title:'행성 성장 & 스터디 모임', titleEn:'Planet Growth & Study Meetups',
+        desc:'공부 시간이 쌓일수록 나만의 행성이 성장합니다. 게시판에서 스터디원을 모집하고, 성사되면 그룹 채팅으로 함께 공부하세요.',
+        subs:['🙋 스터디원 모집 & 그룹 채팅', '⭐ 행성 레벨 시스템'] },
       { icon:'📚', color:'#F59E0B', glow:'rgba(245,158,11,0.12)', border:'rgba(245,158,11,0.2)', badge:'SHARED',
         title:'통합 위키 & 자료 공유', titleEn:'Integrated Wiki & Resources',
         desc:'과목별 노트, 마인드맵, 그림을 위키로 구조화하고 실시간으로 함께 편집하세요.',
@@ -332,7 +332,7 @@
     const STATS = [
       { key:'live',  label:'현재 공부 중', labelEn:'Studying Now', icon:'👥', color:'#00D9C0', value:0, suffix:'명' },
       { key:'hours',  label:'누적 공부 시간', labelEn:'Total Hours Logged', icon:'⏰', color:'#C4B5FD', value:9182540, suffix:'h' },
-      { key:'clans',  label:'활성 클랜', labelEn:'Active Clans', icon:'⚔️', color:'#39FF14', value:0, suffix:'개' },
+      { key:'clans',  label:'모집중인 모임', labelEn:'Open Meetups', icon:'🙋', color:'#39FF14', value:0, suffix:'개' },
       { key:'wiki',   label:'공유된 자료', labelEn:'Shared Resources', icon:'📚', color:'#F59E0B', value:58920, suffix:'개' },
     ];
     document.getElementById('statsGrid').innerHTML = STATS.map(s => `
@@ -344,7 +344,7 @@
       </div>`).join('');
     document.getElementById('syncTime').textContent = new Date().toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' });
 
-    /* 실데이터로 교체: 현재 공부 중 인원 + 활성 클랜 수 */
+    /* 실데이터로 교체: 현재 공부 중 인원 + 모집중인 모임 수 */
     (async () => {
       try {
         const d = await api('/api/study/live', { auth: false });
@@ -355,8 +355,8 @@
     })();
     (async () => {
       try {
-        const clans = await api('/api/clans', { auth: false });
-        document.getElementById('stat-clans').innerHTML = (clans.length || 0).toLocaleString('ko-KR') + '<span style="font-size:1rem;margin-left:2px;">개</span>';
+        const d = await api('/api/posts?type=study&size=1', { auth: false });
+        document.getElementById('stat-clans').innerHTML = (d.total || 0).toLocaleString('ko-KR') + '<span style="font-size:1rem;margin-left:2px;">개</span>';
       } catch (_) {}
     })();
 

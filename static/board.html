@@ -53,9 +53,13 @@
     renderNav();
     renderRail('board');
 
-    const state = { page: 1, size: 10, type: '', q: '', sort: 'latest' };
+    const state = { page: 1, size: 10, type: queryParam('type') || '', q: '', sort: 'latest' };
     const listEl = document.getElementById('postList');
     const pagEl  = document.getElementById('pagination');
+    if (state.type) {
+      document.querySelectorAll('#typeSeg button').forEach(b =>
+        b.classList.toggle('active', b.dataset.type === state.type));
+    }
 
     document.getElementById('writeBtn').onclick = () => {
       if (!Auth.isLoggedIn) { location.href = '/login?next=/write'; return; }

@@ -196,7 +196,7 @@
       try {
         const d = await api('/api/ai/chat', { method: 'POST', body: { messages: history } });
         pending.classList.remove('thinking');
-        pending.textContent = d.reply;
+        pending.innerHTML = await renderMarkdown(d.reply);
         history.push({ role: 'assistant', content: d.reply });
       } catch (err) {
         pending.remove();

@@ -76,18 +76,18 @@ check('공부 통계', r.status_code == 200)
 r = requests.get(f'{BASE}/api/study/ranking?period=all')
 check('공부 랭킹', r.status_code == 200)
 
-# ── Clan ─────────────────────────────────────────────────────────────
-r = requests.post(f'{BASE}/api/clans', headers=H, json={
-    'name': f'테스트클랜_{SUFFIX}', 'description': '스모크 테스트 클랜'
+# ── Meetup (모임, posts type='study') ───────────────────────────────────
+r = requests.post(f'{BASE}/api/posts', headers=H, json={
+    'title': f'테스트모임_{SUFFIX}', 'content': '스모크 테스트 모임', 'type': 'study'
 })
-clan_id = j(r).get('data', {}).get('id')
-check('클랜 생성', r.status_code == 201 and clan_id, f'{r.status_code} {j(r)}')
+meetup_id = j(r).get('data', {}).get('id')
+check('모임 생성', r.status_code == 201 and meetup_id, f'{r.status_code} {j(r)}')
 
-r = requests.get(f'{BASE}/api/clans/{clan_id}/members')
+r = requests.get(f'{BASE}/api/posts/{meetup_id}/members')
 check('멤버 조회(생성자 자동가입)', r.status_code == 200 and len(j(r)['data']) == 1)
 
-r = requests.delete(f'{BASE}/api/clans/{clan_id}/leave', headers=H)
-check('클랜장 탈퇴 차단', r.status_code == 400, f'{r.status_code}')
+r = requests.delete(f'{BASE}/api/posts/{meetup_id}/leave', headers=H)
+check('모임장 탈퇴 차단', r.status_code == 400, f'{r.status_code}')
 
 # ── Mission ──────────────────────────────────────────────────────────
 r = requests.get(f'{BASE}/api/missions/today', headers=H)

@@ -22,6 +22,14 @@ const YJS = 'yjs@13.6.19';
 
 const CURSOR_COLORS = ['#4f8eff', '#3ad4ff', '#a06bff', '#ffb740', '#2fd69e', '#f06060'];
 
+let _marked = null;   // AI 초안(마크다운 텍스트)을 렌더링할 때만 지연 로드
+async function loadMarked() {
+  if (_marked) return _marked;
+  const mod = await import('https://esm.sh/marked@12.0.2');
+  _marked = mod.marked;
+  return _marked;
+}
+
 let _mod = null;   // 동적 import된 라이브러리 캐시(중복 로드 방지)
 async function loadLibs() {
   if (_mod) return _mod;
@@ -321,7 +329,8 @@ function buildToolbar(editorInstance, { title }) {
     aiBtn.disabled = true; aiBtn.textContent = '생성 중...';
     try {
       const draft = await window.api('/api/ai/wiki-draft', { method: 'POST', body: { title: title || '' } });
-      editorInstance.commands.setContent(toTiptapDoc(draft.draft));
+      const marked = await loadMarked();
+      editorInstance.commands.setContent(marked.parse(draft.draft));
     } catch (err) {
       alert('AI 초안 생성에 실패했어요: ' + err.message);
     } finally {

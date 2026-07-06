@@ -15,7 +15,6 @@ from routes.comment      import comment_bp
 from routes.wiki         import wiki_bp
 from routes.study        import study_bp
 from routes.notification import notification_bp
-from routes.clan         import clan_bp
 from routes.upload       import upload_bp
 from routes.mission      import mission_bp
 from routes.crawl        import crawl_bp
@@ -25,8 +24,10 @@ from routes.ai           import ai_bp
 from routes.achievement  import achievement_bp
 from routes.quiz         import quiz_bp
 from routes.wrongnote    import wrongnote_bp
-import routes.wiki_sync      # noqa: F401 — 위키 실시간 협업 SocketIO 핸들러 등록
-import sockets.chat_events   # noqa: F401 — 채팅 SocketIO 핸들러 등록
+from routes.exams        import exams_bp
+import routes.wiki_sync         # noqa: F401 — 위키 실시간 협업 SocketIO 핸들러 등록
+import sockets.chat_events      # noqa: F401 — 1:1 채팅 SocketIO 핸들러 등록
+import sockets.post_chat_events # noqa: F401 — 모임 그룹 채팅 SocketIO 핸들러 등록(chat_events의 sid_user 재사용)
 sockets.chat_events.init_app(app)
 
 app.register_blueprint(auth_bp)
@@ -35,7 +36,6 @@ app.register_blueprint(comment_bp)
 app.register_blueprint(wiki_bp)
 app.register_blueprint(study_bp)
 app.register_blueprint(notification_bp)
-app.register_blueprint(clan_bp)
 app.register_blueprint(upload_bp)
 app.register_blueprint(mission_bp)
 app.register_blueprint(crawl_bp)
@@ -45,8 +45,27 @@ app.register_blueprint(ai_bp)
 app.register_blueprint(achievement_bp)
 app.register_blueprint(quiz_bp)
 app.register_blueprint(wrongnote_bp)
+app.register_blueprint(exams_bp)
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
+
+# ── 시험 일정 크롤러 스케줄러 (매일 06:00, 18:00 KST) ──────────────────
+# Flask 프로세스 안에 내장해서 OS(작업 스케줄러/cron)에 의존하지 않는다 —
+# 지금은 윈도우에서 개발하지만 나중에 리눅스로 옮겨도 코드 수정 없이 그대로 동작한다.
+# debug=True일 때 Werkzeug 리로더가 프로세스를 2개(부모 감시자+자식) 띄우는데,
+# WERKZEUG_RUN_MAIN은 "실제로 요청을 처리하는 자식 프로세스"에서만 설정되므로
+# 이 체크 없이 그냥 등록하면 스케줄러가 2번 등록돼 크롤링이 중복 실행된다.
+if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    def _run_exam_crawl_job():
+        from crawlers.run_all import crawl_and_normalize_all
+        crawl_and_normalize_all()
+
+    _scheduler = BackgroundScheduler(timezone='Asia/Seoul')
+    _scheduler.add_job(_run_exam_crawl_job, 'cron', hour='6,18', minute=0,
+                        id='exam_crawl', replace_existing=True)
+    _scheduler.start()
 
 @app.route('/')
 def index():

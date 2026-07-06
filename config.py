@@ -10,7 +10,7 @@ for env_path in ENV_PATHS:
         load_dotenv(env_path, override=True)
 
 DB_CONFIG = {
-    'host':         os.getenv('DB_HOST',     '192.168.56.102'),
+    'host':         os.getenv('DB_HOST',     '192.168.56.101'),
     'port':         int(os.getenv('DB_PORT', '3306')),
     'user':         os.getenv('DB_USER',     'scott'),
     'password':     os.getenv('DB_PASSWORD', 'tiger'),
