@@ -21,7 +21,10 @@
 
     <!-- ════ 홈 뷰 ════ -->
     <div id="homeView" style="display:none;">
-      <div class="dash-header"><h1>위키</h1><p>함께 만들어가는 학습 자료</p></div>
+      <div class="dash-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div><h1>위키</h1><p>함께 만들어가는 학습 자료</p></div>
+        <button type="button" class="btn btn-primary" id="newWikiBtn" style="padding:9px 18px; white-space:nowrap;">➕ 새 위키 만들기</button>
+      </div>
 
       <div class="wiki-search">
         <input type="search" id="searchInput" placeholder="주제 검색... (없으면 새로 만들 수 있어요)">
@@ -93,6 +96,9 @@
       // 랭킹/최근 2열 그리드가 들어갈 만큼 홈도 조금 넓게
       document.querySelector('.container').style.maxWidth = '1000px';
       document.getElementById('homeView').style.display = 'block';
+
+      // 새 위키 만들기(검색 없이 바로) — 검색해서 "이 주제로 만들기"가 뜨기 전에도 늘 보이는 진입점
+      document.getElementById('newWikiBtn').onclick = () => openCreate();
 
       // 검색
       const searchInput = document.getElementById('searchInput');
@@ -166,15 +172,15 @@
       })();
     }
 
+    // 제목만 받고 여기서 바로 생성하지 않는다 — 실제 생성은 초안 편집화면에서
+    // "저장"을 눌러야 일어난다(그 전까지는 DB에 아무 것도 남지 않는다).
     function openCreate(prefillTitle) {
       if (!Auth.isLoggedIn) { location.href = '/login?next=/wiki'; return; }
       const title = prompt('새 위키 제목', prefillTitle || '');
       if (title === null) return;
       const t = title.trim();
       if (!t) return;
-      api('/api/wiki', { method: 'POST', body: { title: t, content: '', summary: '최초 생성' } })
-        .then(d => { location.href = '/wiki?slug=' + encodeURIComponent(d.slug); })
-        .catch(err => showAlert(alertEl, err.message));
+      location.href = '/wiki?new=' + encodeURIComponent(t);
     }
 
     /* ══════════ 상세 뷰 ══════════ */
@@ -200,12 +206,13 @@
           <div class="wd-hero-row">
             <h1 class="wd-hero-title">${escapeHtml(w.title)}</h1>
             <div class="wd-actions">
+              ${canEdit ? `<button class="btn btn-primary" id="saveBtn" style="padding:7px 16px;">💾 저장</button>` : ''}
               <button class="btn btn-ghost" id="historyBtn" style="padding:7px 14px;">🕘 이력</button>
               ${isAdmin ? `<button class="btn btn-danger" id="delBtn" style="padding:7px 14px;">삭제</button>` : ''}
             </div>
           </div>
           <div class="wd-meta-row">
-            <span class="version-badge">v${w.version}</span>
+            <span class="version-badge" id="versionBadge">v${w.version}</span>
             <span class="wm-sep">|</span>
             <span>최초: ${escapeHtml(w.created_by)}</span>
             <span class="wm-sep">|</span>
@@ -229,24 +236,89 @@
         // 보기/편집 구분 없이 항상 같은 실시간 세션을 연다 — 로그인 사용자는 바로 입력 가능
         // (서식/삽입 도구모음은 wiki-editor.js가 입력 영역 위에 직접 붙인다),
         // 아닌 사람은 읽기 전용으로 보되 남의 변경이 새로고침 없이 그대로 반영된다.
-        const syncEl = document.getElementById('syncStatus');
-        if (syncEl) syncEl.textContent = canEdit ? '동기화 중...' : '';
+        // 자동저장은 없다 — "저장" 버튼을 눌러야만 실제로 반영되고, 안 누르고 나가면
+        // 그동안의 변경은 저장되지 않은 채로 사라진다(다른 접속자에게는 실시간으로만 보였을 뿐).
         await WikiEditor.mount({
           container: document.getElementById('editorMount'),
           slug, initialContent: w.content, username: Auth.username, editable: canEdit, title: w.title,
         });
-        if (syncEl) syncEl.textContent = canEdit ? '자동 저장 켜짐' : '';
+        setSaveState(canEdit ? '저장된 상태' : '읽기 전용');
+
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.onclick = async () => {
+          setLoading(saveBtn, true);
+          try {
+            const result = await WikiEditor.save(slug);
+            const vb = document.getElementById('versionBadge');
+            if (vb && result) vb.textContent = 'v' + result.version;
+            setSaveState('저장됨 · ' + new Date().toLocaleTimeString());
+          } catch (err) {
+            showAlert(alertEl, '저장에 실패했어요: ' + err.message);
+          } finally {
+            setLoading(saveBtn, false, '💾 저장');
+          }
+        };
+
         startStatusbar(canEdit);
       } catch (err) {
         card.innerHTML = `<p class="muted text-center" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
       }
     }
 
+    /* ══════════ 초안(아직 생성 안 된) 뷰 ══════════
+       "저장"을 처음 누르는 순간에만 실제로 POST /api/wiki가 나간다 — 그 전까지는
+       제목만 정해진 상태로 로컬에서만 편집 중인 것이고 DB에는 아무 것도 없다. */
+    async function initDraft(title) {
+      document.querySelector('.container').style.maxWidth = '1200px';
+      document.getElementById('detailView').style.display = 'block';
+      renderBreadcrumb([{ label: '위키 홈', href: '/wiki' }, { label: title }]);
+
+      const card = document.getElementById('docCard');
+      card.innerHTML = `
+        <div class="wd-hero-row">
+          <h1 class="wd-hero-title">${escapeHtml(title)}</h1>
+          <div class="wd-actions">
+            <button class="btn btn-primary" id="saveBtn" disabled style="padding:7px 16px;">💾 저장</button>
+          </div>
+        </div>
+        <div class="wd-meta-row">
+          <span class="muted" id="syncStatus">아직 저장되지 않았어요 — 저장을 눌러야 위키가 만들어져요</span>
+        </div>
+        <div id="editorMount" class="tiptap-mount"></div>`;
+
+      // 아직 존재하지 않는 문서라 slug가 없다 — 임시 room 이름으로만 마운트하고
+      // (다른 사람이 join할 슬러그가 없으므로 실질적으로 혼자만 쓰는 세션),
+      // 처음 저장할 때 실제 slug가 발급되면 그 문서 화면으로 이동한다.
+      await WikiEditor.mount({
+        container: document.getElementById('editorMount'),
+        slug: null, initialContent: '', username: Auth.username, editable: true, title,
+      });
+      startStatusbar(true);
+
+      const saveBtn = document.getElementById('saveBtn');
+      saveBtn.disabled = false;
+      saveBtn.onclick = async () => {
+        setLoading(saveBtn, true);
+        try {
+          const editor = WikiEditor.getEditor();
+          const d = await api('/api/wiki', {
+            method: 'POST',
+            body: { title, content: JSON.stringify(editor.getJSON()), summary: '최초 생성' },
+          });
+          WikiEditor.markClean();
+          location.href = '/wiki?slug=' + encodeURIComponent(d.slug);
+        } catch (err) {
+          showAlert(alertEl, '저장에 실패했어요: ' + err.message);
+          setLoading(saveBtn, false, '💾 저장');
+        }
+      };
+    }
+
     /* ── 하단 상태바: 단어/글자/읽기시간(2초 주기) + 저장 상태 ── */
     let wsTimer = null;
     function startStatusbar(canEdit) {
       document.getElementById('wikiStatusbar').classList.remove('hidden');
-      document.getElementById('wsSave').textContent = canEdit ? '자동 저장 켜짐' : '읽기 전용';
+      document.getElementById('wsSave').textContent = canEdit ? '저장된 상태' : '읽기 전용';
       clearInterval(wsTimer);
       wsTimer = setInterval(() => {
         const ed = window.WikiEditor && WikiEditor.getEditor();
@@ -265,8 +337,18 @@
       const ws = document.getElementById('wsSave');
       if (ws) ws.textContent = label;
     }
-    window.addEventListener('wiki:autosaved',   () => setSaveState('저장됨 · ' + new Date().toLocaleTimeString()));
-    window.addEventListener('wiki:snapshotted', () => setSaveState('버전 기록됨 · ' + new Date().toLocaleTimeString()));
+    // 자동저장 없음 — 변경이 생기면 "저장 안 된 변경사항 있음"만 표시하고,
+    // 실제 반영은 저장 버튼(WikiEditor.save)을 눌러야만 일어난다.
+    window.addEventListener('wiki:dirty', () => setSaveState('저장 안 된 변경사항 있음'));
+    window.addEventListener('wiki:saved', () => setSaveState('저장됨 · ' + new Date().toLocaleTimeString()));
+
+    // 저장하지 않은 변경사항이 있으면 페이지를 떠나기 전에 확인창을 띄운다.
+    window.addEventListener('beforeunload', (e) => {
+      if (window.WikiEditor && WikiEditor.isDirty && WikiEditor.isDirty()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
 
     let historyOpen = false;
     async function toggleHistory() {
@@ -305,7 +387,10 @@
     }
 
     /* ── 라우팅 ── */
-    if (slug) initDetail(); else initHome();
+    const newTitle = queryParam('new');
+    if (slug) initDetail();
+    else if (newTitle) initDraft(newTitle);
+    else initHome();
   </script>
 </body>
 </html>
