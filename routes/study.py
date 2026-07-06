@@ -16,6 +16,9 @@ def err(msg, code, status=400):
 @study_bp.route('/api/study/start', methods=['POST'])
 @login_required
 def start_study():
+    data    = request.get_json(silent=True) or {}
+    post_id = data.get('post_id')  # 이 세션 공부 시간을 기여도로 반영할 모임(선택, 없으면 개인 공부)
+
     conn   = get_db()
     cursor = conn.cursor()
     try:
@@ -26,16 +29,25 @@ def start_study():
         if cursor.fetchone():
             return err('이미 공부 중인 세션이 있습니다', 'SESSION_ACTIVE', 409)
 
+        if post_id is not None:
+            cursor.execute(
+                "SELECT 1 FROM post_members WHERE post_id = %s AND user_id = %s "
+                "AND status = 'active' AND left_at IS NULL",
+                (post_id, g.user_id)
+            )
+            if not cursor.fetchone():
+                return err('가입된 모임이 아닙니다', 'NOT_MEMBER', 404)
+
         cursor.execute(
-            'INSERT INTO study_sessions (user_id) VALUES (%s)',
-            (g.user_id,)
+            'INSERT INTO study_sessions (user_id, post_id) VALUES (%s, %s)',
+            (g.user_id, post_id)
         )
         conn.commit()
         session_id = cursor.lastrowid
     finally:
         conn.close()
 
-    return ok({'session_id': session_id}, '공부 시작'), 201
+    return ok({'session_id': session_id, 'post_id': post_id}, '공부 시작'), 201
 
 
 @study_bp.route('/api/study/end', methods=['POST'])
@@ -45,7 +57,7 @@ def end_study():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            'SELECT id, started_at FROM study_sessions WHERE user_id = %s AND ended_at IS NULL',
+            'SELECT id, started_at, post_id FROM study_sessions WHERE user_id = %s AND ended_at IS NULL',
             (g.user_id,)
         )
         session = cursor.fetchone()
@@ -64,14 +76,13 @@ def end_study():
         cursor.execute('SELECT duration_sec FROM study_sessions WHERE id = %s', (session['id'],))
         duration = cursor.fetchone()['duration_sec']
 
-        # 모임 기여도 누적 (분 단위) — 현재 활성 가입 중인 모임에만 반영
-        # (탈퇴한 모임은 left_at이 남아있는 채로 행이 유지되므로 제외해야 함)
+        # 모임 기여도 누적 (분 단위) — 공부 시작 시 선택한 모임에만 반영(선택 안 했으면 개인 기록만 남음)
         mins = (duration or 0) // 60
-        if mins > 0:
+        if mins > 0 and session['post_id'] is not None:
             cursor.execute(
-                'UPDATE post_members SET contribution_score = contribution_score + %s '
-                'WHERE user_id = %s AND left_at IS NULL',
-                (mins, g.user_id)
+                "UPDATE post_members SET contribution_score = contribution_score + %s "
+                "WHERE post_id = %s AND user_id = %s AND status = 'active' AND left_at IS NULL",
+                (mins, session['post_id'], g.user_id)
             )
             conn.commit()
     finally:
@@ -87,10 +98,11 @@ def study_status():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            '''SELECT id, started_at,
-                      TIMESTAMPDIFF(SECOND, started_at, NOW()) AS elapsed_sec
-               FROM study_sessions
-               WHERE user_id = %s AND ended_at IS NULL''',
+            '''SELECT s.id, s.started_at, s.post_id, p.title AS post_title,
+                      TIMESTAMPDIFF(SECOND, s.started_at, NOW()) AS elapsed_sec
+               FROM study_sessions s
+               LEFT JOIN posts p ON s.post_id = p.id
+               WHERE s.user_id = %s AND s.ended_at IS NULL''',
             (g.user_id,)
         )
         session = cursor.fetchone()

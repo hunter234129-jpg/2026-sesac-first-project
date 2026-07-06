@@ -43,17 +43,21 @@ CREATE TABLE IF NOT EXISTS posts (
     recruit_deadline DATE,
     field            VARCHAR(100),
     linked_exam_name VARCHAR(150) DEFAULT NULL,  -- 특정 시험 준비 모임이면 연결(선택, exams.name)
+    join_mode        ENUM('open','approval') NOT NULL DEFAULT 'open',  -- open=바로 참가, approval=모임장 승인 필요
     deleted_at       DATETIME DEFAULT NULL,
     created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- 스터디 모집(모임) 참가자 — 참가 신청 = 여기에 행 추가. 탈퇴는 소프트 삭제(left_at)라
--- 나간 시점 이전 채팅 기록은 계속 보이고 그 이후만 비공개 처리할 수 있다.
+-- 스터디 모집(모임) 참가자 — 참가 신청 = 여기에 행 추가. posts.join_mode='approval'이면
+-- status='pending'으로 들어가고 모임장이 수락해야 'active'가 된다(거절되면 행 자체를 삭제해서
+-- 재신청 가능하게 함). 탈퇴는 소프트 삭제(left_at)라 나간 시점 이전 채팅 기록은 계속 보이고
+-- 그 이후만 비공개 처리할 수 있다.
 CREATE TABLE IF NOT EXISTS post_members (
     post_id            INT NOT NULL,
     user_id            INT NOT NULL,
+    status             ENUM('active','pending') NOT NULL DEFAULT 'active',
     contribution_score INT DEFAULT 0,
     joined_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
     left_at            DATETIME DEFAULT NULL,
@@ -152,10 +156,12 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE TABLE IF NOT EXISTS study_sessions (
     id           INT AUTO_INCREMENT PRIMARY KEY,
     user_id      INT      NOT NULL,
+    post_id      INT      DEFAULT NULL,  -- 이 세션 공부 시간을 어느 모임 기여도에 반영할지(선택, 미선택시 개인 공부)
     started_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ended_at     DATETIME DEFAULT NULL,
     duration_sec INT      DEFAULT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE SET NULL
 );
 
 -- ── 시험 정보(모임-시험 연결용) ──────────────────────────────────────
@@ -506,3 +512,13 @@ CREATE TABLE IF NOT EXISTS ai_quiz_wrong_notes (
 -- DROP TABLE IF EXISTS clan_chat_messages;
 -- DROP TABLE IF EXISTS clan_members;
 -- DROP TABLE IF EXISTS clans;
+--
+-- -- ── 모임 가입 승인제 + 공부 세션 기여 모임 선택 + 시험 D-day ──
+-- -- 1) 모임 생성 시 "바로 참가"/"모임장 승인 필요" 중 선택 가능하게.
+-- ALTER TABLE posts ADD COLUMN join_mode ENUM('open','approval') NOT NULL DEFAULT 'open' AFTER linked_exam_name;
+-- -- 2) 승인 대기중인 가입 신청을 같은 테이블에 status='pending'으로 저장(수락 시 'active').
+-- ALTER TABLE post_members ADD COLUMN status ENUM('active','pending') NOT NULL DEFAULT 'active' AFTER user_id;
+-- -- 3) 공부 시작 시 어느 모임 기여도로 반영할지 선택 — 세션에 저장해두고 종료 시 그 모임에만 반영.
+-- ALTER TABLE study_sessions ADD COLUMN post_id INT DEFAULT NULL AFTER user_id,
+--   ADD FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE SET NULL;
+-- -- (시험 D-day는 새 컬럼 없이 기존 posts.linked_exam_name + exams 테이블 조인으로 계산)

@@ -103,6 +103,14 @@
           </div>
         </div>
         <div class="field">
+          <label>가입 방식</label>
+          <div class="seg" id="joinModeSeg">
+            <button type="button" data-mode="open" class="active">바로 참가</button>
+            <button type="button" data-mode="approval">모임장 승인 필요</button>
+          </div>
+        </div>
+
+        <div class="field">
           <label for="field">분야</label>
           <input type="text" id="field" placeholder="예: 정보처리기사 실기 (선택)">
         </div>
@@ -137,12 +145,14 @@
 
     const editId  = queryParam('id');           // 있으면 수정 모드
     renderBreadcrumb([{ label: '게시판', href: '/board' }, { label: editId ? '글 수정' : '글쓰기' }]);
-    const isEdit  = !!editId;
-    const alertEl = document.getElementById('alert');
-    let curType   = 'post';
+    const isEdit    = !!editId;
+    const alertEl   = document.getElementById('alert');
+    let curType     = 'post';
+    let curJoinMode = 'open';
 
     const typeSeg     = document.getElementById('typeSeg');
     const studyFields = document.getElementById('studyFields');
+    const joinModeSeg = document.getElementById('joinModeSeg');
 
     function setType(t) {
       curType = t;
@@ -153,6 +163,16 @@
     typeSeg.onclick = (e) => {
       const btn = e.target.closest('button');
       if (btn) setType(btn.dataset.type);
+    };
+
+    function setJoinMode(m) {
+      curJoinMode = m;
+      document.querySelectorAll('#joinModeSeg button').forEach(b =>
+        b.classList.toggle('active', b.dataset.mode === m));
+    }
+    joinModeSeg.onclick = (e) => {
+      const btn = e.target.closest('button');
+      if (btn) setJoinMode(btn.dataset.mode);
     };
 
     // 수정 모드: 기존 값 로드 + 유형 변경 잠금
@@ -190,6 +210,7 @@
               }
             }
             document.getElementById('field').value = p.field || '';
+            setJoinMode(p.join_mode || 'open');
             if (p.linked_exam_name) selectExam({ name: p.linked_exam_name }, null);
           }
         } catch (err) { showAlert(alertEl, err.message); }
@@ -271,6 +292,7 @@
             editBody.recruit_deadline = document.getElementById('recruitDeadline').value || null;
             editBody.field            = document.getElementById('field').value.trim();
             editBody.linked_exam_name = selectedExam ? selectedExam.name : null;
+            editBody.join_mode        = curJoinMode;
           }
           await api('/api/posts/' + editId, { method: 'PUT', body: editBody });
           location.href = '/post?id=' + editId;
@@ -286,6 +308,7 @@
             body.recruit_deadline = document.getElementById('recruitDeadline').value || null;
             body.field            = document.getElementById('field').value.trim();
             body.linked_exam_name = selectedExam ? selectedExam.name : null;
+            body.join_mode        = curJoinMode;
           }
           const d = await api('/api/posts', { method: 'POST', body });
           location.href = '/post?id=' + d.id;

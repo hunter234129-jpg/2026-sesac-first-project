@@ -21,7 +21,7 @@ def room_name(post_id):
 
 def _is_active_member(cursor, post_id, user_id):
     cursor.execute(
-        'SELECT 1 FROM post_members WHERE post_id=%s AND user_id=%s AND left_at IS NULL',
+        "SELECT 1 FROM post_members WHERE post_id=%s AND user_id=%s AND status='active' AND left_at IS NULL",
         (post_id, user_id)
     )
     return cursor.fetchone() is not None

@@ -111,6 +111,13 @@
     .db-btn.end { background: rgba(255,68,102,0.15); border: 1px solid rgba(255,68,102,0.4); color: var(--db-red); }
     .db-btn.ghost { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: var(--db-text2); }
     .db-btn:disabled { opacity: .5; cursor: default; }
+    .study-post-select {
+      width: 100%; padding: 8px 10px; border-radius: 10px; font-size: 12.5px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+      color: var(--db-text); outline: none; appearance: none;
+    }
+    .study-post-select:focus { border-color: rgba(0,229,255,0.4); }
+    .study-post-select:disabled { opacity: .6; }
 
     /* 스트릭 위젯 */
     .streak-wrap { padding: 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -247,6 +254,12 @@
             <div class="label">현재 세션</div>
             <div style="font-weight:700; font-size:15px;" id="totalStudy">누적 데이터 불러오는 중...</div>
             <div class="streak-line" id="streakLine" style="margin-top:4px;"></div>
+          </div>
+          <div>
+            <div class="label">기여할 모임</div>
+            <select id="studyPostSelect" class="study-post-select">
+              <option value="">개인 공부 (선택 안 함)</option>
+            </select>
           </div>
           <div class="timer-controls">
             <button class="db-btn start" id="startStudyBtn">▶ 공부 시작</button>
@@ -386,7 +399,29 @@
     const ringEl = document.getElementById('timerRing');
     const startBtn = document.getElementById('startStudyBtn');
     const endBtn = document.getElementById('endStudyBtn');
+    const postSelect = document.getElementById('studyPostSelect');
     let tick = null, baseSec = 0;
+
+    (async () => {
+      try {
+        const joined = await api('/api/posts/joined');
+        joined.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.title;
+          postSelect.appendChild(opt);
+        });
+      } catch (_) {}
+
+      // 이미 진행 중인 세션이 있으면(새로고침 등) 그 세션이 고른 모임을 선택 상태로 맞춰준다
+      try {
+        const s = await api('/api/study/status');
+        if (s.active) {
+          if (s.session.post_id) postSelect.value = String(s.session.post_id);
+          runTimer(s.session.elapsed_sec || 0);
+        }
+      } catch (_) {}
+    })();
 
     function fmt(sec) {
       const h = String(Math.floor(sec/3600)).padStart(2,'0');
@@ -403,6 +438,7 @@
       const t0 = Date.now();
       startBtn.classList.add('hidden');
       endBtn.classList.remove('hidden');
+      postSelect.disabled = true;
       clearInterval(tick);
       tick = setInterval(() => {
         const cur = baseSec + Math.floor((Date.now()-t0)/1000);
@@ -416,6 +452,7 @@
       clearInterval(tick); tick = null;
       endBtn.classList.add('hidden');
       startBtn.classList.remove('hidden');
+      postSelect.disabled = false;
       timerEl.textContent = '00:00:00';
       setRing(0);
     }
@@ -423,7 +460,8 @@
     startBtn.onclick = async () => {
       startBtn.disabled = true;
       try {
-        await api('/api/study/start', { method: 'POST' });
+        const postId = postSelect.value ? Number(postSelect.value) : null;
+        await api('/api/study/start', { method: 'POST', body: { post_id: postId } });
         runTimer(0);
         loadStreak();
       } catch (e) { alert(e.message); }
@@ -447,13 +485,6 @@
         const g = await api('/api/study/goal');
         GOAL_SEC = (g.daily_goal_min || 240) * 60;
         document.getElementById('goalLabel').textContent = `⏰ 목표 ${fmt(GOAL_SEC)}`;
-      } catch (_) {}
-    })();
-
-    (async () => {
-      try {
-        const s = await api('/api/study/status');
-        if (s.active) runTimer(s.session.elapsed_sec || 0);
       } catch (_) {}
     })();
 

@@ -49,7 +49,8 @@
     let page = 1;
     const SIZE = 15;
 
-    const typeLabel = { keyword: '키워드', system: '시스템', comment: '댓글' };
+    const typeLabel = { keyword: '키워드', system: '시스템', comment: '댓글',
+      join_request: '가입 신청', join_accepted: '가입 승인', join_rejected: '가입 거절' };
 
     async function load() {
       listEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>';

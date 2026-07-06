@@ -48,6 +48,7 @@ MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN real_name VARCHAR(50) DEFAULT NULL AFTER password_hash",
     "ALTER TABLE users ADD COLUMN interest_keywords TEXT DEFAULT NULL AFTER real_name",
     "ALTER TABLE users ADD COLUMN avatar_id SMALLINT NOT NULL DEFAULT 0 AFTER interest_keywords",
+    "ALTER TABLE users ADD COLUMN daily_goal_min INT NOT NULL DEFAULT 240 AFTER avatar_id",
     "ALTER TABLE users ADD COLUMN is_verified TINYINT(1) DEFAULT 0 AFTER is_admin",
     "ALTER TABLE users ADD COLUMN is_deleted TINYINT(1) DEFAULT 0 AFTER is_verified",
     "ALTER TABLE users ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER is_deleted",
@@ -64,6 +65,12 @@ MIGRATIONS = [
     "ALTER TABLE chat_messages ADD COLUMN file_size INT DEFAULT NULL AFTER file_name",
     # posts (클랜 폐지 → 스터디 모집 게시글이 모임 역할을 흡수, 시험 연동)
     "ALTER TABLE posts ADD COLUMN linked_exam_name VARCHAR(150) DEFAULT NULL AFTER field",
+    # posts (모임 가입 방식 — 바로 참가 / 모임장 승인 필요)
+    "ALTER TABLE posts ADD COLUMN join_mode ENUM('open','approval') NOT NULL DEFAULT 'open' AFTER linked_exam_name",
+    # post_members (승인 대기중인 가입 신청 상태)
+    "ALTER TABLE post_members ADD COLUMN status ENUM('active','pending') NOT NULL DEFAULT 'active' AFTER user_id",
+    # study_sessions (이 세션 공부 시간을 어느 모임 기여도로 반영할지 선택)
+    "ALTER TABLE study_sessions ADD COLUMN post_id INT DEFAULT NULL AFTER user_id",
 ]
 
 # 클랜 시스템 폐지(스터디 모집 게시글로 역할 통합) — 실제 운영 데이터가 있다면 이
@@ -98,6 +105,18 @@ try:
             conn.commit()
             print('삭제(있었다면):', table)
 
+    # study_sessions.post_id FK — ALTER ADD COLUMN에는 못 끼워넣어서 따로 시도.
+    # 이미 걸려 있으면 MySQL이 에러를 던지는데 버전마다 에러코드가 달라서 그냥 통째로 건너뛴다.
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                'ALTER TABLE study_sessions ADD FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE SET NULL'
+            )
+            conn.commit()
+            print('적용: study_sessions.post_id FK 추가')
+    except pymysql.err.Error as e:
+        print('건너뜀 (이미 있거나 실패):', e)
+
     with conn.cursor() as cursor:
         cursor.execute("SHOW COLUMNS FROM users")
         print('\nusers 컬럼 확인:')
@@ -115,5 +134,13 @@ try:
         print('\npost_* 테이블 확인(post_members/post_chat_messages 있어야 함):')
         for row in cursor.fetchall():
             print(' ', list(row.values())[0])
+        cursor.execute("SHOW COLUMNS FROM post_members")
+        print('\npost_members 컬럼 확인:')
+        for row in cursor.fetchall():
+            print(' ', row['Field'])
+        cursor.execute("SHOW COLUMNS FROM study_sessions")
+        print('\nstudy_sessions 컬럼 확인:')
+        for row in cursor.fetchall():
+            print(' ', row['Field'])
 finally:
     conn.close()

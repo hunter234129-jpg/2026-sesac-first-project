@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>게시글 · 스터디 플랫폼</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .dday-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .dday-chip {
+      display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px;
+      border-radius: 99px; font-size: 12px; background: rgba(0,229,255,0.08);
+      border: 1px solid rgba(0,229,255,0.2); color: var(--muted, #9aa4c2);
+    }
+    .dday-chip b { color: var(--text, #e8edf8); font-family: monospace; }
+    .dday-chip.soon { background: rgba(255,68,102,0.1); border-color: rgba(255,68,102,0.3); }
+    .dday-chip.soon b { color: #FF4466; }
+  </style>
 </head>
 <body>
   <nav class="navbar">
@@ -22,6 +33,11 @@
 
     <div class="post-detail card mt-16" id="postCard">
       <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
+    </div>
+
+    <div class="card section hidden" id="requestsCard" style="margin-top:20px;">
+      <div class="section-head"><h2>가입 신청 <span id="requestCount" class="muted"></span></h2></div>
+      <div class="rank-list" id="requestList"></div>
     </div>
 
     <div class="card section hidden" id="membersCard" style="margin-top:20px;">
@@ -72,7 +88,33 @@
     if (!postId) { showAlert(alertEl, '잘못된 접근입니다.'); }
 
     const myId = Auth.userId;
-    let amMember = false;
+
+    /* ── 시험 D-day ── */
+    function ddayLabel(dateStr) {
+      if (!dateStr) return null;
+      const target = new Date(dateStr);
+      if (isNaN(target)) return null;
+      const today = new Date();
+      const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const d0 = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+      const diff = Math.round((d0 - t0) / 86400000);
+      if (diff === 0) return { text: 'D-DAY', soon: true };
+      if (diff > 0)   return { text: `D-${diff}`, soon: diff <= 7 };
+      return { text: `D+${-diff}`, soon: false };
+    }
+    function examDdayHtml(info) {
+      if (!info) return '';
+      const items = [
+        ['원서접수 시작', info.apply_start],
+        ['원서접수 마감', info.apply_end],
+        ['시험일',       info.exam_start],
+        ['합격자 발표',   info.result_date],
+      ].map(([label, d]) => {
+        const dd = ddayLabel(d);
+        return dd ? `<span class="dday-chip${dd.soon ? ' soon' : ''}">${label} <b>${dd.text}</b></span>` : '';
+      }).filter(Boolean).join('');
+      return items ? `<div class="dday-row">${items}</div>` : '';
+    }
 
     /* ── 게시글 상세 ── */
     async function loadPost() {
@@ -98,7 +140,14 @@
               <div><div class="label">모집 마감일</div>${p.recruit_deadline || '미정'}</div>
               <div><div class="label">분야</div>${escapeHtml(p.field || '미지정')}</div>
               ${p.linked_exam_name ? `<div><div class="label">연동 시험</div>🗓️ ${escapeHtml(p.linked_exam_name)}</div>` : ''}
-            </div>`;
+              <div><div class="label">가입 방식</div>${p.join_mode === 'approval' ? '모임장 승인 필요' : '바로 참가'}</div>
+            </div>
+            ${examDdayHtml(p.exam_info)}`;
+        }
+
+        let membership = { status: 'none' };
+        if (isStudy && !isOwner && Auth.isLoggedIn) {
+          try { membership = await api(`/api/posts/${postId}/membership`); } catch (_) {}
         }
 
         let ownerActions = '';
@@ -112,8 +161,17 @@
         } else if (isStudy) {
           if (!Auth.isLoggedIn) {
             ownerActions = `<div class="pd-actions"><a class="btn btn-primary" href="/login?next=${encodeURIComponent('/post?id='+postId)}" style="padding:7px 14px;">로그인 후 참가</a></div>`;
+          } else if (membership.status === 'active') {
+            ownerActions = `<div class="pd-actions"><button class="btn btn-ghost" id="leaveBtn" style="padding:7px 14px;">탈퇴하기</button></div>`;
+          } else if (membership.status === 'pending') {
+            ownerActions = `
+              <div class="pd-actions">
+                <span class="tbadge" style="background:rgba(245,158,11,.15); color:#F59E0B;">⏳ 승인 대기중</span>
+                <button class="btn btn-ghost" id="cancelReqBtn" style="padding:7px 14px;">신청 취소</button>
+              </div>`;
           } else {
-            ownerActions = `<div class="pd-actions"><button class="btn btn-primary" id="joinBtn" style="padding:7px 14px;">참가하기</button></div>`;
+            const label = p.join_mode === 'approval' ? '참가 신청하기' : '참가하기';
+            ownerActions = `<div class="pd-actions"><button class="btn btn-primary" id="joinBtn" style="padding:7px 14px;">${label}</button></div>`;
           }
         }
 
@@ -143,16 +201,32 @@
           try { await api(`/api/posts/${postId}/status`, { method: 'PATCH', body: { status: next } }); loadPost(); }
           catch (err) { showAlert(alertEl, err.message); }
         };
-        // 모임 참가
+        // 모임 참가 신청/즉시 가입
         const joinBtn = document.getElementById('joinBtn');
         if (joinBtn) joinBtn.onclick = async () => {
+          const label = joinBtn.textContent;
           setLoading(joinBtn, true);
-          try { await api(`/api/posts/${postId}/join`, { method: 'POST' }); loadPost(); loadMembers(); }
-          catch (err) { showAlert(alertEl, err.message); setLoading(joinBtn, false, '참가하기'); }
+          try { await api(`/api/posts/${postId}/join`, { method: 'POST' }); loadPost(); }
+          catch (err) { showAlert(alertEl, err.message); setLoading(joinBtn, false, label); }
+        };
+        // 탈퇴
+        const leaveBtn = document.getElementById('leaveBtn');
+        if (leaveBtn) leaveBtn.onclick = async () => {
+          if (!confirm('모임에서 탈퇴할까요?')) return;
+          try { await api(`/api/posts/${postId}/leave`, { method: 'DELETE' }); loadPost(); }
+          catch (err) { showAlert(alertEl, err.message); }
+        };
+        // 가입 신청 취소
+        const cancelReqBtn = document.getElementById('cancelReqBtn');
+        if (cancelReqBtn) cancelReqBtn.onclick = async () => {
+          try { await api(`/api/posts/${postId}/leave`, { method: 'DELETE' }); loadPost(); }
+          catch (err) { showAlert(alertEl, err.message); }
         };
 
         if (isStudy) {
           loadMembers(p.user_id);
+          if (isOwner && p.join_mode === 'approval') loadRequests();
+          else document.getElementById('requestsCard').classList.add('hidden');
           if (Auth.isLoggedIn) initChat();
         }
       } catch (err) {
@@ -164,7 +238,6 @@
     async function loadMembers(ownerId) {
       try {
         const members = await api(`/api/posts/${postId}/members`, { auth: false });
-        amMember = Auth.isLoggedIn && members.some(m => m.id === myId);
         document.getElementById('membersCard').classList.remove('hidden');
         document.getElementById('memberCount').textContent = `${members.length}명`;
         const el = document.getElementById('memberList');
@@ -181,18 +254,41 @@
               <div class="rank-time">${m.contribution_score}점</div>
             </div>`;
         }).join('');
-        if (amMember && ownerId !== myId) {
-          el.insertAdjacentHTML('beforeend', `
-            <div style="margin-top:12px; text-align:right;">
-              <button class="btn btn-ghost" id="leaveBtn" style="padding:6px 14px;">탈퇴하기</button>
-            </div>`);
-          document.getElementById('leaveBtn').onclick = async () => {
-            if (!confirm('모임에서 탈퇴할까요?')) return;
-            try { await api(`/api/posts/${postId}/leave`, { method: 'DELETE' }); loadPost(); }
-            catch (err) { showAlert(alertEl, err.message); }
-          };
-        }
       } catch (_) {}
+    }
+
+    /* ── 가입 신청 관리(모임장 전용, join_mode='approval'일 때만) ── */
+    async function loadRequests() {
+      const card = document.getElementById('requestsCard');
+      try {
+        const reqs = await api(`/api/posts/${postId}/requests`);
+        if (!reqs.length) { card.classList.add('hidden'); return; }
+        card.classList.remove('hidden');
+        document.getElementById('requestCount').textContent = `${reqs.length}건`;
+        const el = document.getElementById('requestList');
+        el.innerHTML = reqs.map(r => `
+          <div class="rank-row" data-uid="${r.id}">
+            <div class="rank-name">${escapeHtml(r.username)}</div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-primary" data-act="accept" style="padding:5px 12px;">수락</button>
+              <button class="btn btn-ghost" data-act="reject" style="padding:5px 12px;">거절</button>
+            </div>
+          </div>`).join('');
+        el.querySelectorAll('[data-act]').forEach(btn => {
+          btn.onclick = async () => {
+            const uid = btn.closest('[data-uid]').dataset.uid;
+            btn.disabled = true;
+            try {
+              if (btn.dataset.act === 'accept') {
+                await api(`/api/posts/${postId}/requests/${uid}/accept`, { method: 'POST' });
+              } else {
+                await api(`/api/posts/${postId}/requests/${uid}`, { method: 'DELETE' });
+              }
+              loadPost();
+            } catch (err) { showAlert(alertEl, err.message); btn.disabled = false; }
+          };
+        });
+      } catch (_) { card.classList.add('hidden'); }
     }
 
     /* ── 댓글 ── */
@@ -412,6 +508,9 @@
     }
 
     async function initChat() {
+      // join/leave/가입승인 등으로 loadPost()가 다시 불릴 때마다 initChat도 다시 불리는데,
+      // 이미 초기화돼 있으면 또 불러오지 않는다 — 안 그러면 history가 매번 중복으로 쌓인다.
+      if (chatSocket) return;
       try {
         await loadChatHistory();
       } catch (err) {
