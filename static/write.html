@@ -112,14 +112,17 @@
 
         <div class="field">
           <label for="field">분야</label>
-          <input type="text" id="field" placeholder="예: 정보처리기사 실기 (선택)">
-        </div>
-
-        <!-- 시험명 매칭 — 분야에 등록된 시험명이 포함되면 후보를 보여주고 직접 고르게 한다 -->
-        <div class="exam-match-box hidden" id="examMatchBox">
-          <div class="exam-match-title">🗓️ '<b id="examMatchKeyword"></b>' 관련 시험을 찾았어요 — 이 모임이 준비하는 시험을 골라주세요</div>
-          <div class="exam-match-list" id="examMatchList"></div>
-          <div class="exam-match-item exam-match-skip" id="examMatchSkip">관련 없음 · 그냥 일반 모임이에요</div>
+          <div class="field-combo">
+            <input type="text" id="field" placeholder="자격증을 선택하거나 직접 입력하세요 (선택)" autocomplete="off">
+            <button type="button" class="combo-arrow-btn" id="fieldArrowBtn" title="자격증 목록 보기">▼</button>
+            <!-- 분야 선택 드롭다운 — 등록된 자격증 목록을 보여주고 직접 고르게 한다.
+                 목록에 없는 분야는 그냥 입력한 텍스트 그대로 쓰면 된다(시험 연동 없이). -->
+            <div class="exam-match-box hidden" id="examMatchBox">
+              <div class="exam-match-title" id="examMatchTitle">🗓️ 준비 중인 자격증을 선택하세요</div>
+              <div class="exam-match-list" id="examMatchList"></div>
+              <div class="exam-match-item exam-match-skip" id="examMatchSkip">목록에 없어요 · 입력한 내용 그대로 사용</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -217,59 +220,114 @@
       })();
     }
 
-    /* ── 시험명 매칭 — 분야를 입력할 때마다(디바운스) 후보를 찾아 직접 고르게 한다 ── */
+    /* ── 분야(자격증) 선택 드롭다운 ──
+       인풋을 포커스하거나 ▼를 누르면 등록된 자격증 전체 목록(카테고리별)을 보여주고,
+       타이핑하면 그 안에서 실시간으로 필터링한다. 목록에 없는 분야는 그냥 입력한
+       텍스트 그대로 써도 된다(시험 D-day 연동만 안 될 뿐). */
     let selectedExam = null;   // { name, round, ... } | null
+    const fieldInput    = document.getElementById('field');
+    const fieldArrowBtn = document.getElementById('fieldArrowBtn');
     const examMatchBox  = document.getElementById('examMatchBox');
     const examMatchList = document.getElementById('examMatchList');
+    const examMatchTitle = document.getElementById('examMatchTitle');
 
     function fmtExamDate(iso) {
       if (!iso) return '미정';
       return String(iso).slice(5).replace('-', '.');
     }
-    function renderExamCandidates(keyword, results) {
-      document.getElementById('examMatchKeyword').textContent = keyword;
-      examMatchList.innerHTML = results.map(r => `
+    function examItemHtml(r) {
+      return `
         <div class="exam-match-item" data-name="${escapeHtml(r.name)}">
           <div class="emi-main">
             <div class="emi-name">${escapeHtml(r.name)}${r.round ? ` <span class="muted">제${r.round}회</span>` : ''}</div>
             <div class="emi-date">${r.is_upcoming ? '접수' : '(지난 회차)'} ${fmtExamDate(r.apply_start)}~${fmtExamDate(r.apply_end)} · 시험 ${fmtExamDate(r.exam_start)}</div>
           </div>
           <div class="emi-check">✓</div>
-        </div>`).join('');
-      examMatchList.querySelectorAll('.exam-match-item').forEach((el, i) => {
-        el.onclick = () => selectExam(results[i], el);
-      });
-      examMatchBox.classList.remove('hidden');
+        </div>`;
     }
-    function selectExam(exam, el) {
-      selectedExam = exam;
-      examMatchBox.classList.remove('hidden');
-      if (exam && !el) {
-        examMatchList.innerHTML = `
-          <div class="exam-match-item selected" data-name="${escapeHtml(exam.name)}">
-            <div class="emi-main"><div class="emi-name">${escapeHtml(exam.name)}</div></div>
-            <div class="emi-check">✓</div>
-          </div>`;
+    function renderExamList(keyword, results) {
+      examMatchTitle.innerHTML = keyword
+        ? `🔍 '<b>${escapeHtml(keyword)}</b>' 검색 결과`
+        : '🗓️ 준비 중인 자격증을 선택하세요';
+
+      if (!results.length) {
+        examMatchList.innerHTML = `<p class="muted" style="font-size:12.5px; padding:8px 6px;">일치하는 자격증이 없어요.</p>`;
+      } else if (keyword) {
+        // 검색 중에는 그룹 없이 관련도(가까운 회차)순으로만 보여준다
+        examMatchList.innerHTML = results.map(examItemHtml).join('');
+      } else {
+        // 전체 목록은 카테고리별로 묶어서 보여준다
+        let html = '';
+        let lastCategory = null;
+        results.forEach(r => {
+          const category = r.category || '기타';
+          if (category !== lastCategory) {
+            html += `<div class="exam-match-group-label">${escapeHtml(category)}</div>`;
+            lastCategory = category;
+          }
+          html += examItemHtml(r);
+        });
+        examMatchList.innerHTML = html;
       }
+
+      examMatchList.querySelectorAll('.exam-match-item').forEach((el) => {
+        const r = results.find(x => x.name === el.dataset.name);
+        el.onclick = () => selectExam(r, el);
+      });
+      if (selectedExam) {
+        examMatchList.querySelector(`.exam-match-item[data-name="${CSS.escape(selectedExam.name)}"]`)
+          ?.classList.add('selected');
+      }
+    }
+
+    function openExamDropdown() {
+      examMatchBox.classList.remove('hidden');
+      fieldArrowBtn.classList.add('open');
+      loadExamList(fieldInput.value.trim());
+    }
+    function closeExamDropdown() {
+      examMatchBox.classList.add('hidden');
+      fieldArrowBtn.classList.remove('open');
+    }
+
+    async function loadExamList(keyword) {
+      try {
+        const d = await api('/api/exams/search?q=' + encodeURIComponent(keyword || ''), { auth: false });
+        renderExamList(keyword, d.results || []);
+      } catch (_) {
+        examMatchList.innerHTML = `<p class="muted" style="font-size:12.5px; padding:8px 6px;">목록을 불러오지 못했어요.</p>`;
+      }
+    }
+
+    function selectExam(exam, el) {
+      selectedExam = exam || null;
+      if (exam) fieldInput.value = exam.name;
       document.querySelectorAll('.exam-match-item').forEach(e => e.classList.remove('selected'));
       if (el) el.classList.add('selected');
-      else if (exam) examMatchList.querySelector('.exam-match-item')?.classList.add('selected');
+      closeExamDropdown();
     }
-    document.getElementById('examMatchSkip').onclick = () => selectExam(null, null);
+    document.getElementById('examMatchSkip').onclick = () => { selectedExam = null; closeExamDropdown(); };
+
+    fieldArrowBtn.onclick = (e) => {
+      e.stopPropagation();
+      examMatchBox.classList.contains('hidden') ? openExamDropdown() : closeExamDropdown();
+    };
+    fieldInput.addEventListener('focus', openExamDropdown);
 
     let examSearchDeb;
-    document.getElementById('field').addEventListener('input', (e) => {
+    fieldInput.addEventListener('input', (e) => {
       selectedExam = null;
       clearTimeout(examSearchDeb);
       const keyword = e.target.value.trim();
-      if (keyword.length < 2) { examMatchBox.classList.add('hidden'); return; }
-      examSearchDeb = setTimeout(async () => {
-        try {
-          const d = await api('/api/exams/search?q=' + encodeURIComponent(keyword), { auth: false });
-          if (d.results && d.results.length) renderExamCandidates(keyword, d.results);
-          else examMatchBox.classList.add('hidden');
-        } catch (_) { examMatchBox.classList.add('hidden'); }
-      }, 400);
+      examMatchBox.classList.remove('hidden');
+      fieldArrowBtn.classList.add('open');
+      examSearchDeb = setTimeout(() => loadExamList(keyword), 300);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!examMatchBox.contains(e.target) && e.target !== fieldInput && e.target !== fieldArrowBtn) {
+        closeExamDropdown();
+      }
     });
 
     document.getElementById('writeForm').onsubmit = async (e) => {

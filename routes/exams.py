@@ -37,20 +37,22 @@ def get_best_exam_by_name(cursor, name):
 
 @exams_bp.route('/api/exams/search', methods=['GET'])
 def search_exams():
-    """모임 이름에 시험명이 포함되는지 확인하는 용도 — 부분 일치로 후보를 찾고,
-    같은 이름이 여러 회차로 쌓여 있으면 대표 회차 하나만 골라서 돌려준다.
+    """모임 분야(자격증) 선택용 — 부분 일치로 후보를 찾고, 같은 이름이 여러 회차로
+    쌓여 있으면 대표 회차 하나만 골라서 돌려준다. q가 없으면(드롭다운을 처음 열 때)
+    등록된 전체 자격증 목록을 분류·이름순으로 돌려준다(현재 20종 내외라 페이지네이션 불필요).
     """
     q = request.args.get('q', '').strip()
-    if len(q) < 2:
-        return ok({'results': []})
 
     conn   = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute(
-            'SELECT * FROM exams WHERE name LIKE %s ORDER BY exam_start IS NULL, exam_start ASC',
-            (f'%{q}%',)
-        )
+        if q:
+            cursor.execute(
+                'SELECT * FROM exams WHERE name LIKE %s ORDER BY exam_start IS NULL, exam_start ASC',
+                (f'%{q}%',)
+            )
+        else:
+            cursor.execute('SELECT * FROM exams ORDER BY exam_start IS NULL, exam_start ASC')
         rows = cursor.fetchall()
     finally:
         conn.close()
@@ -61,10 +63,13 @@ def search_exams():
     best_by_name = {name: pick_best_round(group) for name, group in by_name.items()}
 
     today = date.today()
-    results = sorted(
-        best_by_name.values(),
-        key=lambda r: (r['exam_start'] is None, r['exam_start'] or date.max)
-    )[:20]
+    if q:
+        results = sorted(
+            best_by_name.values(),
+            key=lambda r: (r['exam_start'] is None, r['exam_start'] or date.max)
+        )[:20]
+    else:
+        results = sorted(best_by_name.values(), key=lambda r: (r['category'] or '', r['name']))
 
     return ok({'results': [{
         'name':        r['name'],
