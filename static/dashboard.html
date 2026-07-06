@@ -119,6 +119,56 @@
     .study-post-select:focus { border-color: rgba(0,229,255,0.4); }
     .study-post-select:disabled { opacity: .6; }
 
+    /* 미니 달력 */
+    .db-mini-cal {
+      flex: 0 0 260px; min-width: 240px;
+      border-left: 1px solid rgba(0,229,255,0.12);
+      padding-left: 20px;
+      align-self: stretch; display: flex; flex-direction: column; gap: 8px;
+    }
+    .dmc-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+    .dmc-nav span { font-size: 12.5px; font-weight: 700; color: var(--db-cyan); }
+    .dmc-nav button { background: none; border: none; color: var(--db-text2); cursor: pointer; font-size: 15px; padding: 0 4px; line-height: 1; border-radius: 5px; }
+    .dmc-nav button:hover { color: var(--db-cyan); background: rgba(0,229,255,0.1); }
+    .dmc-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+    .dmc-dow { text-align: center; font-size: 9px; color: var(--db-text2); padding-bottom: 4px; font-weight: 600; }
+    .dmc-dow.sun { color: #ff6b6b; } .dmc-dow.sat { color: #5b9bff; }
+    .dmc-cell { position: relative; text-align: center; font-size: 11px; padding: 3px 1px; border-radius: 6px; cursor: default; color: var(--db-text2); line-height: 1.3; }
+    .dmc-cell.today { background: rgba(0,229,255,0.18); color: var(--db-cyan); font-weight: 700; border-radius: 6px; }
+    .dmc-cell.sun { color: rgba(255,107,107,0.7); }
+    .dmc-cell.sat { color: rgba(91,155,255,0.7); }
+    /* 스터디 기간 범위 하이라이트 */
+    .dmc-cell.in-range { background: rgba(168,85,247,0.18); color: var(--db-text); font-weight: 600; border-radius: 0; }
+    .dmc-cell.range-start { border-radius: 6px 0 0 6px; }
+    .dmc-cell.range-end   { border-radius: 0 6px 6px 0; }
+    .dmc-cell.range-single { border-radius: 6px; }
+    .dmc-cell.in-range.today { background: rgba(0,229,255,0.28); color: var(--db-cyan); }
+    .dmc-tooltip {
+      display: none;
+      position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+      background: #1a2035; border: 1px solid rgba(0,229,255,0.3); border-radius: 8px;
+      padding: 6px 9px; min-width: 150px; max-width: 200px; z-index: 100;
+      pointer-events: none; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .dmc-tooltip .dmt-item { font-size: 10.5px; color: var(--db-text); padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .dmc-tooltip .dmt-item:last-child { border-bottom: none; }
+    .dmc-tooltip .dmt-item a { color: var(--db-cyan); text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; }
+    .dmc-tooltip .dmt-item a:hover { text-decoration: underline; }
+    .dmc-tooltip .dmt-badge { font-size: 9px; color: var(--db-text2); margin-top: 1px; }
+    .dmc-cell:hover .dmc-tooltip { display: block; }
+    .dmc-events-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+    .dmc-event-pill {
+      display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+      border-radius: 8px; background: rgba(0,229,255,0.06); border: 1px solid rgba(0,229,255,0.12);
+      font-size: 10.5px; text-decoration: none; color: var(--db-text);
+      transition: background .15s;
+    }
+    .dmc-event-pill:hover { background: rgba(0,229,255,0.12); }
+    .dmc-event-pill .ep-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .dmc-event-pill .ep-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dmc-event-pill .ep-date { font-size: 9.5px; color: var(--db-text2); flex-shrink: 0; }
+    .dmc-empty { font-size: 11px; color: var(--db-text2); text-align: center; padding: 8px 0; }
+
     /* 스트릭 위젯 */
     .streak-wrap { padding: 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
     .streak-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; background: linear-gradient(135deg, rgba(255,100,0,0.2) 0%, rgba(255,50,0,0.1) 100%); border: 1px solid rgba(255,100,0,0.3); }
@@ -265,6 +315,17 @@
             <button class="db-btn start" id="startStudyBtn">▶ 공부 시작</button>
             <button class="db-btn end hidden" id="endStudyBtn">■ 공부 종료</button>
           </div>
+        </div>
+
+        <!-- 스터디 일정 미니 달력 -->
+        <div class="db-mini-cal">
+          <div class="dmc-nav">
+            <button id="dmcPrev">‹</button>
+            <span id="dmcTitle">-</span>
+            <button id="dmcNext">›</button>
+          </div>
+          <div class="dmc-grid" id="dmcGrid"></div>
+          <div class="dmc-events-list" id="dmcEventsList"></div>
         </div>
       </div>
 
@@ -666,6 +727,182 @@
         box.innerHTML = '<p class="muted" style="font-size:12px;">미션을 불러오지 못했어요.</p>';
         mini.innerHTML = '';
       }
+    })();
+
+    /* ── 스터디 일정 미니 달력 ── */
+    (async () => {
+      const KO_DOW = ['일','월','화','수','목','금','토'];
+      const COLORS  = ['#00E5FF','#A855F7','#34D399','#F59E0B','#FF6B35','#5b9bff'];
+      let scheduleData = [];   // [{id, title, recruit_deadline, ...}, ...]
+      let calYear, calMonth;
+
+      const now = new Date();
+      calYear  = now.getFullYear();
+      calMonth = now.getMonth();
+
+      try {
+        scheduleData = (await api('/api/posts/my-schedule')) || [];
+      } catch (_) { scheduleData = []; }
+
+      function dateKey(y, m, d) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+
+      // "2026-07-06" 또는 "Mon, 06 Jul 2026 00:00:00 GMT" 모두 안전하게 파싱
+      function parseLocalDate(str) {
+        if (!str) return null;
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+          const [y, m, d] = str.split('T')[0].split('-').map(Number);
+          return new Date(y, m - 1, d);
+        }
+        const d = new Date(str);
+        return isNaN(d) ? null : d;
+      }
+      function deadlineDateKey(str) {
+        const d = parseLocalDate(str);
+        if (!d) return null;
+        return dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+      }
+      function fmtDeadline(str) {
+        if (!str) return '마감일 미정';
+        const d = parseLocalDate(str);
+        if (!d) return str;
+        const yy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const dow = KO_DOW[d.getDay()];
+        return `${yy}-${mm}-${dd}(${dow}) 마감`;
+      }
+
+      // recruit_deadline 날짜 → 해당 스터디 목록
+      function buildDeadlineMap() {
+        const map = {};
+        scheduleData.forEach((s, i) => {
+          if (!s.recruit_deadline) return;
+          const dk = deadlineDateKey(s.recruit_deadline);
+          if (!dk) return;
+          if (!map[dk]) map[dk] = [];
+          map[dk].push({ ...s, color: COLORS[i % COLORS.length] });
+        });
+        return map;
+      }
+
+      // study_start~study_end 범위의 모든 날짜를 맵으로 구성
+      function buildRangeMap() {
+        const map = {};
+        scheduleData.forEach((s, i) => {
+          if (!s.study_start || !s.study_end) return;
+          const start = parseLocalDate(s.study_start);
+          const end   = parseLocalDate(s.study_end);
+          if (!start || !end || start > end) return;
+          const color = COLORS[i % COLORS.length];
+          const startKey = dateKey(start.getFullYear(), start.getMonth(), start.getDate());
+          const endKey   = dateKey(end.getFullYear(),   end.getMonth(),   end.getDate());
+          const cur = new Date(start);
+          while (cur <= end) {
+            const dk = dateKey(cur.getFullYear(), cur.getMonth(), cur.getDate());
+            if (!map[dk]) map[dk] = [];
+            map[dk].push({ ...s, color, isStart: dk === startKey, isEnd: dk === endKey });
+            cur.setDate(cur.getDate() + 1);
+          }
+        });
+        return map;
+      }
+
+      function fmtD(str) {
+        if (!str) return '?';
+        const d = parseLocalDate(str);
+        if (!d) return str;
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}(${KO_DOW[d.getDay()]})`;
+      }
+
+      function renderCal() {
+        const grid  = document.getElementById('dmcGrid');
+        const title = document.getElementById('dmcTitle');
+        if (!grid) return;
+
+        title.textContent = `${calYear}년 ${calMonth + 1}월`;
+        const rangeMap    = buildRangeMap();
+        const deadlineMap = buildDeadlineMap();
+
+        const today    = new Date();
+        const todayKey = dateKey(today.getFullYear(), today.getMonth(), today.getDate());
+
+        const firstDow    = new Date(calYear, calMonth, 1).getDay();
+        const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+        let html = KO_DOW.map((d, i) =>
+          `<div class="dmc-dow${i===0?' sun':i===6?' sat':''}">${d}</div>`
+        ).join('');
+
+        for (let i = 0; i < firstDow; i++) html += `<div></div>`;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dow  = (firstDow + d - 1) % 7;
+          const dk   = dateKey(calYear, calMonth, d);
+          const evs  = rangeMap[dk] || [];
+          let cls = 'dmc-cell';
+          if (dow === 0) cls += ' sun';
+          if (dow === 6) cls += ' sat';
+          if (dk === todayKey) cls += ' today';
+          if (evs.length) {
+            const isStart  = evs.some(e => e.isStart);
+            const isEnd    = evs.some(e => e.isEnd);
+            const isSingle = isStart && isEnd;
+            cls += isSingle ? ' in-range range-single'
+                 : isStart  ? ' in-range range-start'
+                 : isEnd    ? ' in-range range-end'
+                 :             ' in-range';
+          }
+          // 툴팁: 모집마감일 항목 + 스터디 기간 항목
+          const dlEvs = deadlineMap[dk] || [];
+          const seen = new Set();
+          const tipItems = [
+            ...dlEvs.map(e => ({ id: e.id + '_dl', title: e.title, badge: '모집마감일' })),
+            ...evs.map(e => ({ id: e.id + '_rng', title: e.title, badge: '스터디' })),
+          ].filter(item => { if (seen.has(item.id)) return false; seen.add(item.id); return true; });
+
+          const tipHtml = tipItems.length ? `
+            <div class="dmc-tooltip">
+              ${tipItems.map(item => `
+                <div class="dmt-item">
+                  <a href="/post?id=${item.id.split('_')[0]}">${escapeHtml(item.title)}</a>
+                  <div class="dmt-badge">${item.badge}</div>
+                </div>`).join('')}
+            </div>` : '';
+
+          html += `<div class="${cls}" data-dk="${dk}">${d}${tipHtml}</div>`;
+        }
+        grid.innerHTML = html;
+
+        // 이벤트 목록
+        const list = document.getElementById('dmcEventsList');
+        if (!list) return;
+        if (!scheduleData.length) {
+          list.innerHTML = '<div class="dmc-empty">참여 중인 스터디가 없어요</div>';
+          return;
+        }
+        list.innerHTML = scheduleData.slice(0, 5).map((s, i) => {
+          const color  = COLORS[i % COLORS.length];
+          const period = (s.study_start && s.study_end)
+            ? `${fmtD(s.study_start)} ~ ${fmtD(s.study_end)}`
+            : (s.study_start ? fmtD(s.study_start) + ' ~' : '기간 미정');
+          return `<a class="dmc-event-pill" href="/post?id=${s.id}">
+            <span class="ep-dot" style="background:${color};"></span>
+            <span class="ep-name">${escapeHtml(s.title)}</span>
+            <span class="ep-date">${period}</span>
+          </a>`;
+        }).join('');
+      }
+
+      document.getElementById('dmcPrev').onclick = () => {
+        if (--calMonth < 0) { calMonth = 11; calYear--; }
+        renderCal();
+      };
+      document.getElementById('dmcNext').onclick = () => {
+        if (++calMonth > 11) { calMonth = 0; calYear++; }
+        renderCal();
+      };
+
+      renderCal();
     })();
   </script>
 </body>

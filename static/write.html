@@ -6,8 +6,8 @@
   <title>글쓰기 · 스터디 플랫폼</title>
   <link rel="stylesheet" href="/static/css/style.css">
   <style>
-    .deadline-wrap { position: relative; display: flex; align-items: center; }
-    .deadline-wrap input[type="date"] { width: 100%; padding-right: 38px; }
+    .date-wrap { position: relative; display: flex; align-items: center; }
+    .date-wrap input[type="date"] { width: 100%; padding-right: 38px; }
     .cal-icon-btn {
       position: absolute; right: 8px; background: none; border: none;
       cursor: pointer; font-size: 16px; padding: 0; line-height: 1;
@@ -47,7 +47,13 @@
     .cal-day.sat { color: #5b9bff; }
     .cal-day.today { border: 1px solid rgba(110,168,255,.5); }
     .cal-day.selected { background: linear-gradient(130deg,#6ea8ff,#3f7de0); color:#fff; font-weight:700; }
+    .cal-day.in-range { background: rgba(110,168,255,.15); }
     .cal-day:disabled { opacity: .3; cursor: default; }
+    .date-range-hint {
+      font-size: 11px; color: var(--muted); margin-top: 4px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .date-range-hint .arr { opacity: .5; }
   </style>
 </head>
 <body>
@@ -86,6 +92,34 @@
 
       <!-- 스터디 전용 필드 -->
       <div id="studyFields" class="hidden">
+
+        <!-- 스터디 기간 (시작일 / 종료일) -->
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <div class="field" style="flex:1; min-width:140px;">
+            <label for="studyStart">스터디 시작일</label>
+            <div class="date-wrap">
+              <input type="date" id="studyStart" placeholder="연도-월-일">
+              <button type="button" class="cal-icon-btn" id="startCalBtn" title="날짜 선택">📅</button>
+              <div class="cal-popup-wrap" id="startCalPopup">
+                <div class="cal-popup" id="startCalInner"></div>
+              </div>
+            </div>
+          </div>
+          <div class="field" style="flex:1; min-width:140px;">
+            <label for="studyEnd">스터디 종료일</label>
+            <div class="date-wrap">
+              <input type="date" id="studyEnd" placeholder="연도-월-일">
+              <button type="button" class="cal-icon-btn" id="endCalBtn" title="날짜 선택">📅</button>
+              <div class="cal-popup-wrap" id="endCalPopup">
+                <div class="cal-popup" id="endCalInner"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="date-range-hint" id="dateRangeHint" style="display:none;">
+          <span id="dateRangeText"></span>
+        </div>
+
         <div style="display:flex; gap:12px; flex-wrap:wrap;">
           <div class="field" style="flex:1; min-width:140px;">
             <label for="recruitCount">모집 인원</label>
@@ -93,7 +127,7 @@
           </div>
           <div class="field" style="flex:1; min-width:140px;">
             <label for="recruitDeadline">모집 마감일</label>
-            <div class="deadline-wrap">
+            <div class="date-wrap">
               <input type="date" id="recruitDeadline">
               <button type="button" class="cal-icon-btn" id="deadlineCalBtn" title="날짜 선택">📅</button>
               <div class="cal-popup-wrap" id="deadlineCalPopup">
@@ -102,6 +136,7 @@
             </div>
           </div>
         </div>
+
         <div class="field">
           <label>가입 방식</label>
           <div class="seg" id="joinModeSeg">
@@ -115,7 +150,7 @@
           <input type="text" id="field" placeholder="예: 정보처리기사 실기 (선택)">
         </div>
 
-        <!-- 시험명 매칭 — 분야에 등록된 시험명이 포함되면 후보를 보여주고 직접 고르게 한다 -->
+        <!-- 시험명 매칭 -->
         <div class="exam-match-box hidden" id="examMatchBox">
           <div class="exam-match-title">🗓️ '<b id="examMatchKeyword"></b>' 관련 시험을 찾았어요 — 이 모임이 준비하는 시험을 골라주세요</div>
           <div class="exam-match-list" id="examMatchList"></div>
@@ -143,7 +178,7 @@
     renderNav();
     renderRail('board');
 
-    const editId  = queryParam('id');           // 있으면 수정 모드
+    const editId  = queryParam('id');
     renderBreadcrumb([{ label: '게시판', href: '/board' }, { label: editId ? '글 수정' : '글쓰기' }]);
     const isEdit    = !!editId;
     const alertEl   = document.getElementById('alert');
@@ -175,12 +210,34 @@
       if (btn) setJoinMode(btn.dataset.mode);
     };
 
-    // 수정 모드: 기존 값 로드 + 유형 변경 잠금
+    /* ── 기간 힌트 업데이트 ── */
+    function updateDateHint() {
+      const s = document.getElementById('studyStart').value;
+      const e = document.getElementById('studyEnd').value;
+      const hint = document.getElementById('dateRangeHint');
+      const text = document.getElementById('dateRangeText');
+      if (!s && !e) { hint.style.display = 'none'; return; }
+      hint.style.display = 'flex';
+      if (s && e) {
+        const ds = new Date(s), de = new Date(e);
+        if (de < ds) { text.textContent = '⚠️ 종료일이 시작일보다 앞서 있어요.'; text.style.color = '#ff6b6b'; return; }
+        const days = Math.round((de - ds) / 86400000) + 1;
+        text.textContent = `📅 ${s.slice(5).replace('-','/')} ~ ${e.slice(5).replace('-','/')} · 총 ${days}일`;
+        text.style.color = '';
+      } else {
+        text.textContent = s ? `📅 시작일: ${s.slice(5).replace('-','/')}` : `📅 종료일: ${e.slice(5).replace('-','/')}`;
+        text.style.color = '';
+      }
+    }
+    document.getElementById('studyStart').addEventListener('change', updateDateHint);
+    document.getElementById('studyEnd').addEventListener('change', updateDateHint);
+
+    // 수정 모드: 기존 값 로드
     if (isEdit) {
       document.getElementById('pageTitle').textContent = '글 수정';
       document.getElementById('submitBtn').textContent = '수정';
       document.getElementById('cancelBtn').href = '/post?id=' + editId;
-      document.getElementById('typeField').classList.add('hidden'); // 유형은 변경 불가
+      document.getElementById('typeField').classList.add('hidden');
       (async () => {
         try {
           const p = await api('/api/posts/' + editId, { auth: false });
@@ -195,20 +252,18 @@
           document.getElementById('content').value  = p.content || '';
           if (p.type === 'study') {
             document.getElementById('recruitCount').value = p.recruit_count ?? 0;
-            if (p.recruit_deadline) {
-              const raw = String(p.recruit_deadline);
-              if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-                document.getElementById('recruitDeadline').value = raw.slice(0, 10);
-              } else {
-                const d = new Date(raw);
-                if (!isNaN(d)) {
-                  const y = d.getUTCFullYear();
-                  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-                  const day = String(d.getUTCDate()).padStart(2, '0');
-                  document.getElementById('recruitDeadline').value = `${y}-${m}-${day}`;
-                }
-              }
+            function loadDateField(id, raw) {
+              if (!raw) return;
+              const s = String(raw);
+              document.getElementById(id).value = /^\d{4}-\d{2}-\d{2}/.test(s)
+                ? s.slice(0, 10)
+                : (() => { const d = new Date(s); return isNaN(d) ? '' :
+                    `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; })();
             }
+            loadDateField('studyStart', p.study_start);
+            loadDateField('studyEnd', p.study_end);
+            loadDateField('recruitDeadline', p.recruit_deadline);
+            updateDateHint();
             document.getElementById('field').value = p.field || '';
             setJoinMode(p.join_mode || 'open');
             if (p.linked_exam_name) selectExam({ name: p.linked_exam_name }, null);
@@ -217,8 +272,8 @@
       })();
     }
 
-    /* ── 시험명 매칭 — 분야를 입력할 때마다(디바운스) 후보를 찾아 직접 고르게 한다 ── */
-    let selectedExam = null;   // { name, round, ... } | null
+    /* ── 시험명 매칭 ── */
+    let selectedExam = null;
     const examMatchBox  = document.getElementById('examMatchBox');
     const examMatchList = document.getElementById('examMatchList');
 
@@ -278,8 +333,17 @@
       const btn = document.getElementById('submitBtn');
       const title = document.getElementById('title').value.trim();
       if (!title) { showAlert(alertEl, '제목을 입력해주세요.'); return; }
-      setLoading(btn, true);
 
+      if (curType === 'study') {
+        const ss = document.getElementById('studyStart').value;
+        const se = document.getElementById('studyEnd').value;
+        if (ss && se && new Date(se) < new Date(ss)) {
+          showAlert(alertEl, '종료일이 시작일보다 앞서 있어요.');
+          return;
+        }
+      }
+
+      setLoading(btn, true);
       try {
         if (isEdit) {
           const editBody = {
@@ -290,6 +354,8 @@
           if (curType === 'study') {
             editBody.recruit_count    = +document.getElementById('recruitCount').value || 0;
             editBody.recruit_deadline = document.getElementById('recruitDeadline').value || null;
+            editBody.study_start      = document.getElementById('studyStart').value || null;
+            editBody.study_end        = document.getElementById('studyEnd').value || null;
             editBody.field            = document.getElementById('field').value.trim();
             editBody.linked_exam_name = selectedExam ? selectedExam.name : null;
             editBody.join_mode        = curJoinMode;
@@ -306,6 +372,8 @@
           if (curType === 'study') {
             body.recruit_count    = +document.getElementById('recruitCount').value || 0;
             body.recruit_deadline = document.getElementById('recruitDeadline').value || null;
+            body.study_start      = document.getElementById('studyStart').value || null;
+            body.study_end        = document.getElementById('studyEnd').value || null;
             body.field            = document.getElementById('field').value.trim();
             body.linked_exam_name = selectedExam ? selectedExam.name : null;
             body.join_mode        = curJoinMode;
@@ -321,98 +389,123 @@
   </script>
 
   <script>
-    /* ── 모집 마감일 커스텀 달력 ── */
+    /* ── 달력 팩토리 — 세 개의 날짜 필드 공용 ── */
     (function () {
-      const dateInput = document.getElementById('recruitDeadline');
-      const calBtn    = document.getElementById('deadlineCalBtn');
-      const popupWrap = document.getElementById('deadlineCalPopup');
-      const calInner  = document.getElementById('deadlineCalInner');
+      const KO_DOW = ['일', '월', '화', '수', '목', '금', '토'];
+      const KO_MON = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 
-      const KO_DOW   = ['일', '월', '화', '수', '목', '금', '토'];
-      const KO_MON   = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+      function makeDatePicker(inputId, btnId, popupId, innerId, opts) {
+        opts = opts || {};
+        const dateInput = document.getElementById(inputId);
+        const calBtn    = document.getElementById(btnId);
+        const popupWrap = document.getElementById(popupId);
+        const calInner  = document.getElementById(innerId);
+        if (!dateInput || !calBtn || !popupWrap || !calInner) return;
 
-      let calYear = 0, calMonth = 0;
+        let calYear = 0, calMonth = 0;
 
-      function getSelected() {
-        if (!dateInput.value) return null;
-        const [y, m, d] = dateInput.value.split('-').map(Number);
-        return { y, m: m - 1, d };
-      }
-
-      function render() {
-        const today = new Date();
-        const todayY = today.getFullYear(), todayM = today.getMonth(), todayD = today.getDate();
-        const sel = getSelected();
-
-        const firstDow = new Date(calYear, calMonth, 1).getDay();
-        const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-
-        let html = `
-          <div class="cal-nav">
-            <button type="button" class="cal-nav-btn" id="calPrev">‹</button>
-            <span class="cal-title">${calYear}년 ${KO_MON[calMonth]}</span>
-            <button type="button" class="cal-nav-btn" id="calNext">›</button>
-          </div>
-          <div class="cal-grid">
-            ${KO_DOW.map((d, i) => `<span class="cal-dow${i===0?' sun':i===6?' sat':''}">${d}</span>`).join('')}
-        `;
-
-        for (let i = 0; i < firstDow; i++) html += `<span></span>`;
-
-        for (let d = 1; d <= daysInMonth; d++) {
-          const dow = (firstDow + d - 1) % 7;
-          const isToday = calYear === todayY && calMonth === todayM && d === todayD;
-          const isSel   = sel && calYear === sel.y && calMonth === sel.m && d === sel.d;
-          let cls = 'cal-day';
-          if (dow === 0) cls += ' sun';
-          if (dow === 6) cls += ' sat';
-          if (isToday)   cls += ' today';
-          if (isSel)     cls += ' selected';
-          html += `<button type="button" class="${cls}" data-d="${d}">${d}</button>`;
+        function getSelected() {
+          if (!dateInput.value) return null;
+          const [y, m, d] = dateInput.value.split('-').map(Number);
+          return { y, m: m - 1, d };
         }
 
-        html += `</div>`;
-        calInner.innerHTML = html;
+        function getOtherVal(otherId) {
+          const el = document.getElementById(otherId);
+          return el ? el.value : '';
+        }
 
-        calInner.querySelector('#calPrev').onclick = (e) => {
-          e.stopPropagation();
-          if (--calMonth < 0) { calMonth = 11; calYear--; }
-          render();
-        };
-        calInner.querySelector('#calNext').onclick = (e) => {
-          e.stopPropagation();
-          if (++calMonth > 11) { calMonth = 0; calYear++; }
-          render();
-        };
-        calInner.querySelectorAll('.cal-day').forEach(btn => {
-          btn.onclick = (e) => {
+        function render() {
+          const today = new Date();
+          const todayY = today.getFullYear(), todayM = today.getMonth(), todayD = today.getDate();
+          const sel = getSelected();
+
+          const startVal = getOtherVal(opts.rangeStart || '');
+          const endVal   = getOtherVal(opts.rangeEnd || '');
+          const rangeStart = startVal ? new Date(startVal) : null;
+          const rangeEnd   = endVal   ? new Date(endVal)   : null;
+
+          const firstDow = new Date(calYear, calMonth, 1).getDay();
+          const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+          let html = `
+            <div class="cal-nav">
+              <button type="button" class="cal-nav-btn" id="calPrev_${innerId}">‹</button>
+              <span class="cal-title">${calYear}년 ${KO_MON[calMonth]}</span>
+              <button type="button" class="cal-nav-btn" id="calNext_${innerId}">›</button>
+            </div>
+            <div class="cal-grid">
+              ${KO_DOW.map((d, i) => `<span class="cal-dow${i===0?' sun':i===6?' sat':''}">${d}</span>`).join('')}
+          `;
+
+          for (let i = 0; i < firstDow; i++) html += `<span></span>`;
+
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dow = (firstDow + d - 1) % 7;
+            const thisDate = new Date(calYear, calMonth, d);
+            const isToday  = calYear === todayY && calMonth === todayM && d === todayD;
+            const isSel    = sel && calYear === sel.y && calMonth === sel.m && d === sel.d;
+            const inRange  = rangeStart && rangeEnd && thisDate >= rangeStart && thisDate <= rangeEnd;
+            let cls = 'cal-day';
+            if (dow === 0) cls += ' sun';
+            if (dow === 6) cls += ' sat';
+            if (isToday)   cls += ' today';
+            if (isSel)     cls += ' selected';
+            if (inRange && !isSel) cls += ' in-range';
+            html += `<button type="button" class="${cls}" data-d="${d}">${d}</button>`;
+          }
+
+          html += `</div>`;
+          calInner.innerHTML = html;
+
+          calInner.querySelector(`#calPrev_${innerId}`).onclick = (e) => {
             e.stopPropagation();
-            const mm = String(calMonth + 1).padStart(2, '0');
-            const dd = String(+btn.dataset.d).padStart(2, '0');
-            dateInput.value = `${calYear}-${mm}-${dd}`;
-            close();
+            if (--calMonth < 0) { calMonth = 11; calYear--; }
+            render();
           };
+          calInner.querySelector(`#calNext_${innerId}`).onclick = (e) => {
+            e.stopPropagation();
+            if (++calMonth > 11) { calMonth = 0; calYear++; }
+            render();
+          };
+          calInner.querySelectorAll('.cal-day').forEach(btn => {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              const mm = String(calMonth + 1).padStart(2, '0');
+              const dd = String(+btn.dataset.d).padStart(2, '0');
+              dateInput.value = `${calYear}-${mm}-${dd}`;
+              dateInput.dispatchEvent(new Event('change'));
+              close();
+            };
+          });
+        }
+
+        function open() {
+          document.querySelectorAll('.cal-popup-wrap').forEach(p => { p.style.display = 'none'; });
+          const sel = getSelected();
+          if (sel) { calYear = sel.y; calMonth = sel.m; }
+          else { const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth(); }
+          render();
+          popupWrap.style.display = 'block';
+        }
+
+        function close() { popupWrap.style.display = 'none'; }
+
+        calBtn.onclick = (e) => {
+          e.stopPropagation();
+          popupWrap.style.display === 'block' ? close() : open();
+        };
+
+        document.addEventListener('click', (e) => {
+          if (!popupWrap.contains(e.target) && e.target !== calBtn) close();
         });
       }
 
-      function open() {
-        const sel = getSelected();
-        if (sel) { calYear = sel.y; calMonth = sel.m; }
-        else { const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth(); }
-        render();
-        popupWrap.style.display = 'block';
-      }
-
-      function close() { popupWrap.style.display = 'none'; }
-
-      calBtn.onclick = (e) => {
-        e.stopPropagation();
-        popupWrap.style.display === 'block' ? close() : open();
-      };
-
-      document.addEventListener('click', (e) => {
-        if (!popupWrap.contains(e.target) && e.target !== calBtn) close();
-      });
+      makeDatePicker('studyStart',      'startCalBtn',    'startCalPopup',    'startCalInner',
+        { rangeStart: 'studyStart', rangeEnd: 'studyEnd' });
+      makeDatePicker('studyEnd',        'endCalBtn',      'endCalPopup',      'endCalInner',
+        { rangeStart: 'studyStart', rangeEnd: 'studyEnd' });
+      makeDatePicker('recruitDeadline', 'deadlineCalBtn', 'deadlineCalPopup', 'deadlineCalInner');
     })();
   </script>
 </body>
