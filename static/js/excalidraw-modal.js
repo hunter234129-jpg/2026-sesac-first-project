@@ -62,7 +62,7 @@ let currentSlug = null;
 
 function getSocket(slug) {
   if (presenceSocket && presenceSocket.connected) return presenceSocket;
-  presenceSocket = window.io({ query: { token: (window.Auth && Auth.token) || '' } });
+  presenceSocket = window.io({ query: { token: (window.Auth && window.Auth.token) || '' } });
   presenceSocket.on('connect', () => presenceSocket.emit('join_wiki', { slug }));
   return presenceSocket;
 }

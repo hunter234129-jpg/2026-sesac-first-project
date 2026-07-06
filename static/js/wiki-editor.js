@@ -77,7 +77,9 @@ function makeDrawingBlock({ Node, mergeAttributes }) {
 
         const empty = document.createElement('div');
         empty.className = 'wdb-empty';
-        empty.textContent = '🎨 빈 그림 — "편집"을 눌러 그려보세요';
+        empty.textContent = editor.isEditable
+          ? '🎨 빈 그림 — 눌러서 그려보세요'
+          : '🎨 빈 그림';
 
         const img = document.createElement('img');
         img.className = 'wdb-img';
@@ -101,7 +103,7 @@ function makeDrawingBlock({ Node, mergeAttributes }) {
         }
         render();
 
-        editBtn.addEventListener('click', (e) => {
+        function openDrawingBoard(e) {
           e.preventDefault();
           window.ExcalidrawModal && window.ExcalidrawModal.open({
             slug: window.__wikiEditorSlug,
@@ -113,7 +115,18 @@ function makeDrawingBlock({ Node, mergeAttributes }) {
               }));
             },
           });
-        });
+        }
+
+        editBtn.addEventListener('click', openDrawingBoard);
+        // 편집 가능할 때는 작은 편집 버튼뿐 아니라 그림(또는 빈 그림 안내)을 직접
+        // 클릭해도 그림판이 열려야 자연스럽다 — 버튼을 정확히 못 맞추면 반응이
+        // 없어 보이는 문제가 있었다.
+        if (editor.isEditable) {
+          img.style.cursor   = 'pointer';
+          empty.style.cursor = 'pointer';
+          img.addEventListener('click', openDrawingBoard);
+          empty.addEventListener('click', openDrawingBoard);
+        }
 
         const onPresence = (e) => {
           const p = e.detail;
@@ -271,11 +284,7 @@ function toTiptapDoc(raw) {
 let editor = null;
 let ydoc = null;
 let socket = null;
-let autosaveTimer = null;
-let snapshotTimer = null;
-let dirtySinceSnapshot = false;
-
-const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;   // 5분마다 이력에 자동 스냅샷 기록
+let dirty = false;   // 저장 버튼을 누르기 전까지의 변경 여부(자동저장 없음 — 명시적 저장만 반영)
 
 function mkToolbarBtn(label, title, onClick, extraClass) {
   const btn = document.createElement('button');
@@ -351,8 +360,10 @@ function buildToolbar(editorInstance, { title }) {
 /**
  * 위키 문서를 마운트한다 — 보기/편집 구분 없이 항상 같은 실시간 세션에 join한다.
  * editable=false(뷰어/비로그인)여도 다른 사람의 편집이 새로고침 없이 그대로 반영된다.
- * editable=true(로그인 사용자)일 때만 로컬 편집 + 자동저장/자동 스냅샷을 수행하고,
- * 입력 영역 바로 위에 서식 도구모음을 붙인다.
+ * editable=true(로그인 사용자)일 때만 로컬 편집이 가능하고, 입력 영역 바로 위에
+ * 서식 도구모음을 붙인다. 자동저장은 없다 — save()를 명시적으로 호출해야
+ * wiki_revisions에 반영되고, 그 전까지는 같은 세션에 실시간으로 보이기만 할 뿐
+ * DB에는 남지 않는다(새로고침하면 마지막 저장 시점으로 되돌아감).
  */
 async function mount({ container, slug, initialContent, username, editable, title }) {
   await destroy();
@@ -390,7 +401,7 @@ async function mount({ container, slug, initialContent, username, editable, titl
   // ── 실시간 동기화: 서버는 Yjs 업데이트를 해석하지 않고 방(room) 안에서만 릴레이한다 ──
   // 뷰어도 같은 방에 join하므로 편집 화면을 열지 않아도 남의 변경이 바로 보인다.
   let receivedRemoteSync = false;
-  socket = window.io({ query: { token: (window.Auth && Auth.token) || '' } });
+  socket = window.io({ query: { token: (window.Auth && window.Auth.token) || '' } });
 
   socket.on('connect', () => {
     socket.emit('join_wiki', { slug });
@@ -413,7 +424,7 @@ async function mount({ container, slug, initialContent, username, editable, titl
   ydoc.on('update', (update, origin) => {
     if (origin === 'remote') return;   // 원격에서 받은 걸 그대로 되돌려 보내지 않음
     if (socket && socket.connected) socket.emit('doc_update', { slug, update });
-    if (editable) { dirtySinceSnapshot = true; scheduleAutosave(slug); }
+    if (editable) { dirty = true; window.dispatchEvent(new CustomEvent('wiki:dirty')); }
   });
 
   // 다른 접속자가 이미 있으면 그 실시간 상태를 우선한다(중복 삽입 방지를 위한 짧은 유예).
@@ -421,49 +432,37 @@ async function mount({ container, slug, initialContent, username, editable, titl
   if (fragment.length === 0 && !receivedRemoteSync && initialContent) {
     editor.commands.setContent(toTiptapDoc(initialContent));
   }
-
-  if (editable) startSnapshotTimer(slug);
+  dirty = false;   // 초기 내용 삽입 자체는 "저장 안 된 변경"으로 치지 않는다
 
   return editor;
 }
 
-function scheduleAutosave(slug) {
-  clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(async () => {
-    if (!editor || !slug || !window.api) return;
-    try {
-      await window.api('/api/wiki/' + encodeURIComponent(slug) + '/autosave', {
-        method: 'PATCH', body: { content: JSON.stringify(editor.getJSON()) },
-      });
-      window.dispatchEvent(new CustomEvent('wiki:autosaved'));
-    } catch (_) { /* 자동 저장 실패는 조용히 무시(다음 저장 사이클에서 재시도) */ }
-  }, 2000);
-}
-
-// 저장 버튼 없이도 이력이 의미를 갖도록, 실제 변경이 있었던 경우에만 일정 주기로
-// wiki_revisions에 새 버전을 스냅샷으로 남긴다(요약은 자동 생성).
-function startSnapshotTimer(slug) {
-  clearInterval(snapshotTimer);
-  snapshotTimer = setInterval(async () => {
-    if (!editor || !dirtySinceSnapshot || !window.api) return;
-    try {
-      await window.api('/api/wiki/' + encodeURIComponent(slug), {
-        method: 'PUT',
-        body: { content: JSON.stringify(editor.getJSON()), summary: '자동 스냅샷 · ' + new Date().toLocaleString() },
-      });
-      dirtySinceSnapshot = false;
-      window.dispatchEvent(new CustomEvent('wiki:snapshotted'));
-    } catch (_) { /* 다음 주기에 재시도 */ }
-  }, SNAPSHOT_INTERVAL_MS);
+/** 저장 버튼에서 호출 — 현재 에디터 내용을 새 버전으로 wiki_revisions에 기록한다. */
+async function save(slug, summary) {
+  if (!editor) return null;
+  const data = await window.api('/api/wiki/' + encodeURIComponent(slug), {
+    method: 'PUT',
+    body: { content: JSON.stringify(editor.getJSON()), summary: summary || '수정' },
+  });
+  dirty = false;
+  window.dispatchEvent(new CustomEvent('wiki:saved'));
+  return data;
 }
 
 async function destroy() {
-  clearTimeout(autosaveTimer);
-  clearInterval(snapshotTimer);
-  dirtySinceSnapshot = false;
+  dirty = false;
   if (socket) { socket.emit('leave_wiki', { slug: window.__wikiEditorSlug }); socket.disconnect(); socket = null; }
   if (editor) { editor.destroy(); editor = null; }
   ydoc = null;
+}
+
+// crypto.randomUUID()는 보안 컨텍스트(HTTPS 또는 localhost)에서만 존재한다. 이 프로젝트는
+// 0.0.0.0에 서버를 띄워 LAN IP(예: http://192.168.x.x:5000)로도 접속하는 경우가 흔한데,
+// 그런 일반 HTTP 환경에서는 crypto.randomUUID가 없어서 그냥 호출하면 예외가 나 그림 삽입이
+// 통째로 멈춰버린다. block id는 문서 안에서만 고유하면 되므로 안전한 대체 구현을 쓴다.
+function genBlockId() {
+  if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return 'blk-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 
 // atom 노드(그림/차트) 삽입 직후에는 ProseMirror가 그 노드를 NodeSelection으로 선택된
@@ -472,7 +471,7 @@ async function destroy() {
 function insertDrawing() {
   if (!editor) return;
   editor.chain().focus().insertContent([
-    { type: 'drawingBlock', attrs: { blockId: crypto.randomUUID(), imageUrl: null, version: 0 } },
+    { type: 'drawingBlock', attrs: { blockId: genBlockId(), imageUrl: null, version: 0 } },
     { type: 'paragraph' },
   ]).run();
 }
@@ -486,6 +485,10 @@ function insertChart() {
 }
 
 window.WikiEditor = {
-  mount, destroy, insertDrawing, insertChart, toTiptapDoc,
+  mount, destroy, save, insertDrawing, insertChart, toTiptapDoc,
   getEditor: () => editor,
+  isDirty: () => dirty,
+  // 초안을 처음 생성(POST)할 때처럼 save()가 아닌 경로로 이미 반영한 뒤 다른 페이지로
+  // 이동할 때, beforeunload의 "저장 안 한 변경사항 있음" 확인창이 뜨지 않도록 표시만 지운다.
+  markClean: () => { dirty = false; },
 };

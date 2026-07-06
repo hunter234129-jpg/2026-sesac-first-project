@@ -1,5 +1,9 @@
 """게시판(posts) API 통합테스트."""
+from datetime import date, timedelta
+
 import pytest
+
+from .conftest import _unique_suffix, seed_exam
 
 pytestmark = pytest.mark.integration
 
@@ -107,6 +111,43 @@ def test_create_study_post_rejects_unknown_linked_exam(client, user):
     r = client.post('/api/posts', headers=user['headers'], json={
         'title': '시험연동테스트', 'content': '', 'type': 'study',
         'linked_exam_name': '존재하지않는시험이름_xyz'
+    })
+    assert r.status_code == 404
+    assert r.get_json()['code'] == 'EXAM_NOT_FOUND'
+
+
+def test_create_study_post_links_existing_exam(client, user):
+    exam_name = f'연동시험_{_unique_suffix()}'
+    seed_exam(exam_name, exam_start=date.today() + timedelta(days=14))
+
+    r = client.post('/api/posts', headers=user['headers'], json={
+        'title': '시험연동성공테스트', 'content': '', 'type': 'study',
+        'linked_exam_name': exam_name
+    })
+    assert r.status_code == 201
+    post_id = r.get_json()['data']['id']
+
+    r = client.get(f'/api/posts/{post_id}')
+    assert r.get_json()['data']['linked_exam_name'] == exam_name
+
+
+def test_update_post_can_change_linked_exam(client, user):
+    exam_name = f'수정연동시험_{_unique_suffix()}'
+    seed_exam(exam_name, exam_start=date.today() + timedelta(days=14))
+
+    r = client.post('/api/posts', headers=user['headers'], json={
+        'title': '연동수정테스트', 'content': '', 'type': 'study'
+    })
+    post_id = r.get_json()['data']['id']
+
+    r = client.put(f'/api/posts/{post_id}', headers=user['headers'], json={'linked_exam_name': exam_name})
+    assert r.status_code == 200
+
+    r = client.get(f'/api/posts/{post_id}')
+    assert r.get_json()['data']['linked_exam_name'] == exam_name
+
+    r = client.put(f'/api/posts/{post_id}', headers=user['headers'], json={
+        'linked_exam_name': '없는시험이름_abc'
     })
     assert r.status_code == 404
     assert r.get_json()['code'] == 'EXAM_NOT_FOUND'
