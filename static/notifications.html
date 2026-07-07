@@ -69,7 +69,7 @@
             <span class="ni-dot"></span>
             <div class="ni-body">
               <div class="ni-text">${escapeHtml(n.content)}</div>
-              <div class="ni-date">${(n.created_at || '').replace('T',' ').slice(0,16)}</div>
+              <div class="ni-date">${fmtDateTime(n.created_at)}</div>
             </div>
             <span class="ni-type">${typeLabel[n.type] || n.type}</span>
           </div>`).join('');

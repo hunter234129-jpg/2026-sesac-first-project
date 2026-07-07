@@ -122,10 +122,10 @@ def study_stats():
     try:
         if period == 'week':
             cursor.execute(
-                '''SELECT YEARWEEK(started_at, 1)      AS period_key,
-                          MIN(DATE(started_at))         AS week_start,
-                          SUM(duration_sec)             AS total_sec,
-                          COUNT(*)                      AS session_count
+                '''SELECT YEARWEEK(started_at, 1)                    AS period_key,
+                          DATE_FORMAT(MIN(DATE(started_at)), '%%Y-%%m-%%d') AS week_start,
+                          SUM(duration_sec)                           AS total_sec,
+                          COUNT(*)                                    AS session_count
                    FROM study_sessions
                    WHERE user_id = %s
                      AND ended_at IS NOT NULL
@@ -137,9 +137,9 @@ def study_stats():
             )
         else:
             cursor.execute(
-                '''SELECT DATE(started_at)  AS period_key,
-                          SUM(duration_sec) AS total_sec,
-                          COUNT(*)          AS session_count
+                '''SELECT DATE_FORMAT(started_at, '%%Y-%%m-%%d') AS period_key,
+                          SUM(duration_sec)                      AS total_sec,
+                          COUNT(*)                               AS session_count
                    FROM study_sessions
                    WHERE user_id = %s
                      AND ended_at IS NOT NULL

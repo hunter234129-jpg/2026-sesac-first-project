@@ -235,7 +235,7 @@
             <span class="wm-sep">|</span>
             <span>조회 ${w.view_count}</span>
             <span class="wm-sep">|</span>
-            <span>${(w.last_updated||'').replace('T',' ').slice(0,16)}</span>
+            <span>${fmtDateTime(w.last_updated)}</span>
             ${canEdit ? '<span class="wm-sep">|</span><span class="wm-save" id="syncStatus"></span>' : ''}
           </div>
           <div id="editorMount" class="tiptap-mount"></div>`;
@@ -381,7 +381,7 @@
             <span class="hr-ver">v${h.version}</span>
             <div class="hr-main">
               <div class="hr-summary">${escapeHtml(h.summary || '(요약 없음)')}</div>
-              <div class="hr-sub">${escapeHtml(h.author)} · ${(h.created_at||'').replace('T',' ').slice(0,16)}</div>
+              <div class="hr-sub">${escapeHtml(h.author)} · ${fmtDateTime(h.created_at)}</div>
             </div>
             ${(Auth.isLoggedIn && h.version !== maxVer)
               ? `<button class="btn btn-ghost" data-rev="${h.id}" data-ver="${h.version}" style="padding:5px 12px;">이 버전으로</button>`

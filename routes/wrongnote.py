@@ -97,7 +97,7 @@ def analyze_weakness():
     def run():
         text = call_gemini(
             [{'role': 'user', 'content': _analysis_prompt(rows)}],
-            system=ANALYSIS_SYSTEM, max_tokens=2048, temperature=0.4,
+            system=ANALYSIS_SYSTEM, max_tokens=8192, temperature=0.4,
         )
         return ok({'analysis': text, 'note_count': len(rows)})
 

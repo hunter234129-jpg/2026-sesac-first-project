@@ -258,6 +258,24 @@ function startLivePolling() {
   _liveTimer = setInterval(updateLive, 20000);
 }
 
+/** 서버가 주는 날짜 문자열을 "YYYY-MM-DD HH:MM"로 통일해서 표시한다.
+ * Flask의 기본 JSON 인코더는 datetime을 ISO가 아니라 "Tue, 07 Jul 2026 00:19:45 GMT" 같은
+ * RFC 822 형식으로 내보낸다 — 예전에 여기저기서 쓰던 `.replace('T',' ').slice(0,16)`은
+ * ISO 형식(구분자 "T") 가정이라 RFC 822엔 "T"가 없고 대신 "Tue"의 T가 지워져서
+ * "ue, 07 Jul 2026"처럼 깨져 보였다. new Date()로 제대로 파싱하면 이 문제도 없고,
+ * 저장된 값이 UTC라 브라우저 로컬 시간(한국이면 KST)으로 자동 변환되는 것도 덤으로 맞다. */
+function fmtDateTime(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  if (isNaN(d)) return String(str).replace('T', ' ').slice(0, 16);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+/** 시간 없이 날짜만("YYYY-MM-DD") 필요할 때 — 목록에서 가입일/작성일 표시용. */
+function fmtDate(str) {
+  return fmtDateTime(str).slice(0, 10);
+}
+
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => (
     { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
