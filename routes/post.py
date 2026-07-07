@@ -450,43 +450,94 @@ def get_post_chat(id):
     before = request.args.get('before', type=int)   # 이 메시지 id보다 이전 것만(더 불러오기)
     size   = max(1, min(100, request.args.get('size', 50, type=int)))
 
+    # ── Phase 1: 권한 확인 + 작성자 시스템 메시지 설정 ──────────────────────
     conn   = get_db()
     cursor = conn.cursor()
     try:
+        # posts.created_at을 여기서 같이 가져와 별도 쿼리 없이 post_ts로 활용
+        cursor.execute(
+            'SELECT user_id, created_at FROM posts WHERE id = %s AND deleted_at IS NULL', (id,)
+        )
+        post_row = cursor.fetchone()
+        if not post_row:
+            return err('게시글을 찾을 수 없습니다', 'NOT_FOUND', 404)
+        is_author = (post_row['user_id'] == g.user_id)
+        post_ts   = post_row['created_at']
+
         cursor.execute(
             'SELECT status, left_at FROM post_members WHERE post_id = %s AND user_id = %s',
             (id, g.user_id)
         )
         member = cursor.fetchone()
+
+        if is_author:
+            if not member:
+                cursor.execute(
+                    "INSERT INTO post_members (post_id, user_id, status) VALUES (%s, %s, 'active')",
+                    (id, g.user_id)
+                )
+
+            cursor.execute('SELECT username FROM users WHERE id=%s', (g.user_id,))
+            urow      = cursor.fetchone()
+            uname     = urow['username'] if urow else '작성자'
+            join_msg  = f'{uname}님이 들어왔습니다.'
+
+            cursor.execute(
+                "SELECT id FROM post_chat_messages"
+                " WHERE post_id=%s AND msg_type='system' AND content=%s LIMIT 1",
+                (id, join_msg)
+            )
+            existing = cursor.fetchone()
+            if existing:
+                cursor.execute(
+                    "UPDATE post_chat_messages SET created_at=%s WHERE id=%s",
+                    (post_ts, existing['id'])
+                )
+            else:
+                cursor.execute(
+                    "INSERT INTO post_chat_messages (post_id, sender_id, msg_type, content, created_at)"
+                    " VALUES (%s, NULL, 'system', %s, %s)",
+                    (id, join_msg, post_ts)
+                )
+            conn.commit()
+            member = {'status': 'active', 'left_at': None}
+
         if not member or member['status'] == 'pending':
             return err('모임 멤버만 채팅 기록을 볼 수 있습니다', 'NOT_MEMBER', 403)
 
-        # pm.id/pm.created_at처럼 테이블 별칭을 꼭 붙여야 한다 — users에도 id/created_at이
-        # 있어서 별칭 없이 쓰면 "Ambiguous column" SQL 에러가 난다.
+        left_at   = member['left_at']
+        is_active = member['status'] == 'active' and not left_at
+    finally:
+        conn.close()
+
+    # ── Phase 2: 메시지 조회 (새 연결 — Phase 1 커서 상태와 완전히 분리) ────
+    # pm.id/pm.created_at처럼 테이블 별칭을 꼭 붙여야 한다 — users에도 id/created_at이
+    # 있어서 별칭 없이 쓰면 "Ambiguous column" SQL 에러가 난다.
+    conn2   = get_db()
+    cursor2 = conn2.cursor()
+    try:
         wheres, params = ['pm.post_id = %s'], [id]
-        if member['left_at']:
+        if left_at:
             wheres.append('pm.created_at <= %s')
-            params.append(member['left_at'])
+            params.append(left_at)
         if before:
             wheres.append('pm.id < %s')
             params.append(before)
 
-        cursor.execute(
+        cursor2.execute(
             f'''SELECT pm.id, pm.sender_id, u.username, u.avatar_id, pm.msg_type, pm.content,
                        pm.file_url, pm.file_name, pm.file_size, pm.mime_type, pm.created_at
                 FROM post_chat_messages pm
                 LEFT JOIN users u ON pm.sender_id = u.id
                 WHERE {" AND ".join(wheres)}
-                ORDER BY pm.id DESC LIMIT %s''',
+                ORDER BY pm.created_at DESC, pm.id DESC LIMIT %s''',
             params + [size]
         )
-        rows = cursor.fetchall()
+        rows = list(reversed(cursor2.fetchall()))  # 오래된 순으로 뒤집어 반환
     finally:
-        conn.close()
+        conn2.close()
 
-    rows = list(reversed(rows))  # cursor.fetchall()은 튜플을 반환해서 in-place reverse()가 안 됨. 오래된 순으로 정렬
-    return ok({'messages': rows, 'is_active_member': member['status'] == 'active' and member['left_at'] is None,
-               'has_more': len(rows) == size})
+    return ok({'messages': rows, 'is_active_member': is_active, 'has_more': len(rows) == size})
 
 
 @post_bp.route('/api/posts/<int:id>/join', methods=['POST'])

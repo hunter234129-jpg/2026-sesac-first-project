@@ -7,6 +7,7 @@ sid_user(소켓 sid -> user_id)를 관리하고 있고, Flask-SocketIO는 같은
 핸들러가 여러 개면 나중에 import되는 쪽이 덮어써버리기 때문에(이 프로젝트에서
 이미 한 번 겪은 버그) 새로 등록하지 않고 그 상태를 그대로 재사용한다.
 """
+from datetime import datetime
 from flask import request
 from flask_socketio import join_room, leave_room, emit
 
@@ -20,6 +21,13 @@ def room_name(post_id):
 
 
 def _is_active_member(cursor, post_id, user_id):
+    # 게시글 작성자는 post_members 행 없이도 항상 활성 멤버로 허용
+    cursor.execute(
+        "SELECT user_id FROM posts WHERE id=%s AND deleted_at IS NULL", (post_id,)
+    )
+    post_row = cursor.fetchone()
+    if post_row and post_row['user_id'] == user_id:
+        return True
     cursor.execute(
         "SELECT 1 FROM post_members WHERE post_id=%s AND user_id=%s AND status='active' AND left_at IS NULL",
         (post_id, user_id)
@@ -40,12 +48,14 @@ def post_system_message(post_id, text):
         )
         conn.commit()
         msg_id = cursor.lastrowid
+        created_at = datetime.now().isoformat()
     finally:
         conn.close()
 
     socketio.emit('post_message', {
         'id': msg_id, 'post_id': post_id, 'sender_id': None,
         'username': None, 'avatar_id': None, 'msg_type': 'system', 'content': text,
+        'created_at': created_at,
     }, room=room_name(post_id))
 
 
@@ -58,6 +68,19 @@ def on_join_post_chat(data):
     conn   = get_db()
     cursor = conn.cursor()
     try:
+        # 게시글 작성자 여부 확인
+        cursor.execute(
+            'SELECT user_id FROM posts WHERE id=%s AND deleted_at IS NULL', (post_id,)
+        )
+        post_row = cursor.fetchone()
+        is_author = post_row and post_row['user_id'] == user_id
+
+        cursor.execute(
+            'SELECT status, left_at FROM post_members WHERE post_id=%s AND user_id=%s',
+            (post_id, user_id)
+        )
+        member_row = cursor.fetchone()
+
         if not _is_active_member(cursor, post_id, user_id):
             return
     finally:
@@ -103,13 +126,14 @@ def on_post_message(data):
         )
         conn.commit()
         msg_id = cursor.lastrowid
+        created_at = datetime.now().isoformat()
     finally:
         conn.close()
 
     socketio.emit('post_message', {
         'id': msg_id, 'post_id': post_id, 'sender_id': sender_id,
         'username': sender['username'], 'avatar_id': sender['avatar_id'],
-        'msg_type': 'text', 'content': text,
+        'msg_type': 'text', 'content': text, 'created_at': created_at,
     }, room=room_name(post_id))
 
 
@@ -147,12 +171,13 @@ def on_post_file(data):
         )
         conn.commit()
         msg_id = cursor.lastrowid
+        created_at = datetime.now().isoformat()
     finally:
         conn.close()
 
     socketio.emit('post_message', {
         'id': msg_id, 'post_id': post_id, 'sender_id': sender_id,
         'username': sender['username'], 'avatar_id': sender['avatar_id'],
-        'msg_type': 'file', 'content': content,
+        'msg_type': 'file', 'content': content, 'created_at': created_at,
         'file_url': file_url, 'file_name': file_name, 'file_size': file_size, 'mime_type': mime_type,
     }, room=room_name(post_id))

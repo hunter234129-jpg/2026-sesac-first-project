@@ -15,6 +15,29 @@
     .dday-chip b { color: var(--text, #e8edf8); font-family: monospace; }
     .dday-chip.soon { background: rgba(255,68,102,0.1); border-color: rgba(255,68,102,0.3); }
     .dday-chip.soon b { color: #FF4466; }
+    .clan-chat-date {
+      align-self: center; font-size: 11.5px; color: var(--muted, #7a8ba8);
+      background: rgba(255,255,255,.05); padding: 4px 14px; border-radius: 99px;
+      border: 1px solid rgba(255,255,255,.07); margin: 4px 0; flex-shrink: 0;
+    }
+    .cf-emoji-btn {
+      flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.04); font-size: 18px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; transition: background .15s;
+    }
+    .cf-emoji-btn:hover { background: rgba(0,229,255,.1); border-color: rgba(0,229,255,.3); }
+    .cf-emoji-panel {
+      position: relative; background: rgba(13,18,32,.96); border: 1px solid rgba(255,255,255,.1);
+      border-radius: 14px; padding: 10px; margin-bottom: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5); backdrop-filter: blur(16px);
+      display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
+    }
+    .cf-emoji-panel.hidden { display: none; }
+    .cf-emoji-panel button {
+      font-size: 22px; background: none; border: none; cursor: pointer; padding: 5px;
+      border-radius: 8px; transition: background .12s; line-height: 1;
+    }
+    .cf-emoji-panel button:hover { background: rgba(255,255,255,.1); }
   </style>
 </head>
 <body>
@@ -45,16 +68,32 @@
       <div class="rank-list" id="memberList"></div>
     </div>
 
+    <!-- 파일 용량 초과 다이얼로그 -->
+    <div class="cf-dialog-overlay hidden" id="fileSizeDialog">
+      <div class="cf-dialog">
+        <p class="cf-dialog-title">⚠️ 파일 용량 초과</p>
+        <p class="cf-dialog-body">해당 파일은 200MB가 넘었습니다.<br>200MB 이하의 파일만 전송할 수 있어요.</p>
+        <button class="cf-dialog-ok" onclick="document.getElementById('fileSizeDialog').classList.add('hidden')">확인</button>
+      </div>
+    </div>
+
     <!-- 모임 채팅 — 카카오톡 오픈채팅 방식, 가입한 멤버만 접근·영구 보존 -->
     <div class="card section clan-chat-card hidden" id="chatCard" style="margin-top:20px;">
-      <div class="section-head"><h2>💬 모임 채팅</h2><span class="live-dot" id="chatLiveDot" title="실시간 연결됨" style="display:none;">●</span></div>
+      <div class="section-head">
+        <h2>💬 모임 채팅</h2>
+        <span class="live-dot" id="chatLiveDot" title="실시간 연결됨" style="display:none;">●</span>
+        <button type="button" class="btn btn-ghost hidden" id="chatLeaveBtn"
+          style="padding:5px 14px; font-size:12px; margin-left:auto; color:#ff6b6b; border-color:rgba(255,107,107,.3);">나가기</button>
+      </div>
       <div class="clan-chat-log" id="chatLog">
         <button type="button" class="btn btn-ghost clan-chat-more hidden" id="loadMoreBtn">이전 메시지 더보기</button>
       </div>
+      <div class="cf-emoji-panel hidden" id="emojiPanel"></div>
       <form class="clan-chat-form" id="chatForm">
+        <button type="button" class="cf-emoji-btn" id="chatEmojiBtn" title="이모지">😊</button>
         <button type="button" class="cf-file-btn" id="chatFileBtn" title="파일 첨부">＋</button>
         <input type="file" id="chatFileInput" hidden>
-        <input type="text" id="chatTextInput" placeholder="메시지를 입력하세요" maxlength="1000" autocomplete="off">
+        <textarea id="chatTextInput" placeholder="메시지를 입력하세요" maxlength="1000" autocomplete="off" rows="1"></textarea>
         <button type="submit" class="btn btn-primary">전송</button>
       </form>
       <p class="muted clan-chat-readonly hidden" id="chatReadonlyNote" style="font-size:12px; text-align:center; margin-top:8px;">
@@ -142,6 +181,7 @@
         renderBreadcrumb([{ label: '게시판', href: '/board' }, { label: p.title }]);
         const isOwner = Auth.isLoggedIn && p.user_id === myId;
         const isStudy = p.type === 'study';
+        postOwnerId = p.user_id;
 
         // 실질적 마감 여부 (status, 마감일, 정원 초과 모두 고려)
         const isEffectivelyClosed = isStudy && (() => {
@@ -302,7 +342,6 @@
               <div class="rank-name">
                 ${isLeader ? '👑 ' : ''}${escapeHtml(m.username)}${isMe ? ' <span style="font-size:11px;color:var(--muted,#9aa4c2);">(본인)</span>' : ''}
               </div>
-              <div class="rank-time">${m.contribution_score}점</div>
             </div>`;
         }).join('');
 
@@ -512,6 +551,69 @@
     let chatSocket = null;
     let oldestMsgId = null;
     let chatIsActiveMember = false;
+    let lastRenderedDate = null;  // 마지막으로 렌더링된 메시지의 날짜('YYYY-MM-DD')
+    let postOwnerId = null;       // 게시글 작성자 ID (나가기 버튼 노출 여부 판단용)
+
+    const DOW_KO = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
+    function parseMsgDate(createdAt) {
+      if (!createdAt) return null;
+      const s = String(createdAt);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        // "2026-07-07T09:00:00" 또는 "2026-07-07 09:00:00"
+        const [datePart, timePart = ''] = s.replace('T', ' ').split(' ');
+        const [y, mo, dy] = datePart.split('-').map(Number);
+        const [h = 0, mi = 0] = timePart.split(':').map(Number);
+        return new Date(y, mo - 1, dy, h, mi);
+      }
+      // Flask HTTP date "Mon, 07 Jul 2026 09:00:00 GMT"
+      const dt = new Date(s);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    function msgDateStr(createdAt) {
+      const dt = parseMsgDate(createdAt);
+      if (!dt) return null;
+      const y  = dt.getFullYear();
+      const mo = String(dt.getMonth() + 1).padStart(2, '0');
+      const dy = String(dt.getDate()).padStart(2, '0');
+      return `${y}-${mo}-${dy}`;
+    }
+
+    function msgTimeStr(createdAt) {
+      const dt = parseMsgDate(createdAt);
+      if (!dt) return '';
+      const h   = dt.getHours();
+      const min = dt.getMinutes();
+      const ampm = h < 12 ? '오전' : '오후';
+      const h12  = h % 12 || 12;
+      return `${ampm} ${h12}:${String(min).padStart(2, '0')}`;
+    }
+
+    function dateSeparatorHtml(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dow = DOW_KO[new Date(y, m - 1, d).getDay()];
+      return `<div class="clan-chat-date" data-date="${dateStr}">📅 ${y}년 ${m}월 ${d}일 ${dow}</div>`;
+    }
+
+    function formatFileSize(bytes) {
+      if (!bytes || bytes <= 0) return '';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+      return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
+    function buildMsgHtml(msgs, prevDate) {
+      let html = '';
+      let cur = prevDate;
+      for (const m of msgs) {
+        const d = msgDateStr(m.created_at);
+        if (d && d !== cur) { html += dateSeparatorHtml(d); cur = d; }
+        html += chatBubbleHtml(m);
+      }
+      return { html, lastDate: cur };
+    }
 
     function chatBubbleHtml(m) {
       if (m.msg_type === 'system') {
@@ -521,18 +623,33 @@
       let body;
       if (m.msg_type === 'file') {
         const isImage = (m.mime_type || '').startsWith('image/');
-        body = isImage
-          ? `<a href="${m.file_url}" target="_blank" rel="noopener noreferrer"><img class="cf-file-img" src="${m.file_url}" alt="${escapeHtml(m.file_name)}"></a>`
-          : `<a href="${m.file_url}" target="_blank" rel="noopener noreferrer" class="cf-file-link">📎 ${escapeHtml(m.file_name)}</a>`;
+        if (isImage) {
+          body = `<a href="${m.file_url}" target="_blank" rel="noopener noreferrer"><img class="cf-file-img" src="${m.file_url}" alt="${escapeHtml(m.file_name)}"></a>`;
+        } else {
+          const sizeStr = m.file_size ? `용량: ${formatFileSize(m.file_size)}` : '';
+          body = `<a href="${m.file_url}" download="${escapeHtml(m.file_name || '')}" target="_blank" rel="noopener noreferrer" class="cf-file-card">
+            <div class="cfc-icon">↓</div>
+            <div class="cfc-info">
+              <div class="cfc-name">${escapeHtml(m.file_name || '파일')}</div>
+              ${sizeStr ? `<div class="cfc-size">${sizeStr}</div>` : ''}
+            </div>
+          </a>`;
+        }
       } else {
         body = escapeHtml(m.content);
       }
+      const timeEl = msgTimeStr(m.created_at)
+        ? `<div class="ccr-time">${msgTimeStr(m.created_at)}</div>` : '';
       return `
         <div class="clan-chat-row ${mine ? 'mine' : ''}" data-id="${m.id}">
           ${!mine ? avatarChip(m.avatar_id, 26) : ''}
           <div class="ccr-bubble-wrap">
             ${!mine ? `<div class="ccr-name">${escapeHtml(m.username)}</div>` : ''}
-            <div class="ccr-bubble ${m.msg_type === 'file' ? 'file' : ''}">${body}</div>
+            <div class="ccr-msg-row">
+              ${mine ? timeEl : ''}
+              <div class="ccr-bubble ${m.msg_type === 'file' ? 'file' : ''}">${body}</div>
+              ${!mine ? timeEl : ''}
+            </div>
           </div>
         </div>`;
     }
@@ -541,16 +658,26 @@
       if (!msgs.length) return;
       const log = document.getElementById('chatLog');
       const moreBtn = document.getElementById('loadMoreBtn');
-      const html = msgs.map(chatBubbleHtml).join('');
+
       if (prepend) {
+        // 오래된 메시지를 위로 추가 — 내부 날짜 구분선 생성
+        const { html, lastDate } = buildMsgHtml(msgs, null);
+        // 마지막 추가 메시지 날짜가 현재 첫 번째 메시지 날짜와 같으면 중복 구분선 제거
+        if (lastDate) {
+          const firstSep = log.querySelector('.clan-chat-date');
+          if (firstSep && firstSep.dataset.date === lastDate) firstSep.remove();
+        }
         const beforeHeight = log.scrollHeight;
         moreBtn.insertAdjacentHTML('afterend', html);
         log.scrollTop = log.scrollHeight - beforeHeight;
         oldestMsgId = msgs[0].id;
       } else {
+        // 최신 메시지를 아래에 추가 — lastRenderedDate 기준으로 구분선 삽입
+        const { html, lastDate } = buildMsgHtml(msgs, lastRenderedDate);
         log.insertAdjacentHTML('beforeend', html);
         log.scrollTop = log.scrollHeight;
         if (oldestMsgId === null) oldestMsgId = msgs[0].id;
+        if (lastDate) lastRenderedDate = lastDate;
       }
     }
 
@@ -562,6 +689,9 @@
       appendMessages(d.messages, !!before);
       document.getElementById('chatForm').style.display = chatIsActiveMember ? 'flex' : 'none';
       document.getElementById('chatReadonlyNote').classList.toggle('hidden', chatIsActiveMember);
+      // 나가기 버튼: 활성 멤버이고 글 작성자가 아닐 때만 표시
+      const showLeave = chatIsActiveMember && myId && myId !== postOwnerId;
+      document.getElementById('chatLeaveBtn').classList.toggle('hidden', !showLeave);
     }
 
     function connectChatSocket() {
@@ -587,6 +717,7 @@
         chatIsActiveMember = false;
         document.getElementById('chatForm').style.display = 'none';
         document.getElementById('chatReadonlyNote').classList.remove('hidden');
+        document.getElementById('chatLeaveBtn').classList.add('hidden');
       });
     }
 
@@ -605,24 +736,99 @@
       connectChatSocket();
     }
 
+    document.getElementById('chatLeaveBtn').onclick = async () => {
+      if (!confirm('모임에서 나가시겠습니까?\n나간 이후에는 채팅 기록을 볼 수 없어요.')) return;
+      try {
+        await api(`/api/posts/${postId}/leave`, { method: 'DELETE' });
+        // 탈퇴 성공 → 서버가 post_kicked 이벤트 + "나갔습니다" 시스템 메시지 emit
+        loadPost();
+      } catch (err) {
+        showAlert(alertEl, err.message);
+      }
+    };
+
     document.getElementById('loadMoreBtn').onclick = () => loadChatHistory(oldestMsgId);
+
+    const chatTextInput = document.getElementById('chatTextInput');
+
+    function sendChatMessage() {
+      const text = chatTextInput.value.trim();
+      if (!text || !chatSocket) return;
+      chatSocket.emit('post_message', { post_id: Number(postId), message: text });
+      chatTextInput.value = '';
+      chatTextInput.style.height = '';  // 높이 초기화
+    }
+
+    // textarea 내용에 따라 높이 자동 조절
+    chatTextInput.addEventListener('input', () => {
+      chatTextInput.style.height = '';
+      chatTextInput.style.height = Math.min(chatTextInput.scrollHeight, 120) + 'px';
+    });
+
+    // Enter → 전송 / Shift+Enter → 줄바꿈
+    chatTextInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
 
     document.getElementById('chatForm').onsubmit = (e) => {
       e.preventDefault();
-      const input = document.getElementById('chatTextInput');
-      const text = input.value.trim();
-      if (!text || !chatSocket) return;
-      chatSocket.emit('post_message', { post_id: Number(postId), message: text });
-      input.value = '';
+      sendChatMessage();
     };
+
+    // ── 이모지 피커 ────────────────────────────────────────────────────────
+    const EMOJIS = [
+      '😀','😄','😂','🤣','😊','😍','🥰','😘',
+      '😎','🤩','😏','😢','😭','😤','🤔','😅',
+      '👍','👎','👏','🙏','💪','🤝','✌️','🤞',
+      '❤️','🔥','⭐','🎉','✅','❌','💯','😱',
+      '🎊','📝','☕','🍀','🎯','💡','🚀','🌈',
+    ];
+    const emojiPanel = document.getElementById('emojiPanel');
+    const chatEmojiBtn = document.getElementById('chatEmojiBtn');
+
+    // 패널 버튼 생성 (한 번만)
+    emojiPanel.innerHTML = EMOJIS.map(e =>
+      `<button type="button" data-emoji="${e}">${e}</button>`
+    ).join('');
+
+    chatEmojiBtn.onclick = (ev) => {
+      ev.stopPropagation();
+      emojiPanel.classList.toggle('hidden');
+    };
+
+    emojiPanel.onclick = (ev) => {
+      const emoji = ev.target.closest('[data-emoji]')?.dataset.emoji;
+      if (!emoji) return;
+      const pos = chatTextInput.selectionStart ?? chatTextInput.value.length;
+      chatTextInput.value = chatTextInput.value.slice(0, pos) + emoji + chatTextInput.value.slice(pos);
+      chatTextInput.selectionStart = chatTextInput.selectionEnd = pos + emoji.length;
+      chatTextInput.dispatchEvent(new Event('input'));  // 높이 재계산
+      chatTextInput.focus();
+      emojiPanel.classList.add('hidden');
+    };
+
+    document.addEventListener('click', (ev) => {
+      if (!emojiPanel.contains(ev.target) && ev.target !== chatEmojiBtn) {
+        emojiPanel.classList.add('hidden');
+      }
+    });
 
     const chatFileBtn   = document.getElementById('chatFileBtn');
     const chatFileInput = document.getElementById('chatFileInput');
     chatFileBtn.onclick = () => chatFileInput.click();
+    const MAX_FILE_BYTES = 200 * 1024 * 1024; // 200 MB
+
     chatFileInput.onchange = async () => {
       const file = chatFileInput.files[0];
       chatFileInput.value = '';
       if (!file || !chatSocket) return;
+      if (file.size > MAX_FILE_BYTES) {
+        document.getElementById('fileSizeDialog').classList.remove('hidden');
+        return;
+      }
       chatFileBtn.disabled = true;
       try {
         const fd = new FormData();
