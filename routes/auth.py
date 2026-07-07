@@ -266,6 +266,55 @@ def get_my_wiki():
     })
 
 
+@auth_bp.route('/api/auth/users/<int:user_id>', methods=['GET'])
+@login_required
+def get_public_profile(user_id):
+    conn   = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            '''SELECT id, username, avatar_id, interest_keywords, created_at
+               FROM users WHERE id = %s AND is_deleted = 0''',
+            (user_id,)
+        )
+        user = cursor.fetchone()
+        if not user:
+            return err('사용자를 찾을 수 없습니다', 'NOT_FOUND', 404)
+
+        cursor.execute(
+            '''SELECT COALESCE(SUM(duration_sec), 0) AS total_sec, COUNT(*) AS cnt
+               FROM study_sessions WHERE user_id = %s AND duration_sec IS NOT NULL''',
+            (user_id,)
+        )
+        study = cursor.fetchone()
+
+        cursor.execute('SELECT COUNT(*) AS cnt FROM user_achievements WHERE user_id = %s', (user_id,))
+        badge_count = cursor.fetchone()['cnt']
+
+        cursor.execute('SELECT COUNT(*) AS cnt FROM posts WHERE user_id = %s AND deleted_at IS NULL', (user_id,))
+        post_count = cursor.fetchone()['cnt']
+
+        cursor.execute('SELECT COUNT(DISTINCT wiki_id) AS cnt FROM wiki_revisions WHERE author_id = %s', (user_id,))
+        wiki_count = cursor.fetchone()['cnt']
+    finally:
+        conn.close()
+
+    keywords = [kw.strip() for kw in (user['interest_keywords'] or '').split(',') if kw.strip()]
+
+    return ok({
+        'id':                  user['id'],
+        'username':            user['username'],
+        'avatar_id':           user['avatar_id'],
+        'interest_keywords':   keywords,
+        'joined_at':           user['created_at'],
+        'total_study_seconds': int(study['total_sec']),
+        'session_count':       study['cnt'],
+        'badge_count':         badge_count,
+        'post_count':          post_count,
+        'wiki_count':          wiki_count,
+    })
+
+
 @auth_bp.route('/api/auth/verify', methods=['POST'])
 @login_required
 def verify_identity():

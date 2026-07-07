@@ -49,6 +49,16 @@ const AVATARS = [
   { emoji: '🐮', bg: '#D0BFFF' }, { emoji: '🐷', bg: '#FCC2D7' }
 ];
 
+/* 초를 "Xh Ym" 또는 "Ym"으로 (stats.html의 fmtDur와 동일한 규칙) */
+function fmtDur(sec) {
+  sec = +sec || 0;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor(sec % 3600 / 60);
+  if (h && m) return `${h}시간 ${m}분`;
+  if (h)      return `${h}시간`;
+  return `${m}분`;
+}
+
 function formatFileSize(bytes) {
   if (!bytes || bytes <= 0) return '';
   if (bytes < 1024) return bytes + ' B';
@@ -109,6 +119,68 @@ window.startChatWidget = function () {
     return el;
   }
 
+  /* ── 방문록(다른 멤버의 공개 프로필) 모달 ──
+     관심 키워드를 보여줘서 "무슨 관심사로 채팅 드려요" 라고 말 걸 근거를 준다. */
+  async function showProfileModal(u) {
+    document.getElementById('__profileModal')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = '__profileModal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:#1b2340;border-radius:16px;padding:28px 30px;max-width:340px;width:90%;
+                  box-shadow:0 8px 40px rgba(0,0,0,.7);text-align:center;">
+        <div class="pm-body" style="color:#94a3b8;font-size:13px;padding:20px 0;">불러오는 중...</div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+    const body = overlay.querySelector('.pm-body');
+    try {
+      const p = await api(`/api/auth/users/${u.user_id}`);
+      const kwHtml = p.interest_keywords.length
+        ? p.interest_keywords.map(k => `<span class="tag" style="display:inline-block;margin:3px;padding:4px 11px;background:#2a3660;border-radius:99px;font-size:12.5px;color:#a5b4fc;">#${escapeHtml(k)}</span>`).join('')
+        : '<span style="color:#64748b;font-size:12.5px;">등록된 관심 키워드가 없어요.</span>';
+      const isPending = pendingOutgoing.has(u.user_id);
+      body.innerHTML = `
+        <div style="margin-bottom:8px;">${avatarHtml(p.avatar_id, 64)}</div>
+        <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:2px;">${escapeHtml(p.username)}</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:16px;">${fmtDate(p.joined_at)} 가입</div>
+        <div style="text-align:left;font-size:12px;font-weight:700;color:#cbd5e1;margin-bottom:6px;">관심 키워드</div>
+        <div style="text-align:left;margin-bottom:18px;min-height:26px;">${kwHtml}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:22px;">
+          <div style="background:#151b33;border-radius:10px;padding:10px 6px;">
+            <div style="font-size:15px;font-weight:700;color:#5eead4;">${fmtDur(p.total_study_seconds)}</div>
+            <div style="font-size:11px;color:#64748b;">누적 공부시간</div>
+          </div>
+          <div style="background:#151b33;border-radius:10px;padding:10px 6px;">
+            <div style="font-size:15px;font-weight:700;color:#facc15;">${p.badge_count}개</div>
+            <div style="font-size:11px;color:#64748b;">획득 업적</div>
+          </div>
+          <div style="background:#151b33;border-radius:10px;padding:10px 6px;">
+            <div style="font-size:15px;font-weight:700;color:#93c5fd;">${p.post_count}개</div>
+            <div style="font-size:11px;color:#64748b;">게시글</div>
+          </div>
+          <div style="background:#151b33;border-radius:10px;padding:10px 6px;">
+            <div style="font-size:15px;font-weight:700;color:#c4b5fd;">${p.wiki_count}개</div>
+            <div style="font-size:11px;color:#64748b;">위키 기여</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button style="flex:1;padding:9px 0;background:#242c4f;color:#cbd5e1;border:none;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;" id="__pmClose">닫기</button>
+          <button style="flex:1;padding:9px 0;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;" id="__pmChat" ${isPending ? 'disabled' : ''}>${isPending ? '신청 보냄' : '💬 채팅 신청'}</button>
+        </div>`;
+      body.querySelector('#__pmClose').onclick = close;
+      body.querySelector('#__pmChat').onclick = () => {
+        setBtnState(u.user_id, true, '신청 중...');
+        socket.emit('chat_request', { to_user_id: u.user_id });
+        close();
+      };
+    } catch (e) {
+      body.innerHTML = `<div style="color:#f87171;font-size:13px;">프로필을 불러오지 못했어요.</div>`;
+    }
+  }
+
   /* ── 접속 중인 멤버 목록 렌더 (네브바 드롭다운 + /members 전체보기 페이지 공용) ── */
   function buildRow(u) {
     const row = document.createElement('div');
@@ -116,9 +188,12 @@ window.startChatWidget = function () {
     row.dataset.uid = u.user_id;
     const isPending = pendingOutgoing.has(u.user_id);
     row.innerHTML = `
-      <span class="avatar-wrap">${avatarHtml(u.avatar_id, 32)}<span class="online-dot"></span></span>
-      <span class="online-name">${escapeHtml(u.username)}</span>
+      <span class="online-profile-trigger" title="방문록 보기" style="display:flex; align-items:center; gap:10px; cursor:pointer; flex:1; min-width:0;">
+        <span class="avatar-wrap">${avatarHtml(u.avatar_id, 32)}<span class="online-dot"></span></span>
+        <span class="online-name">${escapeHtml(u.username)}</span>
+      </span>
       <button class="btn btn-ghost online-chat-btn" type="button" ${isPending ? 'disabled' : ''}>${isPending ? '신청 보냄 (대기 중)' : '💬 채팅 신청'}</button>`;
+    row.querySelector('.online-profile-trigger').onclick = () => showProfileModal(u);
     const btn = row.querySelector('.online-chat-btn');
     (btnByUid[u.user_id] = btnByUid[u.user_id] || []).push(btn);
     btn.onclick = () => {

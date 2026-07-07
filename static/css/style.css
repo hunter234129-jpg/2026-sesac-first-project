@@ -922,6 +922,7 @@ html { scrollbar-width: thin; scrollbar-color: rgba(120,140,180,.25) transparent
 .online-row:last-child { border-bottom: none; }
 .online-row .online-name { flex: 1; font-size: 14px; font-weight: 600; }
 .online-row .online-chat-btn { padding: 7px 14px; font-size: 13px; }
+.online-profile-trigger:hover .online-name { color: var(--cyan); text-decoration: underline; }
 
 /* 아바타 칩 — 만화 캐릭터 이모지 + 컬러 배경(배경과 겹치지 않도록 항상 불투명 원) */
 .avatar-chip {
