@@ -323,7 +323,7 @@
             <span class="row-value">${escapeHtml(p.title)}
               <span class="muted" style="font-size:12px;">· ${p.type === 'study' ? '스터디' : '게시글'}</span>
             </span>
-            <span class="muted" style="font-size:13px;">조회 ${p.view_count} · ${(p.created_at||'').slice(0,10)}</span>
+            <span class="muted" style="font-size:13px;">조회 ${p.view_count} · ${fmtDate(p.created_at)}</span>
           </div>`).join('')
           : '<p class="muted" style="font-size:14px;">작성한 게시글이 없어요.</p>';
       } catch (err) {

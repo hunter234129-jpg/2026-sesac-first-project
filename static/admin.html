@@ -86,7 +86,7 @@
               ${escapeHtml(u.username)}
               ${u.is_admin ? '<span class="badge" style="margin-left:6px;">관리자</span>' : ''}
               ${u.is_deleted ? '<span class="tbadge closed" style="margin-left:6px;">탈퇴</span>' : ''}
-              <div class="muted" style="font-size:12px;">${escapeHtml(u.email)} · ${(u.created_at||'').slice(0,10)}</div>
+              <div class="muted" style="font-size:12px;">${escapeHtml(u.email)} · ${fmtDate(u.created_at)}</div>
             </span>
             <span style="display:flex; gap:6px;">
               <button class="btn btn-ghost" style="padding:5px 10px; font-size:12px;" data-admin="${u.id}" data-cur="${u.is_admin?1:0}">${u.is_admin?'관리자 해제':'관리자 지정'}</button>
@@ -116,7 +116,7 @@
             <span class="row-value">
               <a href="/post?id=${p.id}">${escapeHtml(p.title)}</a>
               ${p.deleted_at ? '<span class="tbadge closed" style="margin-left:6px;">삭제됨</span>' : ''}
-              <div class="muted" style="font-size:12px;">${escapeHtml(p.author)} · 조회 ${p.view_count} · ${(p.created_at||'').slice(0,10)}</div>
+              <div class="muted" style="font-size:12px;">${escapeHtml(p.author)} · 조회 ${p.view_count} · ${fmtDate(p.created_at)}</div>
             </span>
             ${p.deleted_at ? '' : `<button class="btn btn-danger" style="padding:5px 10px; font-size:12px;" data-del-post="${p.id}">삭제</button>`}
           </div>`).join('') || '<p class="muted" style="font-size:14px;">게시글이 없어요.</p>';

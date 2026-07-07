@@ -382,7 +382,7 @@
         <div class="comment" data-cid="${c.id}">
           <div class="comment-meta">
             <span class="cm-author">${escapeHtml(c.username)}</span>
-            <span class="cm-date">${(c.created_at||'').replace('T',' ').slice(0,16)}</span>
+            <span class="cm-date">${fmtDateTime(c.created_at)}</span>
           </div>
           <div class="comment-body" data-body>${escapeHtml(c.content)}</div>
           <div class="comment-actions">

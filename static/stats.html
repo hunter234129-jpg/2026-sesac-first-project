@@ -145,17 +145,26 @@
         let cols;
 
         if (period === 'day') {
-          // 최근 7일 빈 날짜 채우기
+          // 최근 7일 빈 날짜 채우기 — period_key는 서버가 RFC822 형식("Tue, 07 Jul
+          // 2026 00:00:00 GMT")으로 내려주기 때문에 ISO 문자열 가정한 slice(0,10)로는
+          // 못 맞고 항상 0으로 표시되던 버그가 있었다. new Date()로 파싱해서 lastNDates와
+          // 동일한 방식(toISOString 기준)으로 키를 만들어야 서로 매칭된다.
           const map = {};
-          raw.forEach(x => { map[String(x.period_key).slice(0,10)] = +x.total_sec || 0; });
+          raw.forEach(x => {
+            const pd = new Date(x.period_key);
+            if (!isNaN(pd)) map[pd.toISOString().slice(0, 10)] = +x.total_sec || 0;
+          });
           cols = lastNDates(7).map(d => ({ label: d.label, sec: map[d.key] || 0, today: d.isToday }));
         } else {
-          // 주별: 오래된 주 → 최신 주 순으로
+          // 주별: 오래된 주 → 최신 주 순으로 (week_start도 동일한 이유로 new Date로 파싱)
           const sorted = [...raw].reverse();
-          cols = sorted.map(x => ({
-            label: (x.week_start || '').slice(5) || '주',
-            sec: +x.total_sec || 0, today: false,
-          }));
+          cols = sorted.map(x => {
+            const wd = new Date(x.week_start);
+            return {
+              label: isNaN(wd) ? '주' : `${wd.getMonth() + 1}/${wd.getDate()}`,
+              sec: +x.total_sec || 0, today: false,
+            };
+          });
           if (!cols.length) cols = [];
         }
 
