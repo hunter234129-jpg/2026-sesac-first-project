@@ -59,10 +59,25 @@ let excalidrawApi = null;
 let presenceSocket = null;
 let currentBlockId = null;
 let currentSlug = null;
+let prevHtmlZoom = null;   // 그림판 여는 동안 html의 zoom을 잠깐 1로 내렸다가 복구하기 위한 저장값
+
+// html { zoom: 1.25 }(style.css)가 걸려있으면 Excalidraw 캔버스의 포인터 좌표 계산이
+// 어긋나서 마우스 커서 위치와 실제 펜/지우개가 그려지는 위치가 달라진다(캔버스 기반
+// 드로잉 라이브러리가 흔히 겪는 문제). 모달에만 CSS로 zoom:1을 걸면 position:fixed와
+// 중첩된 zoom이 브라우저에서 꼬여서 모달 자체가 안 보이는 부작용이 있었다 — 그래서
+// 특정 요소가 아니라 문서 전체(html)의 zoom을 열려있는 동안만 잠깐 1로 내린다.
+function suspendPageZoom() {
+  prevHtmlZoom = document.documentElement.style.zoom || '';
+  document.documentElement.style.zoom = '1';
+}
+function restorePageZoom() {
+  if (prevHtmlZoom !== null) document.documentElement.style.zoom = prevHtmlZoom;
+  prevHtmlZoom = null;
+}
 
 function getSocket(slug) {
   if (presenceSocket && presenceSocket.connected) return presenceSocket;
-  presenceSocket = window.io({ query: { token: (window.Auth && Auth.token) || '' } });
+  presenceSocket = window.io({ query: { token: (window.Auth && window.Auth.token) || '' } });
   presenceSocket.on('connect', () => presenceSocket.emit('join_wiki', { slug }));
   return presenceSocket;
 }
@@ -101,9 +116,14 @@ function buildOverlay() {
 }
 
 async function open({ slug, blockId, onSaved }) {
-  if (!slug || !blockId) return;
+  // slug는 없을 수 있다 — 위키를 아직 저장하지 않은 생성(초안) 화면에는 슬러그가
+  // 없는데, 그런 경우까지 그림판을 막으면 "생성 화면에서 그림이 안 열린다"가 된다.
+  // slug가 없으면 기존 씬 불러오기/scene_json 저장(재편집용)만 건너뛰고, 이미지
+  // 업로드 자체는 그대로 진행해서 완성된 그림은 문서에 들어가게 한다.
+  if (!blockId) return;
   currentBlockId = blockId;
-  currentSlug = slug;
+  currentSlug = slug || null;
+  suspendPageZoom();
 
   let loadErr = null;
   try { await ensureLibs(); } catch (e) { loadErr = e; }
@@ -119,17 +139,19 @@ async function open({ slug, blockId, onSaved }) {
     return;
   }
 
-  // 기존 씬 불러오기(있으면 이어서 편집)
+  // 기존 씬 불러오기(있으면 이어서 편집) — 아직 저장 안 된 위키(slug 없음)는 건너뛴다.
   let initialData = undefined;
-  try {
-    const d = await window.api('/api/wiki/' + encodeURIComponent(slug) + '/drawings/' + encodeURIComponent(blockId), { auth: false });
-    if (d && d.scene_json) {
-      const parsed = JSON.parse(d.scene_json);
-      initialData = { elements: parsed.elements || [], appState: parsed.appState || {} };
-    }
-  } catch (_) { /* 최초 편집 — 빈 캔버스로 시작 */ }
+  if (slug) {
+    try {
+      const d = await window.api('/api/wiki/' + encodeURIComponent(slug) + '/drawings/' + encodeURIComponent(blockId), { auth: false });
+      if (d && d.scene_json) {
+        const parsed = JSON.parse(d.scene_json);
+        initialData = { elements: parsed.elements || [], appState: parsed.appState || {} };
+      }
+    } catch (_) { /* 최초 편집 — 빈 캔버스로 시작 */ }
 
-  broadcastPresence(slug, blockId, true);
+    broadcastPresence(slug, blockId, true);
+  }
 
   const { React, createRoot, Excalidraw } = _libs;
   reactRoot = createRoot(mountDiv);
@@ -161,13 +183,18 @@ async function open({ slug, blockId, onSaved }) {
       form.append('ref_type', 'wiki_drawing');
       const uploaded = await window.api('/api/upload', { method: 'POST', body: form, isForm: true });
 
-      const sceneJson = JSON.stringify({
-        elements,
-        appState: { viewBackgroundColor: appState.viewBackgroundColor },
-      });
-      await window.api('/api/wiki/' + encodeURIComponent(slug) + '/drawings/' + encodeURIComponent(blockId), {
-        method: 'PUT', body: { scene_json: sceneJson, png_file_id: uploaded.id },
-      });
+      // scene_json(재편집용 원본 벡터 데이터)은 위키 문서가 실제로 존재해야 저장할 수 있다.
+      // 아직 저장 전 초안(slug 없음)이면 이미지 자체는 그대로 문서에 들어가지만,
+      // 벡터 재편집 데이터는 위키를 처음 저장한 뒤부터 저장된다.
+      if (slug) {
+        const sceneJson = JSON.stringify({
+          elements,
+          appState: { viewBackgroundColor: appState.viewBackgroundColor },
+        });
+        await window.api('/api/wiki/' + encodeURIComponent(slug) + '/drawings/' + encodeURIComponent(blockId), {
+          method: 'PUT', body: { scene_json: sceneJson, png_file_id: uploaded.id },
+        });
+      }
 
       if (onSaved) onSaved(uploaded.url);
       close();
@@ -188,6 +215,7 @@ function close() {
   currentBlockId = null;
   currentSlug = null;
   document.body.style.overflow = '';
+  restorePageZoom();
 }
 
 window.ExcalidrawModal = { open, close };

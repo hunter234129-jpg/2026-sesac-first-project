@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>문제풀기 · 스터디 플랫폼</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <div class="nav-links" id="navLinks"></div>
+  </nav>
+
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
+  <div class="container">
+    <div class="dash-header dash-header--quiz">
+      <h1>문제풀기</h1>
+      <p>원하는 주제를 입력하면 AI가 그 자리에서 문제를 만들어줘요. 5문제로 실력을 진단한 뒤, 정답률에 맞춰 난이도를 조절하며 계속 풀 수 있어요</p>
+      <svg class="qz-pencil-art" viewBox="-10 -10 160 160" aria-hidden="true">
+        <g transform="rotate(-8 60 75)">
+          <rect x="14" y="20" width="84" height="110" rx="12" style="fill:var(--glass-strong); stroke:var(--border-lit); stroke-width:1.5;"/>
+          <rect x="14" y="20" width="84" height="20" rx="12" style="fill:var(--glass-hi);"/>
+          <line x1="28" y1="58" x2="84" y2="58" style="stroke:var(--muted); stroke-width:3; stroke-linecap:round;"/>
+          <line x1="28" y1="74" x2="84" y2="74" style="stroke:var(--muted); stroke-width:3; stroke-linecap:round;"/>
+          <line x1="28" y1="90" x2="64" y2="90" style="stroke:var(--muted); stroke-width:3; stroke-linecap:round;"/>
+          <circle cx="72" cy="90" r="9" style="fill:none; stroke:var(--cyan); stroke-width:2.5;"/>
+          <path d="M67.5 90 L71 93.5 L77 85.5" style="fill:none; stroke:var(--cyan); stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;"/>
+          <line x1="28" y1="106" x2="80" y2="106" style="stroke:var(--muted); stroke-width:3; stroke-linecap:round;"/>
+        </g>
+        <g transform="rotate(38 100 70)">
+          <rect x="93" y="8" width="14" height="14" rx="3" style="fill:#f28fa3;"/>
+          <rect x="93" y="22" width="14" height="8" style="fill:#d7dce4;"/>
+          <rect x="93" y="30" width="14" height="80" rx="2" style="fill:#f2c14b; stroke:var(--text); stroke-width:1; stroke-opacity:.4;"/>
+          <path d="M93 110 L107 110 L100 128 Z" style="fill:#e8c9a0;"/>
+          <path d="M97 124 L103 124 L100 132 Z" style="fill:#3a3a3a;"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div style="font-weight:800; margin-bottom:8px;">💡 효율적으로 학습하기</div>
+      <ul class="muted" style="font-size:13.5px; line-height:1.7; margin:0; padding-left:18px;">
+        <li>오답노트에 쌓인 문제를 주기적으로 다시 풀어보시면 같은 실수를 반복하지 않을 수 있어요.</li>
+        <li>오답노트의 AI 약점 분석 기능으로 자주 틀리는 문제 유형을 파악하시면 무엇을 더 공부해야 할지 명확해져요.</li>
+        <li>진단 결과에 맞춰 난이도가 자동으로 조절되니, 부담 없이 꾸준히 풀어보시면 학습 효율을 높일 수 있어요.</li>
+      </ul>
+    </div>
+
+    <a href="/wrongnote" class="card wn-entry" id="wnEntry">
+      <div class="wn-entry-icon">❌</div>
+      <div class="wn-entry-body">
+        <div class="wn-entry-title">오답노트</div>
+        <div class="wn-entry-desc" id="wnEntryDesc">불러오는 중...</div>
+      </div>
+      <div class="wn-entry-arrow">→</div>
+    </a>
+
+    <div class="card" id="startCard">
+      <div class="qz-start-row">
+        <input type="text" id="subjectInput" placeholder="예: 중2 수학 이차방정식 문제" maxlength="100">
+        <button class="btn btn-primary" id="startBtn">진단 시작</button>
+      </div>
+      <div class="qz-hint">과목·학년·단원·난이도 등 원하는 대로 자유롭게 적어주세요. 처음엔 실력 진단을 위한 5문제가 나와요.</div>
+    </div>
+
+    <div class="card hidden" id="statusCard">
+      <div class="qz-status">
+        <span class="qz-subject" id="qzSubjectLabel"></span>
+        <span class="qz-level-badge hidden" id="qzLevelBadge"></span>
+        <button class="btn btn-ghost qz-restart" id="restartBtn">↻ 새 주제로 다시 시작</button>
+      </div>
+      <div class="curri-subject-prog hidden" id="diagProgWrap">
+        <span style="font-size:13px; color:var(--muted);">진단 진행률</span>
+        <div class="prog"><i id="diagProgFill" style="width:0%;"></i></div>
+        <span class="csp-num" id="diagProgNum">0 / 0</span>
+      </div>
+    </div>
+
+    <div class="card hidden" id="quizCard"></div>
+  </div>
+  </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!Auth.require()) { /* 로그인 페이지로 이동됨 */ }
+    renderNav();
+    renderRail('quiz');
+
+    const startCard    = document.getElementById('startCard');
+    const statusCard   = document.getElementById('statusCard');
+    const quizCard     = document.getElementById('quizCard');
+    const subjectInput = document.getElementById('subjectInput');
+    const startBtn     = document.getElementById('startBtn');
+
+    let state = { subjectQuery: '', phase: null, level: null };
+
+    function setStatus() {
+      statusCard.classList.remove('hidden');
+      document.getElementById('qzSubjectLabel').textContent = state.subjectQuery;
+      const levelBadge = document.getElementById('qzLevelBadge');
+      if (state.level) {
+        levelBadge.textContent = `레벨: ${state.level}`;
+        levelBadge.classList.remove('hidden');
+      } else {
+        levelBadge.classList.add('hidden');
+      }
+    }
+
+    function setDiagProgress(done, total) {
+      const wrap = document.getElementById('diagProgWrap');
+      if (done == null) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      document.getElementById('diagProgFill').style.width = pct + '%';
+      document.getElementById('diagProgNum').textContent = `${done} / ${total}`;
+    }
+
+    function renderQuestion(q) {
+      quizCard.classList.remove('hidden');
+      quizCard.innerHTML = `
+        <div class="quiz-q">${escapeHtml(q.question)}</div>
+        <div class="quiz-choices">
+          ${q.choices.map((c, i) => `<button class="quiz-choice" data-index="${i}">${escapeHtml(c)}</button>`).join('')}
+        </div>`;
+      quizCard.querySelectorAll('.quiz-choice').forEach(btn => {
+        btn.onclick = () => submitAnswer(q.id, Number(btn.dataset.index));
+      });
+    }
+
+    function renderMessage(html) {
+      quizCard.classList.remove('hidden');
+      quizCard.innerHTML = html;
+    }
+
+    async function startQuiz(subjectQuery) {
+      startBtn.disabled = true;
+      renderMessage('<p class="muted text-center" style="padding:30px 0;">AI가 진단 문제 5개를 만드는 중...</p>');
+      try {
+        const d = await api('/api/quiz/start', { method: 'POST', body: { subject_query: subjectQuery } });
+        state = { subjectQuery: d.subject_query, phase: 'diagnostic', level: null };
+        setStatus();
+        setDiagProgress(0, d.questions.length);
+        state.questions = d.questions;
+        state.qIndex = 0;
+        renderQuestion(state.questions[0]);
+        loadWrongNoteEntry();
+      } catch (e) {
+        renderMessage(`<p class="muted text-center" style="padding:30px 0;">${escapeHtml(e.message)}</p>`);
+      } finally {
+        startBtn.disabled = false;
+      }
+    }
+
+    async function submitAnswer(id, choiceIndex) {
+      const buttons = [...quizCard.querySelectorAll('.quiz-choice')];
+      buttons.forEach(b => { b.disabled = true; });
+      try {
+        const r = await api(`/api/quiz/questions/${id}/submit`, { method: 'POST', body: { choice_index: choiceIndex } });
+        buttons.forEach((b, i) => {
+          if (i === choiceIndex) b.classList.add(r.correct ? 'chosen-correct' : 'chosen-wrong');
+          else if (i === r.answer_index) b.classList.add('reveal-correct');
+        });
+        const markSvg = r.correct
+          ? '<svg class="mark-svg mark-o" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" pathLength="1"/></svg>'
+          : '<svg class="mark-svg mark-x" viewBox="0 0 100 100"><line x1="22" y1="22" x2="78" y2="78" pathLength="1"/><line x1="78" y1="22" x2="22" y2="78" pathLength="1"/></svg>';
+        const resultEl = document.createElement('div');
+        resultEl.className = 'quiz-result';
+        resultEl.innerHTML = `${markSvg}<div class="qr-text">${r.correct ? '정답이에요! 🎉' : '아쉬워요, 정답을 확인해보세요.'} ${escapeHtml(r.explanation || '')}</div>`;
+        quizCard.appendChild(resultEl);
+
+        if (r.diagnostic_progress) setDiagProgress(r.diagnostic_progress.done, r.diagnostic_progress.total);
+
+        if (r.phase === 'adaptive' && r.diagnostic_progress) {
+          // 방금 진단 5문제가 끝나고 레벨이 막 산정된 순간
+          state.phase = 'adaptive';
+          state.level = r.level;
+          setStatus();
+          const nextRow = document.createElement('div');
+          nextRow.className = 'qz-diag-done';
+          nextRow.innerHTML = `
+            <div class="qdd-emoji">🎯</div>
+            <p>진단 완료! 측정된 레벨은 <b>${escapeHtml(r.level)}</b>이에요.</p>
+            <button class="btn btn-primary" id="continueBtn">이 레벨로 계속 풀기 →</button>`;
+          quizCard.appendChild(nextRow);
+          document.getElementById('continueBtn').onclick = fetchNext;
+        } else if (r.diagnostic_progress) {
+          // 진단 문제 중간 — 다음 진단 문제로
+          state.qIndex += 1;
+          const nextBtn = document.createElement('div');
+          nextBtn.className = 'qz-next-row';
+          nextBtn.innerHTML = `<button class="btn btn-primary" id="nextBtn">다음 문제 →</button>`;
+          quizCard.appendChild(nextBtn);
+          document.getElementById('nextBtn').onclick = () => renderQuestion(state.questions[state.qIndex]);
+        } else {
+          // 적응형 단계
+          if (r.level) state.level = r.level;
+          setStatus();
+          const nextRow = document.createElement('div');
+          nextRow.className = 'qz-next-row';
+          nextRow.innerHTML = `
+            ${r.level_changed ? `<p class="muted" style="font-size:12.5px; margin-bottom:8px;">레벨이 <b>${escapeHtml(r.level)}</b>(으)로 조정됐어요</p>` : ''}
+            <button class="btn btn-primary" id="nextBtn">다음 문제 →</button>`;
+          quizCard.appendChild(nextRow);
+          document.getElementById('nextBtn').onclick = fetchNext;
+        }
+      } catch (e) {
+        alert(e.message);
+        buttons.forEach(b => { b.disabled = false; });
+      }
+    }
+
+    async function fetchNext() {
+      renderMessage('<p class="muted text-center" style="padding:30px 0;">AI가 다음 문제를 만드는 중...</p>');
+      try {
+        const q = await api('/api/quiz/next', { method: 'POST' });
+        renderQuestion(q);
+      } catch (e) {
+        renderMessage(`
+          <p class="muted text-center" style="padding:20px 0;">${escapeHtml(e.message)}</p>
+          <div class="qz-next-row"><button class="btn btn-primary" id="retryBtn">다시 시도</button></div>`);
+        document.getElementById('retryBtn').onclick = fetchNext;
+      }
+    }
+
+    startBtn.onclick = () => {
+      const q = subjectInput.value.trim();
+      if (!q) { subjectInput.focus(); return; }
+      startQuiz(q);
+    };
+    subjectInput.onkeydown = (e) => { if (e.key === 'Enter') startBtn.click(); };
+
+    document.getElementById('restartBtn').onclick = () => {
+      statusCard.classList.add('hidden');
+      quizCard.classList.add('hidden');
+      quizCard.innerHTML = '';
+      subjectInput.value = '';
+      subjectInput.focus();
+    };
+
+    async function loadWrongNoteEntry() {
+      const el = document.getElementById('wnEntryDesc');
+      try {
+        const notes = await api('/api/wrongnotes');
+        el.textContent = notes.length > 0
+          ? `틀린 문제 ${notes.length}개를 다시 풀어보세요`
+          : '틀린 문제가 없어요 👍';
+      } catch (e) {
+        el.textContent = '불러오지 못했어요';
+      }
+    }
+
+    const qpSubject = queryParam('subject');
+    if (qpSubject) {
+      subjectInput.value = qpSubject;
+      startQuiz(qpSubject);
+    }
+    loadWrongNoteEntry();
+  </script>
+</body>
+</html>

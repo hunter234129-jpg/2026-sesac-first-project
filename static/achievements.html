@@ -8,10 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
       <div><h1>🏅 업적</h1><p>공부 여정에서 모은 뱃지들</p></div>
@@ -21,11 +24,14 @@
     <div class="alert" id="alert"></div>
     <div id="achWrap"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { throw new Error('redirect'); }
     renderNav();
+    renderRail('achievements');
 
     function achCard(a) {
       const pct = Math.round(a.progress * 100);

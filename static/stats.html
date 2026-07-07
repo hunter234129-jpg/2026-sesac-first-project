@@ -8,10 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header"><h1>공부 통계</h1><p>나의 공부 기록과 전체 랭킹</p></div>
 
@@ -25,23 +28,40 @@
       <div class="sc"><div class="sc-label">일 평균(7일)</div><div class="sc-value" id="sumAvg">-</div></div>
     </div>
 
-<<<<<<< HEAD
     <!-- 연속 공부 + 잔디 -->
     <div class="card section">
-      <div class="section-head"><h2>🔥 연속 공부 &amp; 잔디</h2><span class="muted" id="heatHint" style="font-size:12px;"></span></div>
+      <div class="section-head">
+        <h2>🔥 연속 공부 &amp; 잔디</h2>
+        <span class="muted" id="heatHint" style="font-size:12px;"></span>
+      </div>
+      <div class="goal-row" id="goalRow">
+        <span class="goal-badge" id="goalBadge">🎯 목표: -</span>
+        <button class="btn btn-ghost goal-edit-btn" id="goalEditBtn">수정</button>
+        <div class="goal-edit hidden" id="goalEditWrap">
+          <input type="number" id="goalHoursInput" min="0.5" max="12" step="0.5">
+          <span class="muted" style="font-size:12.5px;">시간 / 하루</span>
+          <button class="btn btn-primary" id="goalSaveBtn">저장</button>
+          <button class="btn btn-ghost" id="goalCancelBtn">취소</button>
+        </div>
+      </div>
+      <p class="goal-explain">🌱 그날 목표 시간을 얼마나 채웠는지에 따라 잔디 색이 정해져요. <b>많이 공부할수록 잔디가 진해져요</b> — 목표를 다 채우면 꽉 찬 초록, 목표를 훌쩍 넘기면 반짝이는 황금빛 잔디가 돼요!</p>
       <div class="streak-grid">
         <div class="streak-cell"><div class="em" id="stFire">🔥</div><div class="v" id="stCur">-</div><div class="k">현재 연속</div></div>
         <div class="streak-cell"><div class="em">🏆</div><div class="v cy" id="stMax">-</div><div class="k">최장 연속</div></div>
         <div class="streak-cell"><div class="em">🪐</div><div class="v gr" id="stDays">-</div><div class="k">공부한 날</div></div>
+        <div class="streak-cell"><div class="em">✅</div><div class="v" id="stGoalDays" style="color:var(--yellow);">-</div><div class="k">목표 달성일</div></div>
       </div>
       <div class="heatmap" id="heatmap"><p class="chart-empty">불러오는 중...</p></div>
-      <div class="heat-legend">적음
-        <span class="heat-cell"></span><span class="heat-cell l1"></span><span class="heat-cell l2"></span><span class="heat-cell l3"></span><span class="heat-cell l4"></span>
-        많음</div>
+      <div class="heat-legend">0%
+        <span class="heat-cell" style="background:rgba(52,211,153,.18);"></span>
+        <span class="heat-cell" style="background:rgba(52,211,153,.36);"></span>
+        <span class="heat-cell" style="background:rgba(52,211,153,.54);"></span>
+        <span class="heat-cell" style="background:rgba(52,211,153,.72);"></span>
+        <span class="heat-cell l-full"></span>
+        <span class="heat-cell l-super"></span>
+        100%+</div>
     </div>
 
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     <!-- 차트 -->
     <div class="card section">
       <div class="section-head">
@@ -64,11 +84,14 @@
       <div class="rank-list" id="rankList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { throw new Error('redirect'); }
     renderNav();
+    renderRail('stats');
     const alertEl = document.getElementById('alert');
     const myId = Auth.userId;
 
@@ -107,7 +130,7 @@
       for (let i = n - 1; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(today.getDate() - i);
-        const key = d.toISOString().slice(0, 10);
+        const key = ymd(d);
         arr.push({ key, label: `${d.getMonth()+1}/${d.getDate()}`, isToday: i === 0 });
       }
       return arr;
@@ -122,17 +145,26 @@
         let cols;
 
         if (period === 'day') {
-          // 최근 7일 빈 날짜 채우기
+          // 최근 7일 빈 날짜 채우기 — period_key는 서버가 RFC822 형식("Tue, 07 Jul
+          // 2026 00:00:00 GMT")으로 내려주기 때문에 ISO 문자열 가정한 slice(0,10)로는
+          // 못 맞고 항상 0으로 표시되던 버그가 있었다. new Date()로 파싱해서 lastNDates와
+          // 동일한 방식(toISOString 기준)으로 키를 만들어야 서로 매칭된다.
           const map = {};
-          raw.forEach(x => { map[String(x.period_key).slice(0,10)] = +x.total_sec || 0; });
+          raw.forEach(x => {
+            const pd = new Date(x.period_key);
+            if (!isNaN(pd)) map[pd.toISOString().slice(0, 10)] = +x.total_sec || 0;
+          });
           cols = lastNDates(7).map(d => ({ label: d.label, sec: map[d.key] || 0, today: d.isToday }));
         } else {
-          // 주별: 오래된 주 → 최신 주 순으로
+          // 주별: 오래된 주 → 최신 주 순으로 (week_start도 동일한 이유로 new Date로 파싱)
           const sorted = [...raw].reverse();
-          cols = sorted.map(x => ({
-            label: (x.week_start || '').slice(5) || '주',
-            sec: +x.total_sec || 0, today: false,
-          }));
+          cols = sorted.map(x => {
+            const wd = new Date(x.week_start);
+            return {
+              label: isNaN(wd) ? '주' : `${wd.getMonth() + 1}/${wd.getDate()}`,
+              sec: +x.total_sec || 0, today: false,
+            };
+          });
           if (!cols.length) cols = [];
         }
 
@@ -205,7 +237,6 @@
       loadRanking(tab.dataset.r);
     };
 
-<<<<<<< HEAD
     /* ── 연속 공부 + 잔디 ── */
     function ymd(d) {
       return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -219,25 +250,33 @@
         document.getElementById('stFire').style.opacity = d.studied_today ? '1' : '.35';
       } catch (_) {}
     }
+    let dailyGoalMin = 240;
+
     async function loadHeatmap() {
       const wrap = document.getElementById('heatmap');
       try {
         const d = await api('/api/study/heatmap?days=119');
+        dailyGoalMin = d.daily_goal_min || 240;
+        renderGoalBadge();
+        const goalSec = dailyGoalMin * 60;
+
         const map = {};
         (d.days || []).forEach(x => { map[x.date] = +x.total_sec || 0; });
         const today = new Date(); today.setHours(0,0,0,0);
         const cur = new Date(today);
         cur.setDate(today.getDate() - 118);
         cur.setDate(cur.getDate() - cur.getDay());   // 주 시작(일요일)으로 정렬
-        const lvl = sec => {
-          if (!sec) return '';
-          const h = sec / 3600;
-          if (h < 0.5) return 'l1';
-          if (h < 1.5) return 'l2';
-          if (h < 3)   return 'l3';
-          return 'l4';
+        // 목표(goalSec) 대비 달성률에 정비례해서 잔디 농도가 연속적으로 진해지도록 계산
+        const MIN_OPACITY = 0.16, MAX_OPACITY = 0.9;
+        const heatCell = sec => {
+          if (!sec) return { cls: '', style: '' };
+          const ratio = sec / goalSec;
+          if (ratio >= 1.5) return { cls: 'l-super', style: '' };   // 목표의 150%+ : 특별히 반짝이는 강조
+          if (ratio >= 1)   return { cls: 'l-full',  style: '' };   // 목표 달성
+          const opacity = MIN_OPACITY + Math.min(ratio, 1) * (MAX_OPACITY - MIN_OPACITY);
+          return { cls: '', style: `background:rgba(52,211,153,${opacity.toFixed(2)});` };
         };
-        const weeks = []; let studiedDays = 0;
+        const weeks = []; let studiedDays = 0, goalDays = 0;
         while (cur <= today) {
           const col = [];
           for (let i = 0; i < 7; i++) {
@@ -245,7 +284,11 @@
             else {
               const key = ymd(cur), sec = map[key] || 0;
               if (sec) studiedDays++;
-              col.push(`<div class="heat-cell ${lvl(sec)}" title="${key} · ${sec ? fmtDur(sec) : '기록 없음'}"></div>`);
+              if (sec >= goalSec) goalDays++;
+              const pct = Math.round(sec / goalSec * 100);   // 목표 초과 시 100% 넘게도 표시
+              const title = sec ? `${key} · ${fmtDur(sec)} (목표 대비 ${pct}%)` : `${key} · 기록 없음`;
+              const { cls, style } = heatCell(sec);
+              col.push(`<div class="heat-cell ${cls}" style="${style}" title="${title}"></div>`);
             }
             cur.setDate(cur.getDate() + 1);
           }
@@ -253,19 +296,56 @@
         }
         wrap.innerHTML = weeks.join('');
         document.getElementById('heatHint').textContent = `최근 17주 · 공부한 날 ${studiedDays}일`;
+        document.getElementById('stGoalDays').textContent = goalDays + '일';
       } catch (err) {
         wrap.innerHTML = `<p class="chart-empty">${escapeHtml(err.message)}</p>`;
       }
     }
 
+    /* ── 하루 목표 설정 ── */
+    function renderGoalBadge() {
+      const h = dailyGoalMin / 60;
+      document.getElementById('goalBadge').textContent = `🎯 목표: ${h % 1 === 0 ? h : h.toFixed(1)}시간 / 하루`;
+    }
+
+    const goalEditBtn  = document.getElementById('goalEditBtn');
+    const goalEditWrap = document.getElementById('goalEditWrap');
+    const goalHoursInput = document.getElementById('goalHoursInput');
+
+    goalEditBtn.onclick = () => {
+      goalHoursInput.value = dailyGoalMin / 60;
+      goalEditWrap.classList.remove('hidden');
+      goalEditBtn.classList.add('hidden');
+      goalHoursInput.focus();
+    };
+    document.getElementById('goalCancelBtn').onclick = () => {
+      goalEditWrap.classList.add('hidden');
+      goalEditBtn.classList.remove('hidden');
+    };
+    document.getElementById('goalSaveBtn').onclick = async () => {
+      const hours = parseFloat(goalHoursInput.value);
+      if (!hours || hours < 0.5 || hours > 12) {
+        alert('목표 시간은 0.5시간에서 12시간 사이로 입력해주세요');
+        return;
+      }
+      const btn = document.getElementById('goalSaveBtn');
+      btn.disabled = true;
+      try {
+        await api('/api/study/goal', { method: 'PUT', body: { daily_goal_min: Math.round(hours * 60) } });
+        goalEditWrap.classList.add('hidden');
+        goalEditBtn.classList.remove('hidden');
+        loadHeatmap();
+      } catch (e) {
+        alert(e.message);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
     /* ── 초기 로드 ── */
     loadSummary();
     loadStreak();
     loadHeatmap();
-=======
-    /* ── 초기 로드 ── */
-    loadSummary();
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     loadChart('day');
     loadRanking('today');
   </script>

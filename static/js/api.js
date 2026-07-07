@@ -41,6 +41,11 @@ const Auth = {
     location.href = '/';
   }
 };
+// classic <script>의 최상위 const/let은 window에 자동으로 붙지 않는다(함수 선언과 다름).
+// wiki-editor.js(type="module")처럼 별도 스코프에서 window.Auth로 접근하는 코드가 있어서
+// 명시적으로 붙여줘야 한다 — 안 붙어있으면 항상 undefined 취급돼 토큰 없이 소켓 연결을 시도하다
+// 서버(on_connect)에 거부당하는 문제로 이어진다.
+window.Auth = Auth;
 
 /**
  * API 호출. 성공 시 응답 JSON의 data를 반환, 실패 시 Error throw.
@@ -108,33 +113,113 @@ function renderNav() {
   if (!nav) return;
   if (Auth.isLoggedIn) {
     nav.innerHTML = `
-<<<<<<< HEAD
       <a href="/stats" class="live-badge" id="liveBadge" title="지금 공부 중인 사람 수">🛰️ <b id="liveCount">·</b><span class="live-word">공부 중</span></a>
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
       <a href="/board">게시판</a>
       <a href="/wiki">위키</a>
       <a href="/dashboard">대시보드</a>
+      <div class="nav-icon-wrap" id="onlineIconWrap">
+        <a href="/members" class="bell online-bell" id="onlineBell" title="접속 중인 멤버">👥<span class="bell-count hidden" id="onlineCount">0</span></a>
+        <div class="nav-dropdown hidden" id="onlineDropdown">
+          <div class="nd-head">🟢 접속 중인 멤버</div>
+          <div class="nd-list" id="onlineDropdownList"><p class="muted" style="font-size:13px;">연결 중...</p></div>
+          <a href="/members" class="nd-viewall">전체보기 →</a>
+        </div>
+      </div>
       <a href="/notifications" class="bell" id="notifBell" title="알림">🔔<span class="bell-count hidden" id="bellCount">0</span></a>
       <span class="muted">${escapeHtml(Auth.username)}님</span>
       <a href="#" id="logoutBtn">로그아웃</a>`;
     document.getElementById('logoutBtn').onclick = (e) => { e.preventDefault(); Auth.logout(); };
     startNotifPolling();
+
+    const onlineBell     = document.getElementById('onlineBell');
+    const onlineDropdown = document.getElementById('onlineDropdown');
+    onlineBell.onclick = (e) => { e.preventDefault(); onlineDropdown.classList.toggle('hidden'); };
+    document.addEventListener('click', (e) => {
+      if (!document.getElementById('onlineIconWrap')?.contains(e.target)) onlineDropdown.classList.add('hidden');
+    });
+    ensureChatWidget();
   } else {
     nav.innerHTML = `
-<<<<<<< HEAD
       <a href="/stats" class="live-badge" id="liveBadge" title="지금 공부 중인 사람 수">🛰️ <b id="liveCount">·</b><span class="live-word">공부 중</span></a>
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
       <a href="/board">게시판</a>
       <a href="/wiki">위키</a>
       <a href="/login">로그인</a>
       <a href="/register">회원가입</a>`;
   }
-<<<<<<< HEAD
   startLivePolling();
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
+}
+
+/* ── 상단 경로(breadcrumb) — 로고 바로 오른쪽, 요소 id="breadcrumb" ──
+   items: [{label, href?}, ...] href 없거나 마지막 항목이면 현재 위치로 표시 */
+function renderBreadcrumb(items) {
+  const el = document.getElementById('breadcrumb');
+  if (!el) return;
+  el.innerHTML = items.map((it, i) => {
+    const isLast = i === items.length - 1;
+    const seg = (isLast || !it.href)
+      ? `<span class="bc-current">${escapeHtml(it.label)}</span>`
+      : `<a href="${it.href}">${escapeHtml(it.label)}</a>`;
+    return (i > 0 ? '<span class="bc-sep">›</span>' : '') + seg;
+  }).join('');
+}
+
+/* ── 좌측 아이콘 레일 (대시보드 제외 모든 로그인 후 페이지 공통, 요소 id="appRail") ──
+   activeKey로 현재 페이지에 해당하는 항목을 강조 표시한다. */
+const RAIL_ITEMS = [
+  { key: 'dashboard',    href: '/dashboard',    icon: '🏠', label: '대시보드' },
+  { key: 'board',        href: '/board',        icon: '📝', label: '게시판' },
+  { key: 'wiki',         href: '/wiki',         icon: '📚', label: '위키' },
+  { key: 'ai',           href: '/chat',         icon: '🛰️', label: 'AI 도우미' },
+  { key: 'ocr',          href: '/ocr',          icon: '🔭', label: 'OCR' },
+  { key: 'exam',         href: '/exam',         icon: '🗓️', label: '시험일정' },
+  { key: 'members',      href: '/members',      icon: '👥', label: '멤버' },
+  { key: 'stats',        href: '/stats',        icon: '📊', label: '통계' },
+  { key: 'missions',     href: '/missions',     icon: '🎯', label: '미션' },
+  { key: 'quiz',         href: '/roadmap',      icon: '📝', label: '문제풀기' },
+  { key: 'achievements', href: '/achievements', icon: '🏅', label: '업적' },
+  { key: 'mypage',       href: '/mypage',       icon: '👤', label: 'MY' },
+  { key: 'admin',        href: '/admin',        icon: '🛸', label: '관리자', adminOnly: true },
+  { key: 'api-docs',     href: '/api-docs',     icon: '🔌', label: 'API', adminOnly: true },
+];
+function renderRail(activeKey) {
+  const rail = document.getElementById('appRail');
+  if (!rail) return;
+  if (!Auth.isLoggedIn) { rail.remove(); return; }
+  const items = RAIL_ITEMS.filter(it => !it.adminOnly || Auth.isAdmin);
+  rail.innerHTML = `
+    <nav class="app-rail-nav">
+      ${items.map(it => `
+        <a class="app-nav-item ${it.key === activeKey ? 'active' : ''}" href="${it.href}">
+          <span class="ic">${it.icon}</span><span class="lb">${it.label}</span>
+        </a>`).join('')}
+    </nav>
+    <a class="app-rail-planet" id="appRailPlanet" href="/planet" title="내 행성 보기"></a>`;
+  (async () => {
+    const box = document.getElementById('appRailPlanet');
+    try {
+      const p = await api('/api/study/planet');
+      box.innerHTML = `
+        <div class="arp-em">${p.emoji}</div>
+        <div class="arp-lv">Lv.${p.level}</div>
+        <div class="arp-bar"><i style="width:${Math.round((p.progress || 0) * 100)}%"></i></div>
+        <div class="arp-name">${escapeHtml(p.name)}</div>`;
+    } catch (_) { box.innerHTML = ''; }
+  })();
+}
+
+/* 실시간 채팅 위젯 — socket.io 클라이언트 + chat-widget.js를 필요할 때만 동적 로드 */
+function ensureChatWidget() {
+  if (window.__chatWidgetLoading) return;
+  window.__chatWidgetLoading = true;
+  const socketScript = document.createElement('script');
+  socketScript.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+  socketScript.onload = () => {
+    const widgetScript = document.createElement('script');
+    widgetScript.src = '/static/js/chat-widget.js';
+    widgetScript.onload = () => { if (window.startChatWidget) window.startChatWidget(); };
+    document.body.appendChild(widgetScript);
+  };
+  document.body.appendChild(socketScript);
 }
 
 /* 상단 알림 아이콘 — 미읽음 개수 폴링 (30초) */
@@ -155,7 +240,6 @@ function startNotifPolling() {
   _notifTimer = setInterval(updateBell, 30000);
 }
 
-<<<<<<< HEAD
 /* 상단 "지금 N명 공부 중" — 실시간 인원 폴링 (20초, 비회원 포함) */
 let _liveTimer = null;
 async function updateLive() {
@@ -174,12 +258,42 @@ function startLivePolling() {
   _liveTimer = setInterval(updateLive, 20000);
 }
 
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
+/** 서버가 주는 날짜 문자열을 "YYYY-MM-DD HH:MM"로 통일해서 표시한다.
+ * Flask의 기본 JSON 인코더는 datetime을 ISO가 아니라 "Tue, 07 Jul 2026 00:19:45 GMT" 같은
+ * RFC 822 형식으로 내보낸다 — 예전에 여기저기서 쓰던 `.replace('T',' ').slice(0,16)`은
+ * ISO 형식(구분자 "T") 가정이라 RFC 822엔 "T"가 없고 대신 "Tue"의 T가 지워져서
+ * "ue, 07 Jul 2026"처럼 깨져 보였다. new Date()로 제대로 파싱하면 이 문제도 없고,
+ * 저장된 값이 UTC라 브라우저 로컬 시간(한국이면 KST)으로 자동 변환되는 것도 덤으로 맞다. */
+function fmtDateTime(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  if (isNaN(d)) return String(str).replace('T', ' ').slice(0, 16);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+/** 시간 없이 날짜만("YYYY-MM-DD") 필요할 때 — 목록에서 가입일/작성일 표시용. */
+function fmtDate(str) {
+  return fmtDateTime(str).slice(0, 10);
+}
+
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => (
     { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
   ));
+}
+
+/* AI 응답(마크다운 텍스트) 렌더링 — chat.html, dashboard.html 미니챗 공용 */
+let _markedLib = null;
+async function loadMarked() {
+  if (_markedLib) return _markedLib;
+  const mod = await import('https://esm.sh/marked@12.0.2');
+  _markedLib = mod.marked;
+  return _markedLib;
+}
+/** raw 텍스트를 먼저 이스케이프해서 원본에 섞인 HTML/스크립트는 무력화한 뒤 마크다운만 파싱한다. */
+async function renderMarkdown(raw) {
+  const marked = await loadMarked();
+  return marked.parse(escapeHtml(raw));
 }
 
 /** ?key=value 쿼리 파라미터 읽기 */

@@ -8,10 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:720px;">
     <div class="dash-header"><h1>🔭 OCR 텍스트 추출</h1><p>교재·필기 사진을 올리면 텍스트로 변환해드려요.</p></div>
 
@@ -20,10 +23,14 @@
     <div class="card section">
       <div class="dropzone" id="dropzone">
         <div class="dz-icon">🖼️</div>
-        <div class="dz-text">이미지를 클릭하거나 드래그해서 업로드하세요<br>(PNG, JPG · 한글+영어 인식)</div>
+        <div class="dz-text">이미지를 클릭하거나 드래그해서 업로드하세요<br>(PNG, JPG · PDF · 한글+영어 인식)</div>
       </div>
-      <input type="file" id="fileInput" accept="image/*" class="hidden">
+      <input type="file" id="fileInput" accept="image/*,.pdf" class="hidden">
       <img id="preview" class="ocr-preview hidden" alt="미리보기">
+      <div id="pdfPreview" class="hidden" style="text-align:center; padding:24px 0 8px;">
+        <div style="font-size:48px;">📄</div>
+        <div id="pdfName" style="margin-top:8px; font-size:14px; color:var(--text-secondary); word-break:break-all;"></div>
+      </div>
       <div class="mt-16 hidden" id="runRow">
         <button class="btn btn-primary" id="runBtn">텍스트 추출하기</button>
       </div>
@@ -40,29 +47,44 @@
       </div>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { throw new Error('redirect'); }
     renderNav();
+    renderRail('ocr');
 
-    const alertEl = document.getElementById('alert');
-    const dz      = document.getElementById('dropzone');
-    const fileInput = document.getElementById('fileInput');
-    const preview = document.getElementById('preview');
-    const runRow  = document.getElementById('runRow');
-    const runBtn  = document.getElementById('runBtn');
+    const alertEl    = document.getElementById('alert');
+    const dz         = document.getElementById('dropzone');
+    const fileInput  = document.getElementById('fileInput');
+    const preview    = document.getElementById('preview');
+    const pdfPreview = document.getElementById('pdfPreview');
+    const pdfName    = document.getElementById('pdfName');
+    const runRow     = document.getElementById('runRow');
+    const runBtn     = document.getElementById('runBtn');
     const resultCard = document.getElementById('resultCard');
     const resultText = document.getElementById('resultText');
-    let currentFile = null;
+    let currentFile  = null;
 
     function setFile(file) {
-      if (!file || !file.type.startsWith('image/')) {
-        showAlert(alertEl, '이미지 파일을 올려주세요.'); return;
+      if (!file) return;
+      const isImage = file.type.startsWith('image/');
+      const isPdf   = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      if (!isImage && !isPdf) {
+        showAlert(alertEl, '이미지(PNG, JPG 등) 또는 PDF 파일을 올려주세요.'); return;
       }
       currentFile = file;
-      preview.src = URL.createObjectURL(file);
-      preview.classList.remove('hidden');
+      if (isImage) {
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+        pdfPreview.classList.add('hidden');
+      } else {
+        pdfName.textContent = file.name;
+        pdfPreview.classList.remove('hidden');
+        preview.classList.add('hidden');
+      }
       runRow.classList.remove('hidden');
       hideAlert(alertEl);
     }

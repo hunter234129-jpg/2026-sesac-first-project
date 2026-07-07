@@ -1,11 +1,12 @@
+import time
+
 from flask import Blueprint, jsonify, request, g
 from db.connection import get_db
 from utils.auth import login_required
-<<<<<<< HEAD
 from config import GEMINI_API_KEY, GEMINI_MODEL
-=======
-from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
+
+RETRYABLE_STATUS_CODES = {429, 500, 503}   # 레이트리밋/서버과부하 — 잠깐 기다리면 풀리는 오류
+RETRY_DELAYS_SEC       = [1.5, 3]          # 재시도 사이 대기 시간(초), 순서대로 사용
 
 ai_bp = Blueprint('ai', __name__)
 
@@ -24,20 +25,24 @@ def err(msg, code, status=400):
 
 
 def _client():
-<<<<<<< HEAD
     if not GEMINI_API_KEY:
         return None
     from google import genai
     return genai.Client(api_key=GEMINI_API_KEY)
 
 
-def call_gemini(messages, system=SYSTEM, max_tokens=8192):
-    """Gemini 호출 → 텍스트 반환. 키 없으면 RuntimeError('NO_KEY')."""
+def call_gemini(messages, system=SYSTEM, max_tokens=8192, json_mode=False, temperature=None):
+    """Gemini 호출 → 텍스트 반환. 키 없으면 RuntimeError('NO_KEY').
+
+    json_mode=True면 모델이 순수 JSON 문자열만 응답하도록 강제한다(출제 자판기 용도).
+    503(서버 과부하)·429(레이트리밋)처럼 잠깐 기다리면 풀리는 오류는 짧게 재시도한 뒤
+    그래도 실패하면 원래 예외를 그대로 올려서 _guard가 처리하게 한다.
+    """
     client = _client()
     if client is None:
         raise RuntimeError('NO_KEY')
 
-    from google.genai import types
+    from google.genai import errors, types
 
     # Anthropic 형식(role: assistant) → Gemini 형식(role: model) 변환
     contents = [
@@ -48,35 +53,29 @@ def call_gemini(messages, system=SYSTEM, max_tokens=8192):
         for m in messages
     ]
 
-    resp = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=contents,
-        config=types.GenerateContentConfig(
-            system_instruction=system,
-            max_output_tokens=max_tokens,
-        ),
-    )
-    return resp.text.strip()
-=======
-    if not ANTHROPIC_API_KEY:
-        return None
-    import anthropic
-    return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    config_kwargs = {
+        'system_instruction': system,
+        'max_output_tokens': max_tokens,
+    }
+    if json_mode:
+        config_kwargs['response_mime_type'] = 'application/json'
+    if temperature is not None:
+        config_kwargs['temperature'] = temperature
 
+    config = types.GenerateContentConfig(**config_kwargs)
 
-def call_claude(messages, system=SYSTEM, max_tokens=1500):
-    """Claude 호출 → 텍스트 반환. 키 없으면 RuntimeError('NO_KEY')."""
-    client = _client()
-    if client is None:
-        raise RuntimeError('NO_KEY')
-    resp = client.messages.create(
-        model=ANTHROPIC_MODEL,
-        max_tokens=max_tokens,
-        system=system,
-        messages=messages,
-    )
-    return ''.join(b.text for b in resp.content if b.type == 'text').strip()
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
+    attempts = len(RETRY_DELAYS_SEC) + 1
+    for attempt in range(attempts):
+        try:
+            resp = client.models.generate_content(
+                model=GEMINI_MODEL, contents=contents, config=config,
+            )
+            return resp.text.strip()
+        except errors.APIError as e:
+            is_last = attempt == attempts - 1
+            if is_last or e.code not in RETRYABLE_STATUS_CODES:
+                raise
+            time.sleep(RETRY_DELAYS_SEC[attempt])
 
 
 def _guard(fn):
@@ -85,7 +84,6 @@ def _guard(fn):
         return fn()
     except RuntimeError as e:
         if str(e) == 'NO_KEY':
-<<<<<<< HEAD
             return err('AI 기능을 쓰려면 서버에 GEMINI_API_KEY 환경변수를 설정해야 해요',
                        'NO_API_KEY', 503)
         raise
@@ -93,16 +91,9 @@ def _guard(fn):
         name = type(e).__name__
         if name == 'ModuleNotFoundError':
             return err('google-genai 패키지가 필요합니다 (pip install google-genai)', 'MISSING_DEPENDENCY', 500)
-=======
-            return err('AI 기능을 쓰려면 서버에 ANTHROPIC_API_KEY 환경변수를 설정해야 해요',
-                       'NO_API_KEY', 503)
-        raise
-    except Exception as e:
-        # anthropic 패키지 미설치 / API 오류 등
-        name = type(e).__name__
-        if name == 'ModuleNotFoundError':
-            return err('anthropic 패키지가 필요합니다 (pip install anthropic)', 'MISSING_DEPENDENCY', 500)
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
+        if getattr(e, 'code', None) in RETRYABLE_STATUS_CODES:
+            return err('AI 서버가 지금 많이 몰려서 응답을 만들지 못했어요. 잠시 후 다시 시도해주세요',
+                       'AI_OVERLOADED', 503)
         return err(f'AI 응답 생성 실패: {e}', 'AI_FAILED', 502)
 
 
@@ -113,10 +104,6 @@ def chat():
     messages = data.get('messages')
     single   = data.get('message')
 
-<<<<<<< HEAD
-=======
-    # messages 배열 우선, 없으면 단일 message
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     convo = []
     if isinstance(messages, list) and messages:
         for m in messages[-20:]:                     # 최근 20개만
@@ -130,11 +117,7 @@ def chat():
     if not convo or convo[-1]['role'] != 'user':
         return err('보낼 메시지가 없습니다', 'EMPTY_MESSAGE')
 
-<<<<<<< HEAD
     return _guard(lambda: ok({'reply': call_gemini(convo, max_tokens=8192)}))
-=======
-    return _guard(lambda: ok({'reply': call_claude(convo, max_tokens=2000)}))
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 
 
 @ai_bp.route('/api/ai/summarize', methods=['POST'])
@@ -144,10 +127,6 @@ def summarize():
     post_id = data.get('post_id')
     text    = (data.get('text') or '').strip()
 
-<<<<<<< HEAD
-=======
-    # post_id가 오면 게시글 본문을 불러와 요약
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     if post_id:
         conn = get_db(); cursor = conn.cursor()
         try:
@@ -166,11 +145,7 @@ def summarize():
         return err('요약할 내용이 없습니다 (post_id 또는 text 필요)', 'EMPTY')
 
     prompt = f"다음 글을 핵심 위주로 3~5개의 불릿으로 요약해줘:\n\n{text}"
-<<<<<<< HEAD
     return _guard(lambda: ok({'summary': call_gemini([{'role': 'user', 'content': prompt}], max_tokens=4096)}))
-=======
-    return _guard(lambda: ok({'summary': call_claude([{'role': 'user', 'content': prompt}], max_tokens=1000)}))
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 
 
 @ai_bp.route('/api/ai/plan', methods=['POST'])
@@ -185,11 +160,7 @@ def study_plan():
         f"다음 학습 목표에 대한 현실적인 공부 계획을 세워줘. "
         f"기간이 명시되지 않았으면 4주를 기준으로, 주차별 목표와 매일 할 일을 표처럼 정리해줘.\n\n목표: {goal}"
     )
-<<<<<<< HEAD
     return _guard(lambda: ok({'plan': call_gemini([{'role': 'user', 'content': prompt}], max_tokens=8192)}))
-=======
-    return _guard(lambda: ok({'plan': call_claude([{'role': 'user', 'content': prompt}], max_tokens=2500)}))
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 
 
 @ai_bp.route('/api/ai/wiki-draft', methods=['POST'])
@@ -205,8 +176,4 @@ def wiki_draft():
         f"개요, 핵심 개념, 자세한 설명, 정리 순서로 구성하고 마크다운 형식으로 써줘."
     )
     return _guard(lambda: ok({'title': title,
-<<<<<<< HEAD
                               'draft': call_gemini([{'role': 'user', 'content': prompt}], max_tokens=8192)}))
-=======
-                              'draft': call_claude([{'role': 'user', 'content': prompt}], max_tokens=3000)}))
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed

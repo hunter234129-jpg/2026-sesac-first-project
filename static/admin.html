@@ -8,10 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header"><h1>🛸 관리자</h1><p>회원과 게시글을 관리해요.</p></div>
     <div class="alert" id="alert"></div>
@@ -32,11 +35,14 @@
       </div>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { throw new Error('redirect'); }
     renderNav();
+    renderRail('admin');
     const alertEl = document.getElementById('alert');
 
     if (!Auth.isAdmin) {
@@ -65,7 +71,7 @@
           <div class="sc"><div class="sc-label">회원</div><div class="sc-value">${s.users}</div></div>
           <div class="sc"><div class="sc-label">게시글</div><div class="sc-value green">${s.posts}</div></div>
           <div class="sc"><div class="sc-label">위키</div><div class="sc-value">${s.wiki}</div></div>
-          <div class="sc"><div class="sc-label">클랜</div><div class="sc-value">${s.clans}</div></div>`;
+          <div class="sc"><div class="sc-label">모임</div><div class="sc-value">${s.meetups}</div></div>`;
       } catch (err) { showAlert(alertEl, err.message); }
     }
 
@@ -80,7 +86,7 @@
               ${escapeHtml(u.username)}
               ${u.is_admin ? '<span class="badge" style="margin-left:6px;">관리자</span>' : ''}
               ${u.is_deleted ? '<span class="tbadge closed" style="margin-left:6px;">탈퇴</span>' : ''}
-              <div class="muted" style="font-size:12px;">${escapeHtml(u.email)} · ${(u.created_at||'').slice(0,10)}</div>
+              <div class="muted" style="font-size:12px;">${escapeHtml(u.email)} · ${fmtDate(u.created_at)}</div>
             </span>
             <span style="display:flex; gap:6px;">
               <button class="btn btn-ghost" style="padding:5px 10px; font-size:12px;" data-admin="${u.id}" data-cur="${u.is_admin?1:0}">${u.is_admin?'관리자 해제':'관리자 지정'}</button>
@@ -110,7 +116,7 @@
             <span class="row-value">
               <a href="/post?id=${p.id}">${escapeHtml(p.title)}</a>
               ${p.deleted_at ? '<span class="tbadge closed" style="margin-left:6px;">삭제됨</span>' : ''}
-              <div class="muted" style="font-size:12px;">${escapeHtml(p.author)} · 조회 ${p.view_count} · ${(p.created_at||'').slice(0,10)}</div>
+              <div class="muted" style="font-size:12px;">${escapeHtml(p.author)} · 조회 ${p.view_count} · ${fmtDate(p.created_at)}</div>
             </span>
             ${p.deleted_at ? '' : `<button class="btn btn-danger" style="padding:5px 10px; font-size:12px;" data-del-post="${p.id}">삭제</button>`}
           </div>`).join('') || '<p class="muted" style="font-size:14px;">게시글이 없어요.</p>';

@@ -1,8 +1,5 @@
 from flask import Blueprint, jsonify, request, g
-<<<<<<< HEAD
 from datetime import timedelta
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
 from db.connection import get_db
 from utils.auth import login_required
 
@@ -19,6 +16,9 @@ def err(msg, code, status=400):
 @study_bp.route('/api/study/start', methods=['POST'])
 @login_required
 def start_study():
+    data    = request.get_json(silent=True) or {}
+    post_id = data.get('post_id')  # 이 세션 공부 시간을 기여도로 반영할 모임(선택, 없으면 개인 공부)
+
     conn   = get_db()
     cursor = conn.cursor()
     try:
@@ -29,16 +29,25 @@ def start_study():
         if cursor.fetchone():
             return err('이미 공부 중인 세션이 있습니다', 'SESSION_ACTIVE', 409)
 
+        if post_id is not None:
+            cursor.execute(
+                "SELECT 1 FROM post_members WHERE post_id = %s AND user_id = %s "
+                "AND status = 'active' AND left_at IS NULL",
+                (post_id, g.user_id)
+            )
+            if not cursor.fetchone():
+                return err('가입된 모임이 아닙니다', 'NOT_MEMBER', 404)
+
         cursor.execute(
-            'INSERT INTO study_sessions (user_id) VALUES (%s)',
-            (g.user_id,)
+            'INSERT INTO study_sessions (user_id, post_id) VALUES (%s, %s)',
+            (g.user_id, post_id)
         )
         conn.commit()
         session_id = cursor.lastrowid
     finally:
         conn.close()
 
-    return ok({'session_id': session_id}, '공부 시작'), 201
+    return ok({'session_id': session_id, 'post_id': post_id}, '공부 시작'), 201
 
 
 @study_bp.route('/api/study/end', methods=['POST'])
@@ -48,7 +57,7 @@ def end_study():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            'SELECT id, started_at FROM study_sessions WHERE user_id = %s AND ended_at IS NULL',
+            'SELECT id, started_at, post_id FROM study_sessions WHERE user_id = %s AND ended_at IS NULL',
             (g.user_id,)
         )
         session = cursor.fetchone()
@@ -66,18 +75,16 @@ def end_study():
 
         cursor.execute('SELECT duration_sec FROM study_sessions WHERE id = %s', (session['id'],))
         duration = cursor.fetchone()['duration_sec']
-<<<<<<< HEAD
 
-        # 클랜 기여도 누적 (분 단위) — 가입한 모든 클랜에 반영
+        # 모임 기여도 누적 (분 단위) — 공부 시작 시 선택한 모임에만 반영(선택 안 했으면 개인 기록만 남음)
         mins = (duration or 0) // 60
-        if mins > 0:
+        if mins > 0 and session['post_id'] is not None:
             cursor.execute(
-                'UPDATE clan_members SET contribution_score = contribution_score + %s WHERE user_id = %s',
-                (mins, g.user_id)
+                "UPDATE post_members SET contribution_score = contribution_score + %s "
+                "WHERE post_id = %s AND user_id = %s AND status = 'active' AND left_at IS NULL",
+                (mins, session['post_id'], g.user_id)
             )
             conn.commit()
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
     finally:
         conn.close()
 
@@ -91,10 +98,11 @@ def study_status():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            '''SELECT id, started_at,
-                      TIMESTAMPDIFF(SECOND, started_at, NOW()) AS elapsed_sec
-               FROM study_sessions
-               WHERE user_id = %s AND ended_at IS NULL''',
+            '''SELECT s.id, s.started_at, s.post_id, p.title AS post_title,
+                      TIMESTAMPDIFF(SECOND, s.started_at, NOW()) AS elapsed_sec
+               FROM study_sessions s
+               LEFT JOIN posts p ON s.post_id = p.id
+               WHERE s.user_id = %s AND s.ended_at IS NULL''',
             (g.user_id,)
         )
         session = cursor.fetchone()
@@ -114,10 +122,10 @@ def study_stats():
     try:
         if period == 'week':
             cursor.execute(
-                '''SELECT YEARWEEK(started_at, 1)      AS period_key,
-                          MIN(DATE(started_at))         AS week_start,
-                          SUM(duration_sec)             AS total_sec,
-                          COUNT(*)                      AS session_count
+                '''SELECT YEARWEEK(started_at, 1)                    AS period_key,
+                          DATE_FORMAT(MIN(DATE(started_at)), '%%Y-%%m-%%d') AS week_start,
+                          SUM(duration_sec)                           AS total_sec,
+                          COUNT(*)                                    AS session_count
                    FROM study_sessions
                    WHERE user_id = %s
                      AND ended_at IS NOT NULL
@@ -129,9 +137,9 @@ def study_stats():
             )
         else:
             cursor.execute(
-                '''SELECT DATE(started_at)  AS period_key,
-                          SUM(duration_sec) AS total_sec,
-                          COUNT(*)          AS session_count
+                '''SELECT DATE_FORMAT(started_at, '%%Y-%%m-%%d') AS period_key,
+                          SUM(duration_sec)                      AS total_sec,
+                          COUNT(*)                               AS session_count
                    FROM study_sessions
                    WHERE user_id = %s
                      AND ended_at IS NOT NULL
@@ -189,7 +197,6 @@ def study_ranking():
         conn.close()
 
     return ok({'ranking': ranking, 'period': period})
-<<<<<<< HEAD
 
 
 # ── 연속 공부(스트릭) ──────────────────────────────────────────────
@@ -257,6 +264,44 @@ def study_streak():
     })
 
 
+# ── 하루 목표 공부 시간(잔디/타이머 링 기준) ────────────────────────
+MIN_GOAL_MIN = 10     # 10분
+MAX_GOAL_MIN = 720    # 12시간
+
+
+@study_bp.route('/api/study/goal', methods=['GET'])
+@login_required
+def get_goal():
+    conn   = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT daily_goal_min FROM users WHERE id = %s', (g.user_id,))
+        row = cursor.fetchone()
+    finally:
+        conn.close()
+
+    return ok({'daily_goal_min': row['daily_goal_min'] if row else 240})
+
+
+@study_bp.route('/api/study/goal', methods=['PUT'])
+@login_required
+def set_goal():
+    data    = request.get_json(silent=True) or {}
+    minutes = data.get('daily_goal_min')
+    if not isinstance(minutes, int) or not (MIN_GOAL_MIN <= minutes <= MAX_GOAL_MIN):
+        return err(f'목표 시간은 {MIN_GOAL_MIN}~{MAX_GOAL_MIN}분 사이여야 합니다', 'INVALID_GOAL')
+
+    conn   = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('UPDATE users SET daily_goal_min = %s WHERE id = %s', (minutes, g.user_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+    return ok({'daily_goal_min': minutes})
+
+
 # ── 공부 잔디(히트맵) ──────────────────────────────────────────────
 @study_bp.route('/api/study/heatmap', methods=['GET'])
 @login_required
@@ -267,6 +312,9 @@ def study_heatmap():
     conn   = get_db()
     cursor = conn.cursor()
     try:
+        cursor.execute('SELECT daily_goal_min FROM users WHERE id = %s', (g.user_id,))
+        goal_row = cursor.fetchone()
+
         cursor.execute(
             '''SELECT DATE(started_at) AS d,
                       SUM(duration_sec) AS total_sec,
@@ -282,12 +330,13 @@ def study_heatmap():
     finally:
         conn.close()
 
+    daily_goal_min = goal_row['daily_goal_min'] if goal_row else 240
     data = [{
         'date':      str(r['d']),
         'total_sec': int(r['total_sec'] or 0),
         'sessions':  r['sessions'],
     } for r in rows]
-    return ok({'days': data, 'range_days': days})
+    return ok({'days': data, 'range_days': days, 'daily_goal_min': daily_goal_min})
 
 
 # ── 실시간 공부 인원 ───────────────────────────────────────────────
@@ -375,5 +424,3 @@ def study_planet():
         'progress':       round(progress, 3),
         'stages':         PLANET_STAGES,
     })
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed

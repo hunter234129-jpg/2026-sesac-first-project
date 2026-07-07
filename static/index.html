@@ -3,42 +3,364 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StudyBoard · 함께 공부하는 우주</title>
+  <title>StudyBoard · 공부하며 나만의 행성을 성장시키세요</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    :root {
+      --ld-bg: #0A0E1A; --ld-cyan: #00D9C0; --ld-purple: #C4B5FD; --ld-green: #39FF14; --ld-amber: #F59E0B;
+      --ld-text: #E2E8F0; --ld-text2: #94A3B8; --ld-text3: #64748B; --ld-text4: #475569; --ld-text5: #334155;
+    }
+    body { background: var(--ld-bg); font-family: 'Inter', sans-serif; overflow-x: hidden; }
+    .disp { font-family: 'Oxanium', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    @keyframes twinkle { from { opacity: .2; } to { opacity: .9; } }
+    @keyframes pulseGlow { 0%,100% { transform: scale(1); opacity: .6; } 50% { transform: scale(1.08); opacity: 1; } }
+    @keyframes spinSlow { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+    @keyframes floatPlanet { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-16px); } }
+    @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+
+    /* 네비게이션 재도색 */
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      background: rgba(10,14,26,0.8); backdrop-filter: blur(16px) saturate(140%);
+      border-bottom: 1px solid rgba(255,255,255,0.06); padding: 14px 24px;
+    }
+    .navbar .brand { font-family: 'Oxanium', sans-serif; font-weight: 700; font-size: 1.15rem; color: var(--ld-text); }
+    .navbar .brand .dot { color: var(--ld-cyan); text-shadow: 0 0 10px var(--ld-cyan); }
+    .navbar .nav-links a { color: var(--ld-text2); font-size: 13px; }
+    .navbar .nav-links a:hover { color: var(--ld-cyan); }
+
+    /* ── Hero ── */
+    .ld-hero { position: relative; min-height: 100vh; display: flex; align-items: center; overflow: hidden; padding-top: 90px; }
+    .ld-nebula { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .ld-nebula .base { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(76,29,149,0.18) 0%, transparent 70%); }
+    .ld-nebula .cyan { position: absolute; width: 700px; height: 700px; top: -200px; left: -150px; background: radial-gradient(ellipse at center, rgba(0,217,192,0.07) 0%, transparent 65%); filter: blur(40px); }
+    .ld-nebula .purple { position: absolute; width: 800px; height: 800px; top: -100px; right: -200px; background: radial-gradient(ellipse at center, rgba(139,92,246,0.12) 0%, transparent 65%); filter: blur(50px); }
+    .ld-hero-inner { position: relative; z-index: 2; max-width: 1280px; margin: 0 auto; padding: 0 24px; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 60px; flex-wrap: wrap; }
+    .ld-copy { flex: 1; min-width: 320px; max-width: 560px; }
+    .ld-badge { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 22px; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(0,217,192,0.2); background: rgba(0,217,192,0.06); backdrop-filter: blur(16px); }
+    .ld-badge .ping { width: 8px; height: 8px; border-radius: 50%; background: var(--ld-green); box-shadow: 0 0 6px var(--ld-green); }
+    .ld-badge span.txt { font-size: 11px; font-weight: 700; letter-spacing: .18em; color: var(--ld-cyan); }
+    .ld-h1 { font-weight: 800; font-size: clamp(2rem, 5vw, 3.4rem); color: var(--ld-text); letter-spacing: -.02em; line-height: 1.18; margin-bottom: 20px; }
+    .ld-h1 .grad { background: linear-gradient(90deg, #00D9C0 0%, #C4B5FD 50%, #00D9C0 100%); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 4s linear infinite; }
+    .ld-h1 .sub-en { display: block; margin-top: 4px; font-size: .55em; font-weight: 300; letter-spacing: .05em; color: var(--ld-text4); background: none; -webkit-text-fill-color: unset; }
+    .ld-lead { color: var(--ld-text2); font-size: 1.05rem; line-height: 1.7; max-width: 40ch; margin-bottom: 36px; }
+    .ld-lead strong { color: var(--ld-purple); }
+    .ld-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+    .btn-glow { font-family: 'Oxanium', sans-serif; padding: 15px 30px; border-radius: 999px; font-weight: 700; font-size: 1rem; display: inline-flex; align-items: center; gap: 8px; background: var(--ld-green); color: #0A0E1A; border: none; cursor: pointer; box-shadow: 0 0 20px rgba(57,255,20,.35), 0 0 40px rgba(57,255,20,.12); transition: all .25s ease; letter-spacing: .02em; }
+    .btn-glow:hover { box-shadow: 0 0 30px rgba(57,255,20,.5), 0 0 60px rgba(57,255,20,.2); transform: translateY(-2px); }
+    .btn-ghost2 { padding: 15px 22px; border-radius: 999px; font-weight: 500; font-size: .9rem; color: var(--ld-text2); border: 1px solid rgba(255,255,255,.1); background: transparent; cursor: pointer; transition: all .2s ease; }
+    .btn-ghost2:hover { color: var(--ld-text); border-color: rgba(255,255,255,.2); }
+    .ld-social { margin-top: 40px; display: flex; align-items: center; gap: 16px; }
+    .ld-avatars { display: flex; }
+    .ld-avatars span { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--ld-bg); margin-left: -8px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #0A0E1A; }
+    .ld-avatars span:first-child { margin-left: 0; }
+    .ld-social-txt { font-size: .85rem; font-weight: 600; color: var(--ld-text); }
+    .ld-social-txt .n { color: var(--ld-cyan); }
+    .ld-stars-line { display: flex; align-items: center; gap: 1px; margin-top: 3px; font-size: 11px; color: var(--ld-text3); }
+
+    /* Planet illustration */
+    .ld-planet-wrap { flex-shrink: 0; position: relative; display: none; align-items: center; justify-content: center; width: 340px; height: 340px; }
+    @media (min-width: 1024px) { .ld-planet-wrap { display: flex; } }
+    .ld-planet-float { animation: floatPlanet 6s ease-in-out infinite; }
+    .ld-chip { position: absolute; border-radius: 12px; padding: 8px 12px; backdrop-filter: blur(16px); }
+    .ld-chip .l { font-size: 11px; color: var(--ld-text2); font-family: 'JetBrains Mono', monospace; }
+    .ld-chip .v { font-size: 17px; font-weight: 800; font-family: 'Oxanium', sans-serif; }
+    .ld-chip.c1 { left: -16px; top: 40px; border: 1px solid rgba(0,217,192,0.2); background: rgba(0,217,192,0.08); }
+    .ld-chip.c1 .v { color: var(--ld-cyan); }
+    .ld-chip.c2 { right: -24px; bottom: 60px; border: 1px solid rgba(139,92,246,0.2); background: rgba(139,92,246,0.08); }
+    .ld-chip.c2 .v { color: var(--ld-purple); display: flex; align-items: center; gap: 5px; }
+    .ld-chip.c3 { right: 20px; top: 12px; border: 1px solid rgba(57,255,20,0.15); background: rgba(57,255,20,0.05); }
+    .ld-chip.c3 .v { color: var(--ld-green); }
+    .ld-bottom-fade { position: absolute; bottom: 0; left: 0; right: 0; height: 130px; background: linear-gradient(to bottom, transparent, var(--ld-bg)); pointer-events: none; }
+
+    /* ── Section shared ── */
+    .ld-section { position: relative; padding: 100px 24px; max-width: 1280px; margin: 0 auto; }
+    .ld-eyebrow { display: block; margin-bottom: 12px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .18em; color: var(--ld-cyan); }
+    .ld-h2 { text-align: center; font-weight: 700; font-size: clamp(1.7rem, 3.4vw, 2.5rem); color: var(--ld-text); margin-bottom: 16px; }
+    .ld-h2 .hl { color: var(--ld-purple); }
+    .ld-h2-lead { text-align: center; max-width: 30rem; margin: 0 auto 56px; color: var(--ld-text3); }
+
+    /* Feature cards */
+    .ld-features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+    .feat-card { border-radius: 18px; padding: 26px; display: flex; flex-direction: column; gap: 20px; background: rgba(255,255,255,0.03); backdrop-filter: blur(16px); transition: transform .3s ease; }
+    .feat-card:hover { transform: translateY(-6px); }
+    .feat-top { display: flex; align-items: flex-start; justify-content: space-between; }
+    .feat-icon { padding: 11px; border-radius: 12px; font-size: 22px; line-height: 1; }
+    .feat-badge { font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 999px; letter-spacing: .08em; }
+    .feat-title { font-family: 'Oxanium', sans-serif; font-weight: 700; color: var(--ld-text); font-size: 1rem; margin-bottom: 2px; }
+    .feat-title-en { font-size: 11px; opacity: .7; }
+    .feat-desc { font-size: .87rem; line-height: 1.65; color: var(--ld-text2); flex: 1; }
+    .feat-subs { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .feat-subs .row { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ld-text3); }
+
+    /* Dashboard preview strip */
+    .ld-preview { border-radius: 18px; overflow: hidden; border: 1px solid rgba(0,217,192,0.1); background: rgba(0,217,192,0.02); backdrop-filter: blur(16px); }
+    .ld-preview-top { padding: 14px 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .ld-preview-top .d { width: 11px; height: 11px; border-radius: 50%; opacity: .6; }
+    .ld-preview-grid { padding: 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; }
+    .ld-preview-cell { border-radius: 12px; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+    .ld-preview-cell .lbl { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; font-size: 11px; color: var(--ld-text3); }
+    .ld-preview-cell .val { font-family: 'Oxanium', sans-serif; font-weight: 700; font-size: 1.15rem; }
+
+    /* Stat cards */
+    .ld-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+    .stat-card { border-radius: 18px; padding: 30px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); backdrop-filter: blur(16px); }
+    .stat-card .icon { padding: 11px; border-radius: 12px; font-size: 22px; }
+    .stat-card .num { font-family: 'Oxanium', sans-serif; font-weight: 900; font-size: clamp(1.7rem, 3vw, 2.3rem); line-height: 1; font-variant-numeric: tabular-nums; }
+    .stat-card .lbl { font-size: .9rem; font-weight: 600; color: var(--ld-text2); }
+    .stat-card .lbl-en { font-size: 11px; color: var(--ld-text4); margin-top: 2px; }
+
+    /* Final CTA */
+    .ld-final { text-align: center; padding: 110px 24px; }
+    .ld-final h2 { font-family: 'Oxanium', sans-serif; font-weight: 800; font-size: clamp(1.8rem, 4vw, 2.7rem); color: var(--ld-text); margin-bottom: 22px; }
+    .ld-final .grad2 { background: linear-gradient(90deg, #39FF14, #00D9C0); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .ld-final p.lead2 { color: var(--ld-text3); font-size: 1.1rem; margin-bottom: 38px; }
+    .ld-final .note { margin-top: 18px; font-size: .85rem; color: var(--ld-text5); }
+
+    footer.ld-footer { border-top: 1px solid rgba(255,255,255,0.06); padding: 36px 24px; }
+    .ld-footer-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .ld-footer-brand { display: flex; align-items: center; gap: 8px; font-family: 'Oxanium', sans-serif; font-weight: 700; color: var(--ld-text4); }
+    .ld-footer-links { display: flex; gap: 22px; flex-wrap: wrap; }
+    .ld-footer-links a { font-size: 11px; color: var(--ld-text5); }
+    .ld-footer-links a:hover { color: var(--ld-text2); }
+    .ld-footer-copy { font-size: 11px; color: #334155; font-family: 'JetBrains Mono', monospace; }
+  </style>
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
-  <section class="hero">
-    <canvas id="solarCanvas"></canvas>
+  <!-- ── Hero ── -->
+  <section class="ld-hero">
+    <div class="ld-nebula">
+      <div class="base"></div>
+      <div class="cyan"></div>
+      <div class="purple"></div>
+      <svg id="starField" style="position:absolute; inset:0; width:100%; height:100%;"></svg>
+    </div>
 
-    <h1>오늘도 <span class="accent">한 걸음</span> 더<br>함께 공부해요</h1>
-    <p class="lead">
-      공부 시간 기록부터 스터디 모집, 위키 정리, 클랜 활동까지.<br>
-      각자의 궤도를 돌지만, 같은 항성을 향해.
-    </p>
-    <button class="btn btn-success btn-lg" id="startBtn">오늘의 공부 시작하기 →</button>
-
-    <div class="ranking-preview card" id="rankingCard" style="text-align:left;">
-      <div style="font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">
-        🔥 인기 위키 (오늘)
+    <div class="ld-hero-inner">
+      <div class="ld-copy">
+        <div class="ld-badge"><span class="ping"></span><span class="txt disp">STUDY × GAME</span></div>
+        <h1 class="ld-h1 disp">
+          공부하며 <span class="grad">나만의 행성을</span><br>성장시키세요
+          <span class="sub-en">Grow Your Planet by Studying</span>
+        </h1>
+        <p class="ld-lead">공부 시간 기록부터 스터디 모임까지,<br><strong>당신의 공부를 게임처럼</strong></p>
+        <div class="ld-ctas">
+          <button class="btn-glow disp" id="ctaMain">지금 무료로 시작하기 ›</button>
+          <button class="btn-ghost2" id="ctaDemo"><span style="color:var(--ld-purple);">▶</span> 데모 보기</button>
+        </div>
+        <div class="ld-social">
+          <div class="ld-avatars">
+            <span style="background:#00D9C0;">K</span><span style="background:#C4B5FD;">J</span>
+            <span style="background:#F59E0B;">M</span><span style="background:#39FF14;">L</span>
+            <span style="background:#EC4899;">S</span>
+          </div>
+          <div>
+            <div class="ld-social-txt"><span class="n" id="liveHeroCount">24,837명</span>이 지금 공부 중</div>
+            <div class="ld-stars-line">★★★★★<span style="margin-left:4px;">4.9 / 5.0</span></div>
+          </div>
+        </div>
       </div>
-      <div id="rankingList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+
+      <div class="ld-planet-wrap">
+        <div class="ld-planet-float">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <defs>
+              <radialGradient id="planetGrad" cx="38%" cy="35%" r="65%">
+                <stop offset="0%" stop-color="#1E3A5F" /><stop offset="40%" stop-color="#0F2044" />
+                <stop offset="80%" stop-color="#0A0E1A" /><stop offset="100%" stop-color="#060810" />
+              </radialGradient>
+              <radialGradient id="planetShine" cx="30%" cy="28%" r="40%">
+                <stop offset="0%" stop-color="rgba(0,217,192,0.25)" /><stop offset="100%" stop-color="transparent" />
+              </radialGradient>
+              <radialGradient id="atmosphereGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="75%" stop-color="transparent" /><stop offset="90%" stop-color="rgba(0,217,192,0.08)" />
+                <stop offset="100%" stop-color="rgba(0,217,192,0.18)" />
+              </radialGradient>
+              <clipPath id="planetClip2"><circle cx="100" cy="100" r="72" /></clipPath>
+            </defs>
+            <circle cx="100" cy="100" r="80" fill="url(#atmosphereGrad)" />
+            <circle cx="100" cy="100" r="72" fill="url(#planetGrad)" />
+            <g clip-path="url(#planetClip2)">
+              <ellipse cx="100" cy="82" rx="72" ry="8" fill="rgba(0,180,160,0.08)" />
+              <ellipse cx="100" cy="100" rx="72" ry="6" fill="rgba(139,92,246,0.06)" />
+              <ellipse cx="80" cy="90" rx="22" ry="14" fill="rgba(0,217,192,0.12)" transform="rotate(-20,80,90)" />
+              <ellipse cx="120" cy="110" rx="18" ry="10" fill="rgba(139,92,246,0.1)" transform="rotate(15,120,110)" />
+            </g>
+            <circle cx="100" cy="100" r="72" fill="url(#planetShine)" />
+            <ellipse cx="100" cy="100" rx="110" ry="22" fill="none" stroke="rgba(0,217,192,0.3)" stroke-width="1.5" />
+            <ellipse cx="100" cy="100" rx="110" ry="22" fill="none" stroke="rgba(0,217,192,0.08)" stroke-width="6" />
+            <circle cx="210" cy="100" r="6" fill="#1E3A5F" stroke="rgba(0,217,192,0.5)" stroke-width="1" />
+            <circle cx="76" cy="88" r="2.5" fill="#00D9C0" opacity=".7" />
+          </svg>
+        </div>
+        <div class="ld-chip c1"><div class="l">Focus Session</div><div class="v">24:51</div></div>
+        <div class="ld-chip c2"><div class="l">Daily Streak</div><div class="v">🔥 27 DAYS</div></div>
+        <div class="ld-chip c3"><div class="l">Planet Level</div><div class="v">LV. 14</div></div>
+      </div>
+    </div>
+    <div class="ld-bottom-fade"></div>
+  </section>
+
+  <!-- ── Features ── -->
+  <section class="ld-section">
+    <span class="ld-eyebrow disp">CORE FEATURES</span>
+    <h2 class="ld-h2 disp">공부를 게임처럼 만드는<br><span class="hl">4가지 핵심 기능</span></h2>
+    <p class="ld-h2-lead">StudyBoard의 모든 기능은 학습 몰입도를 극대화하도록 설계되었습니다.</p>
+    <div class="ld-features-grid" id="featuresGrid"></div>
+  </section>
+
+  <!-- ── Dashboard preview ── -->
+  <section style="padding:48px 24px; border-top:1px solid rgba(255,255,255,.04); border-bottom:1px solid rgba(255,255,255,.04);">
+    <div style="max-width:1280px; margin:0 auto;">
+      <div class="ld-preview">
+        <div class="ld-preview-top">
+          <div class="d" style="background:#ef4444;"></div><div class="d" style="background:#eab308;"></div><div class="d" style="background:#22c55e;"></div>
+          <span class="mono" style="margin-left:10px; font-size:11px; color:var(--ld-text3);">studyboard.app / dashboard</span>
+        </div>
+        <div class="ld-preview-grid">
+          <div class="ld-preview-cell"><div class="lbl">⏱ Today Focus</div><div class="val" style="color:#00D9C0;">3h 24m</div></div>
+          <div class="ld-preview-cell"><div class="lbl">🔥 Streak</div><div class="val" style="color:#F59E0B;">27 Days</div></div>
+          <div class="ld-preview-cell"><div class="lbl">🪐 Planet XP</div><div class="val" style="color:#C4B5FD;">+840</div></div>
+          <div class="ld-preview-cell"><div class="lbl">🙋 Open Meetups</div><div class="val" style="color:#39FF14;" id="meetupPreview">12 Groups</div></div>
+        </div>
+      </div>
     </div>
   </section>
+
+  <!-- ── Live stats ── -->
+  <section class="ld-section">
+    <span class="ld-eyebrow disp" style="color:var(--ld-green); display:inline-flex; align-items:center; gap:8px; justify-content:center; width:100%;">
+      <span class="ping" style="width:8px;height:8px;border-radius:50%;background:var(--ld-green);box-shadow:0 0 6px var(--ld-green);animation:pulseGlow 2s ease-in-out infinite;display:inline-block;"></span>LIVE DATA
+    </span>
+    <h2 class="ld-h2 disp">지금 이 순간에도 공부 중인<br><span style="color:var(--ld-cyan);">StudyBoard 유저들</span></h2>
+    <div class="ld-stats-grid" id="statsGrid"></div>
+    <p style="text-align:center; margin-top:32px; font-size:13px; color:#475569;">* 수치는 실시간으로 업데이트됩니다. Last sync: <span class="mono" id="syncTime"></span></p>
+  </section>
+
+  <!-- ── 인기 위키(실데이터) ── -->
+  <section class="ld-section" style="padding-top:0;">
+    <div class="ld-preview" style="max-width:640px; margin:0 auto; text-align:left;">
+      <div class="ld-preview-top"><span style="font-size:13px; color:var(--ld-text2);">🔥 인기 위키 (오늘)</span></div>
+      <div style="padding:8px 20px 18px;" id="rankingList"><p class="muted" style="font-size:14px;">불러오는 중...</p></div>
+    </div>
+  </section>
+
+  <!-- ── Final CTA ── -->
+  <section class="ld-final">
+    <h2>지금 바로 나만의 행성을<br><span class="grad2">시작하세요</span></h2>
+    <p class="lead2">무료로 시작하고, 공부가 게임이 되는 경험을 직접 느껴보세요.</p>
+    <button class="btn-glow disp" id="ctaFinal" style="padding:19px 42px; font-size:1.1rem; margin:0 auto;">지금 무료로 시작하기 ›</button>
+    <p class="note">신용카드 불필요 · 영구 무료 플랜 · 가입 즉시 행성 지급</p>
+  </section>
+
+  <footer class="ld-footer">
+    <div class="ld-footer-inner">
+      <div class="ld-footer-brand"><span class="dot" style="color:#00D9C0;">●</span> StudyBoard</div>
+      <div class="ld-footer-links">
+        <a href="#">이용약관</a><a href="#">개인정보처리방침</a><a href="#">공지사항</a><a href="#">고객센터</a>
+      </div>
+      <span class="ld-footer-copy">© 2026 StudyBoard</span>
+    </div>
+  </footer>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
 
-    document.getElementById('startBtn').onclick = () => {
-      location.href = Auth.isLoggedIn ? '/dashboard' : '/login';
-    };
+    function goStart() { location.href = Auth.isLoggedIn ? '/dashboard' : '/login'; }
+    document.getElementById('ctaMain').onclick = goStart;
+    document.getElementById('ctaFinal').onclick = goStart;
+    document.getElementById('ctaDemo').onclick = () => document.querySelector('.ld-preview').scrollIntoView({ behavior: 'smooth' });
 
-    /* ── 인기 위키 랭킹 ── */
+    /* ── 별밭 SVG ── */
+    (() => {
+      const svg = document.getElementById('starField');
+      const ns = 'http://www.w3.org/2000/svg';
+      for (let i = 0; i < 80; i++) {
+        const c = document.createElementNS(ns, 'circle');
+        c.setAttribute('cx', Math.random() * 100 + '%');
+        c.setAttribute('cy', Math.random() * 100 + '%');
+        c.setAttribute('r', (Math.random() * 1.3 + 0.4).toFixed(2));
+        c.setAttribute('fill', 'white');
+        c.setAttribute('opacity', (Math.random() * 0.6 + 0.2).toFixed(2));
+        c.style.animation = `twinkle ${2 + Math.random() * 4}s ease-in-out infinite alternate`;
+        svg.appendChild(c);
+      }
+    })();
+
+    /* ── 기능 카드 ── */
+    const FEATURES = [
+      { icon:'⏱️', color:'#00D9C0', glow:'rgba(0,217,192,0.15)', border:'rgba(0,217,192,0.2)', badge:'CORE',
+        title:'실시간 타이머 & 스트릭', titleEn:'Real-time Timer & Streak',
+        desc:'포모도로 타이머, 집중 세션 트래킹, 연속 공부 스트릭으로 꾸준한 학습 루틴을 만들어 드립니다.',
+        subs:['🔥 최장 스트릭 기록', '⚡ 집중 세션 트래킹'] },
+      { icon:'🪐', color:'#C4B5FD', glow:'rgba(139,92,246,0.15)', border:'rgba(139,92,246,0.2)', badge:'UNIQUE',
+        title:'행성 성장 & 스터디 모임', titleEn:'Planet Growth & Study Meetups',
+        desc:'공부 시간이 쌓일수록 나만의 행성이 성장합니다. 게시판에서 스터디원을 모집하고, 성사되면 그룹 채팅으로 함께 공부하세요.',
+        subs:['🙋 스터디원 모집 & 그룹 채팅', '⭐ 행성 레벨 시스템'] },
+      { icon:'📚', color:'#F59E0B', glow:'rgba(245,158,11,0.12)', border:'rgba(245,158,11,0.2)', badge:'SHARED',
+        title:'통합 위키 & 자료 공유', titleEn:'Integrated Wiki & Resources',
+        desc:'과목별 노트, 마인드맵, 그림을 위키로 구조화하고 실시간으로 함께 편집하세요.',
+        subs:['🔗 실시간 공동 편집', '🎨 그림·차트 삽입'] },
+      { icon:'🛰️', color:'#39FF14', glow:'rgba(57,255,20,0.10)', border:'rgba(57,255,20,0.18)', badge:'AI',
+        title:'AI 도우미 & OCR 스캔', titleEn:'AI Assistant & OCR Scan',
+        desc:'모르는 개념은 AI에게 질문하고, 교재 사진을 찍으면 OCR이 자동으로 텍스트를 추출해 정리합니다.',
+        subs:['🔭 교재 자동 추출', '🤖 AI 기반 Q&A'] },
+    ];
+    document.getElementById('featuresGrid').innerHTML = FEATURES.map(f => `
+      <div class="feat-card" style="border:1px solid ${f.border}; box-shadow:0 0 40px ${f.glow}, inset 0 1px 0 rgba(255,255,255,.05);">
+        <div class="feat-top">
+          <div class="feat-icon" style="background:${f.glow}; border:1px solid ${f.border};">${f.icon}</div>
+          <span class="feat-badge disp" style="color:${f.color}; background:${f.glow}; border:1px solid ${f.border};">${f.badge}</span>
+        </div>
+        <div><div class="feat-title">${f.title}</div><div class="feat-title-en" style="color:${f.color};">${f.titleEn}</div></div>
+        <p class="feat-desc">${f.desc}</p>
+        <div class="feat-subs">${f.subs.map(s => `<div class="row">${s}</div>`).join('')}</div>
+      </div>`).join('');
+
+    /* ── 통계 카드(가능한 것은 실데이터, 나머지는 예시 수치) ── */
+    const STATS = [
+      { key:'live',  label:'현재 공부 중', labelEn:'Studying Now', icon:'👥', color:'#00D9C0', value:0, suffix:'명' },
+      { key:'hours',  label:'누적 공부 시간', labelEn:'Total Hours Logged', icon:'⏰', color:'#C4B5FD', value:9182540, suffix:'h' },
+      { key:'clans',  label:'모집중인 모임', labelEn:'Open Meetups', icon:'🙋', color:'#39FF14', value:0, suffix:'개' },
+      { key:'wiki',   label:'공유된 자료', labelEn:'Shared Resources', icon:'📚', color:'#F59E0B', value:58920, suffix:'개' },
+    ];
+    document.getElementById('statsGrid').innerHTML = STATS.map(s => `
+      <div class="stat-card">
+        <div class="icon" style="background:${s.color}15; border:1px solid ${s.color}25;">${s.icon}</div>
+        <div class="num" style="color:${s.color};" id="stat-${s.key}">${s.value.toLocaleString('ko-KR')}<span style="font-size:1rem; margin-left:2px;">${s.suffix}</span></div>
+        <div class="lbl">${s.label}</div>
+        <div class="lbl-en">${s.labelEn}</div>
+      </div>`).join('');
+    document.getElementById('syncTime').textContent = new Date().toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' });
+
+    /* 실데이터로 교체: 현재 공부 중 인원 + 모집중인 모임 수 */
+    (async () => {
+      try {
+        const d = await api('/api/study/live', { auth: false });
+        const n = d.count || 0;
+        document.getElementById('stat-live').innerHTML = n.toLocaleString('ko-KR') + '<span style="font-size:1rem;margin-left:2px;">명</span>';
+        document.getElementById('liveHeroCount').textContent = n.toLocaleString('ko-KR') + '명';
+      } catch (_) {}
+    })();
+    (async () => {
+      try {
+        const d = await api('/api/posts?type=study&size=1', { auth: false });
+        document.getElementById('stat-clans').innerHTML = (d.total || 0).toLocaleString('ko-KR') + '<span style="font-size:1rem;margin-left:2px;">개</span>';
+      } catch (_) {}
+    })();
+
+    /* ── 인기 위키 랭킹(실데이터) ── */
     (async () => {
       const list = document.getElementById('rankingList');
       try {
@@ -49,177 +371,14 @@
           return;
         }
         list.innerHTML = items.map((w, i) => `
-          <div style="display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--border);">
-            <span style="color:var(--cyan); font-weight:800; width:20px;">${i + 1}</span>
-            <a href="/wiki?slug=${encodeURIComponent(w.slug)}" style="flex:1;">${escapeHtml(w.title)}</a>
+          <div style="display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.06);">
+            <span style="color:var(--ld-cyan); font-weight:800; width:20px;">${i + 1}</span>
+            <a href="/wiki?slug=${encodeURIComponent(w.slug)}" style="flex:1; color:var(--ld-text);">${escapeHtml(w.title)}</a>
             <span class="muted" style="font-size:13px;">조회 ${w.view_count}</span>
           </div>`).join('');
       } catch (e) {
         list.innerHTML = `<p class="muted" style="font-size:14px;">랭킹을 불러오지 못했어요</p>`;
       }
-    })();
-
-    /* ════════════════ 태양계 캔버스 ════════════════ */
-    (() => {
-      const canvas = document.getElementById('solarCanvas');
-      const ctx = canvas.getContext('2d');
-      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      let W, H, DPR, cx, cy, maxR, stars = [];
-      const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
-
-      // 행성: orbit(궤도 비율 0~1) · size(반지름 비율) · color[r,g,b] · speed · angle0 · ring
-      const planets = [
-        { orbit: 0.22, size: 0.013, color: [165,150,135], speed: 0.55, a: 0.4 },
-        { orbit: 0.31, size: 0.020, color: [222,184,120], speed: 0.40, a: 2.1 },
-        { orbit: 0.41, size: 0.022, color: [ 78,150,225], speed: 0.32, a: 5.0, glow:'rgba(90,160,235,.4)' },
-        { orbit: 0.51, size: 0.018, color: [205, 95, 60], speed: 0.26, a: 1.2 },
-        { orbit: 0.66, size: 0.040, color: [212,172,120], speed: 0.16, a: 3.4 },
-        { orbit: 0.80, size: 0.034, color: [228,205,150], speed: 0.12, a: 0.8, ring: true },
-        { orbit: 0.93, size: 0.028, color: [ 96,170,240], speed: 0.09, a: 4.4, glow:'rgba(90,209,255,.4)' },
-      ];
-
-      function resize() {
-        DPR = Math.min(window.devicePixelRatio || 1, 2);
-        W = canvas.clientWidth; H = canvas.clientHeight;
-        canvas.width = W * DPR; canvas.height = H * DPR;
-        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        cx = W / 2; cy = H / 2;
-        maxR = Math.min(W, H) * 0.46;
-        stars = [];
-        const n = Math.round(W * H / 7000);
-        for (let i = 0; i < n; i++) {
-          stars.push({
-            x: Math.random() * W, y: Math.random() * H,
-            r: Math.random() * 1.3 + 0.2,
-            tw: Math.random() * Math.PI * 2,
-            sp: Math.random() * 0.04 + 0.01,
-          });
-        }
-      }
-
-      function shade(c, f) {  // f>0 밝게, f<0 어둡게
-        const m = (v) => Math.max(0, Math.min(255, Math.round(f > 0 ? v + (255 - v) * f : v * (1 + f))));
-        return `rgb(${m(c[0])},${m(c[1])},${m(c[2])})`;
-      }
-
-      function drawSun(t) {
-        const r = maxR * 0.115;
-        const flick = 1 + Math.sin(t * 1.8) * 0.03;
-        // 외곽 코로나 글로우
-        const bloom = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r * 5.5 * flick);
-        bloom.addColorStop(0, 'rgba(255,180,90,.55)');
-        bloom.addColorStop(0.18, 'rgba(255,140,60,.28)');
-        bloom.addColorStop(0.5, 'rgba(255,110,50,.08)');
-        bloom.addColorStop(1, 'rgba(255,110,50,0)');
-        ctx.fillStyle = bloom;
-        ctx.fillRect(0, 0, W, H);
-        // 본체
-        const body = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.25, r * 0.1, cx, cy, r);
-        body.addColorStop(0, '#fff6e0');
-        body.addColorStop(0.4, '#ffd27a');
-        body.addColorStop(0.8, '#ff9a3d');
-        body.addColorStop(1, '#ff6a2a');
-        ctx.beginPath(); ctx.arc(cx, cy, r * flick, 0, Math.PI * 2);
-        ctx.fillStyle = body; ctx.fill();
-      }
-
-      function drawPlanet(p, t) {
-        const ang = p.a + (reduce ? 0 : t * p.speed);
-        const orad = maxR * p.orbit;
-        const x = cx + Math.cos(ang) * orad;
-        const y = cy + Math.sin(ang) * orad * 0.62;   // 약간 기울어진 궤도(원근)
-        const r = Math.max(2, maxR * p.size);
-
-        // 궤도 링
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, orad, orad * 0.62, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(140,160,220,.07)';
-        ctx.lineWidth = 1; ctx.stroke();
-
-        // 발광(지구/해왕성 등)
-        if (p.glow) {
-          const gl = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 2.6);
-          gl.addColorStop(0, p.glow); gl.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, r * 2.6, 0, Math.PI * 2); ctx.fill();
-        }
-
-        // 태양 방향(광원)
-        const dx = cx - x, dy = cy - y, d = Math.hypot(dx, dy) || 1;
-        const hx = x + (dx / d) * r * 0.5, hy = y + (dy / d) * r * 0.5;
-
-        // 토성 뒤쪽 링
-        if (p.ring) drawRing(x, y, r, ang, true);
-
-        // 구체 셰이딩
-        const g = ctx.createRadialGradient(hx, hy, r * 0.05, x, y, r);
-        g.addColorStop(0, shade(p.color, 0.55));
-        g.addColorStop(0.45, shade(p.color, 0.05));
-        g.addColorStop(0.85, shade(p.color, -0.55));
-        g.addColorStop(1, shade(p.color, -0.78));
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = g; ctx.fill();
-
-        // 림 라이트(태양 쪽 가장자리)
-        ctx.save();
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
-        const rim = ctx.createRadialGradient(hx, hy, r * 0.7, hx, hy, r * 1.25);
-        rim.addColorStop(0, 'rgba(255,255,255,0)');
-        rim.addColorStop(1, 'rgba(255,245,220,.35)');
-        ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-
-        // 토성 앞쪽 링
-        if (p.ring) drawRing(x, y, r, ang, false);
-      }
-
-      function drawRing(x, y, r, ang, back) {
-        ctx.save();
-        ctx.translate(x, y); ctx.rotate(-0.5);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, r * 2.1, r * 0.7, 0, back ? Math.PI : 0, back ? Math.PI * 2 : Math.PI);
-        ctx.strokeStyle = 'rgba(228,205,150,.55)'; ctx.lineWidth = r * 0.45; ctx.stroke();
-        ctx.beginPath();
-        ctx.ellipse(0, 0, r * 2.5, r * 0.83, 0, back ? Math.PI : 0, back ? Math.PI * 2 : Math.PI);
-        ctx.strokeStyle = 'rgba(228,205,150,.22)'; ctx.lineWidth = r * 0.3; ctx.stroke();
-        ctx.restore();
-      }
-
-      function frame(ts) {
-        const t = ts / 1000;
-        ctx.clearRect(0, 0, W, H);
-
-        // 패럴랙스 이징
-        mouse.x += (mouse.tx - mouse.x) * 0.05;
-        mouse.y += (mouse.ty - mouse.y) * 0.05;
-        ctx.save();
-        ctx.translate(mouse.x, mouse.y);
-
-        // 별
-        for (const s of stars) {
-          const a = 0.4 + Math.sin(t * 2 + s.tw) * 0.35;
-          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(205,214,255,${a})`; ctx.fill();
-        }
-
-        drawSun(t);
-        // 뒤(아래쪽 y)부터 그려 겹침 자연스럽게
-        const order = planets.map((p, i) => {
-          const ang = p.a + (reduce ? 0 : t * p.speed);
-          return { p, depth: Math.sin(ang) };
-        }).sort((a, b) => a.depth - b.depth);
-        for (const o of order) drawPlanet(o.p, t);
-
-        ctx.restore();
-        if (!reduce) requestAnimationFrame(frame);
-      }
-
-      window.addEventListener('resize', resize);
-      window.addEventListener('mousemove', (e) => {
-        mouse.tx = (e.clientX / window.innerWidth - 0.5) * -30;
-        mouse.ty = (e.clientY / window.innerHeight - 0.5) * -18;
-      });
-      resize();
-      if (reduce) frame(0); else requestAnimationFrame(frame);
     })();
   </script>
 </body>

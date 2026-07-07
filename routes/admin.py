@@ -168,14 +168,29 @@ def admin_stats():
         post_count = cursor.fetchone()['cnt']
         cursor.execute('SELECT COUNT(*) AS cnt FROM wiki_pages')
         wiki_count = cursor.fetchone()['cnt']
-        cursor.execute('SELECT COUNT(*) AS cnt FROM clans')
-        clan_count = cursor.fetchone()['cnt']
+        cursor.execute("SELECT COUNT(*) AS cnt FROM posts WHERE type = 'study' AND deleted_at IS NULL")
+        meetup_count = cursor.fetchone()['cnt']
     finally:
         conn.close()
 
     return ok({
-        'users': user_count,
-        'posts': post_count,
-        'wiki':  wiki_count,
-        'clans': clan_count
+        'users':   user_count,
+        'posts':   post_count,
+        'wiki':    wiki_count,
+        'meetups': meetup_count
     })
+
+
+# ── 시험 일정 크롤러 수동 실행 ──────────────────────────────────────
+# 평소엔 06:00/18:00에 자동 실행되지만(app.py의 APScheduler), 개발 중 확인이나
+# 급하게 최신화가 필요할 때 관리자가 바로 돌려볼 수 있게 수동 트리거도 열어둔다.
+
+@admin_bp.route('/api/admin/crawl-exams', methods=['POST'])
+@admin_required
+def trigger_exam_crawl():
+    from crawlers.run_all import crawl_and_normalize_all
+    try:
+        result = crawl_and_normalize_all()
+    except Exception as e:
+        return err(f'크롤링 중 오류가 발생했습니다: {e}', 'CRAWL_FAILED', 500)
+    return ok(result, '시험 일정 크롤링 완료')

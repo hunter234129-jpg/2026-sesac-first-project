@@ -38,6 +38,18 @@ def login_required(f):
     return wrapper
 
 
+def get_optional_user_id():
+    """토큰이 있으면 user_id를 반환, 없거나 유효하지 않으면 None."""
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return None
+    try:
+        payload = decode_token(auth[7:])
+        return payload['user_id']
+    except Exception:
+        return None
+
+
 def admin_required(f):
     @wraps(f)
     @login_required

@@ -8,10 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:760px;">
     <div class="dash-header">
       <h1>마이페이지</h1>
@@ -30,10 +33,9 @@
       <!-- 조회 모드 -->
       <div id="profileView">
         <div class="profile-top">
-          <div class="avatar" id="avatar">?</div>
+          <div class="avatar" id="avatar" title="클릭하여 아바타 변경" style="cursor:pointer;" onclick="showAvatarPicker()">?</div>
           <div>
             <div style="font-size:20px; font-weight:700;" id="pName">-</div>
-            <div id="verifyBadge"></div>
           </div>
         </div>
         <div class="row"><span class="row-label">이메일</span><span class="row-value" id="pEmail">-</span></div>
@@ -60,12 +62,6 @@
           <button type="button" class="btn btn-ghost" id="cancelBtn">취소</button>
         </div>
       </form>
-    </div>
-
-    <!-- 실명 인증 -->
-    <div class="card section" id="verifySection">
-      <div class="section-head"><h2>실명 인증</h2></div>
-      <div id="verifyBody"></div>
     </div>
 
     <!-- 관심 키워드 -->
@@ -100,27 +96,135 @@
       <button class="btn btn-danger" id="withdrawBtn">회원 탈퇴</button>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     if (!Auth.require()) { throw new Error('redirect'); }
     renderNav();
+    renderRail('mypage');
 
     const alertEl = document.getElementById('alert');
     let me = null;
 
+    const AVATARS = [
+      { emoji: '🦊', bg: '#FF6B6B' }, { emoji: '🐱', bg: '#FFA94D' }, { emoji: '🐶', bg: '#FFD43B' },
+      { emoji: '🐼', bg: '#94D82D' }, { emoji: '🐨', bg: '#37B24D' }, { emoji: '🦁', bg: '#20C997' },
+      { emoji: '🐯', bg: '#22B8CF' }, { emoji: '🐵', bg: '#4DABF7' }, { emoji: '🐰', bg: '#5C7CFA' },
+      { emoji: '🐺', bg: '#845EF7' }, { emoji: '🐸', bg: '#CC5DE8' }, { emoji: '🐧', bg: '#F783AC' },
+      { emoji: '🦉', bg: '#FF8787' }, { emoji: '🐙', bg: '#FFC078' }, { emoji: '🦋', bg: '#FFE066' },
+      { emoji: '🐹', bg: '#B2F2BB' }, { emoji: '🐭', bg: '#99E9F2' }, { emoji: '🐔', bg: '#91A7FF' },
+      { emoji: '🐮', bg: '#D0BFFF' }, { emoji: '🐷', bg: '#FCC2D7' },
+    ];
+
+    function fmtDate(str) {
+      if (!str) return '-';
+      let d;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const [y, m, day] = str.split('T')[0].split('-').map(Number);
+        d = new Date(y, m - 1, day);
+      } else {
+        d = new Date(str);
+      }
+      if (isNaN(d)) return str;
+      const KO_DOW = ['일','월','화','수','목','금','토'];
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}(${KO_DOW[d.getDay()]})`;
+    }
+
+    function applyAvatar(id) {
+      const av = AVATARS[id] || AVATARS[0];
+      const avatarEl = document.getElementById('avatar');
+      avatarEl.textContent = av.emoji;
+      avatarEl.style.background = av.bg;
+      avatarEl.style.fontSize = '28px';
+    }
+
+    function showAvatarPicker() {
+      document.getElementById('__avatarPickerOverlay')?.remove();
+      const currentId = me ? (me.avatar_id ?? 0) : 0;
+      let selectedId = currentId;
+
+      const overlay = document.createElement('div');
+      overlay.id = '__avatarPickerOverlay';
+      overlay.style.cssText = [
+        'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;',
+        'display:flex;align-items:center;justify-content:center;'
+      ].join('');
+      overlay.innerHTML = `
+        <div style="background:#1b2340;border-radius:18px;padding:28px 24px 24px;
+                    max-width:340px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.7);text-align:center;">
+          <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:20px;">아바타 선택</div>
+          <div id="__avatarGrid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:22px;">
+            ${AVATARS.map((a, i) => `
+              <button type="button" data-i="${i}"
+                style="background:${a.bg};width:48px;height:48px;border-radius:50%;cursor:pointer;
+                       font-size:26px;border:3px solid ${i === currentId ? '#fff' : 'transparent'};
+                       transition:transform .12s,border-color .12s;display:flex;align-items:center;
+                       justify-content:center;line-height:1;"
+              >${a.emoji}</button>`).join('')}
+          </div>
+          <div style="display:flex;gap:10px;justify-content:center;">
+            <button type="button" id="__avatarPickerClose"
+              style="padding:9px 28px;background:rgba(255,255,255,.08);color:#94a3b8;border:none;
+                     border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">취소</button>
+            <button type="button" id="__avatarPickerConfirm"
+              style="padding:9px 28px;background:#4f46e5;color:#fff;border:none;
+                     border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">확인</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      const allBtns = overlay.querySelectorAll('#__avatarGrid button');
+      function selectBtn(id) {
+        selectedId = id;
+        allBtns.forEach(b => {
+          b.style.borderColor = Number(b.dataset.i) === id ? '#fff' : 'transparent';
+        });
+        // 아이콘 클릭 즉시 대시보드(다른 탭)에 미리보기 반영
+        localStorage.setItem('sb_avatar_id', String(id));
+      }
+
+      allBtns.forEach(btn => {
+        btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.12)'; });
+        btn.addEventListener('mouseleave', () => { btn.style.transform = ''; });
+        btn.onclick = () => selectBtn(Number(btn.dataset.i));
+      });
+
+      const closeDialog = (revert) => {
+        if (revert) localStorage.setItem('sb_avatar_id', String(currentId));
+        overlay.remove();
+      };
+
+      document.getElementById('__avatarPickerConfirm').onclick = async () => {
+        const id = selectedId;
+        applyAvatar(id);
+        if (me) me.avatar_id = id;
+        localStorage.setItem('sb_avatar_id', String(id));
+        overlay.remove();
+        // REST API로 DB 즉시 업데이트 (소켓 로딩 여부와 무관하게 확실히 저장)
+        try { await api('/api/auth/me', { method: 'PUT', body: { avatar_id: id } }); } catch (_) {}
+        // 소켓 브로드캐스트로 다른 접속자에게 실시간 반영
+        if (window.changeMyAvatar) window.changeMyAvatar(id);
+      };
+      document.getElementById('__avatarPickerClose').onclick = () => closeDialog(true);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDialog(true); });
+    }
+
+    window.addEventListener('avatar-changed', (e) => {
+      const id = e.detail.avatar_id;
+      if (me) me.avatar_id = id;
+      applyAvatar(id);
+    });
+
     /* ── 프로필 로드 ── */
     async function loadProfile() {
       me = await api('/api/auth/me');
-      document.getElementById('avatar').textContent = (me.username || '?')[0].toUpperCase();
+      applyAvatar(me.avatar_id);
       document.getElementById('pName').textContent  = me.username;
       document.getElementById('pEmail').textContent = me.email;
       document.getElementById('pReal').textContent  = me.real_name || '미등록';
-      document.getElementById('pJoined').textContent = (me.created_at || '').replace('T', ' ').slice(0, 16);
-      document.getElementById('verifyBadge').innerHTML = me.is_verified
-        ? '<span class="badge">✓ 실명 인증됨</span>'
-        : '<span class="muted" style="font-size:13px;">미인증</span>';
-      renderVerifySection();
+      document.getElementById('pJoined').textContent = fmtDate(me.created_at);
     }
 
     /* ── 프로필 수정 ── */
@@ -160,42 +264,6 @@
         setLoading(btn, false, '저장');
       }
     };
-
-    /* ── 실명 인증 ── */
-    function renderVerifySection() {
-      const body = document.getElementById('verifyBody');
-      if (me.is_verified) {
-        body.innerHTML = '<p class="muted" style="font-size:14px;">✓ 이미 실명 인증이 완료된 계정이에요.</p>';
-        return;
-      }
-      body.innerHTML = `
-        <div class="field">
-          <label for="vName">이름</label>
-          <input type="text" id="vName" placeholder="실명" value="${escapeHtml(me.real_name || '')}">
-        </div>
-        <div class="field">
-          <label for="vCode">인증번호</label>
-          <input type="text" id="vCode" placeholder="6자리 숫자" maxlength="6" inputmode="numeric">
-          <p class="hint">데모 환경에서는 6자리 숫자(예: 123456)를 입력하면 인증돼요.</p>
-        </div>
-        <button class="btn btn-primary" id="verifyBtn">인증하기</button>`;
-      document.getElementById('verifyBtn').onclick = async () => {
-        hideAlert(alertEl);
-        const btn = document.getElementById('verifyBtn');
-        setLoading(btn, true);
-        try {
-          await api('/api/auth/verify', { method: 'POST', body: {
-            real_name: document.getElementById('vName').value.trim(),
-            code: document.getElementById('vCode').value.trim(),
-          }});
-          await loadProfile();
-          showAlert(alertEl, '실명 인증이 완료됐어요.', 'success');
-        } catch (err) {
-          showAlert(alertEl, err.message);
-          setLoading(btn, false, '인증하기');
-        }
-      };
-    }
 
     /* ── 관심 키워드 ── */
     async function loadKeywords() {
@@ -255,7 +323,7 @@
             <span class="row-value">${escapeHtml(p.title)}
               <span class="muted" style="font-size:12px;">· ${p.type === 'study' ? '스터디' : '게시글'}</span>
             </span>
-            <span class="muted" style="font-size:13px;">조회 ${p.view_count} · ${(p.created_at||'').slice(0,10)}</span>
+            <span class="muted" style="font-size:13px;">조회 ${p.view_count} · ${fmtDate(p.created_at)}</span>
           </div>`).join('')
           : '<p class="muted" style="font-size:14px;">작성한 게시글이 없어요.</p>';
       } catch (err) {

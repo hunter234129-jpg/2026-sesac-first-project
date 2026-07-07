@@ -18,9 +18,16 @@ def err(msg, code, status=400):
     return jsonify({'error': msg, 'code': code}), status
 
 
+def get_extension(filename):
+    """파일 확장자 추출. secure_filename()은 한글 등 비ASCII 문자를 통째로 지워버려서
+    (예: '스크린샷.zip' -> 'zip', 점이 사라짐) 원본 파일명에서 직접 뽑아야 안전하다."""
+    if '.' not in filename:
+        return ''
+    return filename.rsplit('.', 1)[1].lower()
+
+
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return get_extension(filename) in ALLOWED_EXTENSIONS
 
 
 @upload_bp.route('/api/upload', methods=['POST'])
@@ -42,8 +49,10 @@ def upload_file():
     if size > MAX_UPLOAD_BYTES:
         return err('파일이 너무 큽니다 (최대 10MB)', 'TOO_LARGE', 413)
 
-    original = secure_filename(file.filename)
-    ext      = original.rsplit('.', 1)[1].lower()
+    # 화면 표시용 원본 파일명은 한글 등을 그대로 보존한다 (DB 컬럼 길이에 맞춰 자르기만 함).
+    # 실제 디스크 저장 이름은 항상 UUID 기반이라 원본 파일명의 문자 구성과 무관하게 안전하다.
+    original = file.filename[:255]
+    ext      = get_extension(file.filename)
     stored   = f'{uuid.uuid4().hex}.{ext}'
     file.save(os.path.join(UPLOAD_DIR, stored))
 

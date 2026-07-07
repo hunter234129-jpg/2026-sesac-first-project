@@ -1,5 +1,5 @@
-# 민감 정보
-.env
+# 민감 정보 (.env, ".env copy", .env.local 등 전부 제외)
+.env*
 
 # 가상환경
 venv/

@@ -5,70 +5,399 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>시험 일정 · StudyBoard</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    /* ── 시험 캘린더 ── */
+    .ec-wrap { background: #1e2240; border-radius: 14px; overflow: hidden; border: 1px solid rgba(120,140,200,.25); }
+
+    /* 네비게이션 */
+    .ec-nav { display: flex; flex-direction: column; gap: 10px; padding: 14px 20px 12px; border-bottom: 1px solid rgba(120,140,200,.2); }
+    .ec-nav-row { display: flex; align-items: center; justify-content: space-between; }
+    .ec-nav-side { min-width: 80px; }
+    .ec-today-btn { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15); color: #c8cde8; border-radius: 8px; padding: 6px 16px; font-size: 13px; cursor: pointer; font-family: var(--font); }
+    .ec-today-btn:hover { background: rgba(255,255,255,.2); }
+    .ec-title { font-size: 18px; font-weight: 700; color: #e0e4f4; text-align: center; min-width: 150px; }
+    .ec-arrow { background: none; border: none; color: #9ba3c0; cursor: pointer; font-size: 26px; line-height: 1; padding: 2px 10px; border-radius: 7px; font-family: var(--font); }
+    .ec-arrow:hover { background: rgba(255,255,255,.1); color: #e0e4f4; }
+
+    /* 요일 헤더 */
+    .ec-header { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .ec-dow { text-align: center; font-size: 12px; font-weight: 600; padding: 8px 0; color: #6b7494; border-right: 1px solid rgba(120,140,200,.08); }
+    .ec-dow:last-child { border-right: none; }
+    .ec-dow.sun { color: #e0455a; }
+    .ec-dow.sat { color: #5b9bff; }
+
+    /* 주(week) 블록 */
+    .ec-week { border-top: 1px solid rgba(120,140,200,.18); }
+    .ec-day-row { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .ec-day-cell { padding: 5px 6px 2px; border-right: 1px solid rgba(120,140,200,.08); min-height: 30px; }
+    .ec-day-cell:last-child { border-right: none; }
+    .ec-daynum { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; font-size: 12px; font-weight: 600; border-radius: 50%; color: #c8cde8; }
+    .ec-daynum.sun { color: #e0455a; }
+    .ec-daynum.sat { color: #5b9bff; }
+    .ec-daynum.today { background: #4dabf7; color: #fff; }
+    .ec-daynum.other { color: #323856; }
+    .ec-more { font-size: 10px; color: #9ba3c0; cursor: default; display: block; line-height: 1.6; padding-left: 2px; }
+
+    /* 이벤트 바 레이어 */
+    .ec-evt-layer { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 20px; gap: 2px 0; padding: 2px 0 6px; }
+    .ec-evt { border-radius: 3px; font-size: 11px; padding: 2px 6px; color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin: 0 2px; cursor: default; line-height: 1.6; }
+    .ec-evt:hover { filter: brightness(1.12); }
+    .ec-evt.cont-left  { border-radius: 0 3px 3px 0; margin-left: 0; padding-left: 4px; }
+    .ec-evt.cont-right { border-radius: 3px 0 0 3px; margin-right: 0; }
+    .ec-evt.cont-both  { border-radius: 0; margin-left: 0; margin-right: 0; padding-left: 4px; }
+
+    .ec-loading { padding: 60px 0; text-align: center; color: #6b7494; font-size: 14px; }
+
+    /* 범례 (필터) */
+    .ec-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .ec-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #9ba3c0; cursor: pointer; padding: 4px 10px; border-radius: 20px; border: 1px solid transparent; transition: opacity .15s, border-color .15s; user-select: none; }
+    .ec-legend-item:hover { background: rgba(255,255,255,.07); }
+    .ec-legend-item.active { color: #e0e4f4; border-color: rgba(255,255,255,.12); }
+    .ec-legend-item.inactive { opacity: .38; }
+    .ec-legend-dot { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; transition: background .15s; }
+  </style>
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
+
     <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
       <div>
         <h1>🗓️ 국가기술자격 시험 일정</h1>
-        <p>Q-net 연간 시험일정 (1시간마다 갱신)</p>
+        <p class="muted">Q-net 연간 시험일정 (1시간마다 갱신)</p>
       </div>
       <button class="btn btn-ghost" id="refreshBtn">새로고침</button>
     </div>
-
     <div class="alert" id="alert"></div>
-    <div id="content"><p class="muted text-center" style="padding:50px 0;">불러오는 중...</p></div>
+
+    <div class="ec-wrap">
+      <!-- 네비게이션 -->
+      <div class="ec-nav">
+        <div class="ec-nav-row">
+          <div class="ec-nav-side">
+            <button class="ec-today-btn" id="todayBtn">오늘</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <button class="ec-arrow" id="prevBtn">&#8249;</button>
+            <div class="ec-title" id="calTitle"></div>
+            <button class="ec-arrow" id="nextBtn">&#8250;</button>
+          </div>
+          <div class="ec-nav-side"></div>
+        </div>
+        <!-- 범례 / 필터 -->
+        <div class="ec-legend" id="ecLegend"></div>
+      </div>
+
+      <!-- 요일 헤더 -->
+      <div class="ec-header">
+        <div class="ec-dow sun">일요일</div>
+        <div class="ec-dow">월요일</div>
+        <div class="ec-dow">화요일</div>
+        <div class="ec-dow">수요일</div>
+        <div class="ec-dow">목요일</div>
+        <div class="ec-dow">금요일</div>
+        <div class="ec-dow sat">토요일</div>
+      </div>
+
+      <!-- 달력 본문 -->
+      <div id="calBody">
+        <div class="ec-loading">불러오는 중...</div>
+      </div>
+
+    </div>
+
     <p class="muted mt-16" style="font-size:12px;">
-      출처: <a href="https://www.q-net.or.kr" target="_blank" rel="noopener">q-net.or.kr</a> · 실제 접수일은 큐넷에서 다시 확인하세요.
+      출처: <a href="https://www.q-net.or.kr" target="_blank" rel="noopener">q-net.or.kr</a>
+      · 실제 접수일은 큐넷에서 다시 확인하세요.
     </p>
+  </div>
+  </div>
   </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
-    const alertEl = document.getElementById('alert');
-    const content = document.getElementById('content');
+    renderRail('exam');
 
+    const KO_MON = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+    const TODAY  = new Date();
+    let curYear  = TODAY.getFullYear();
+    let curMonth = TODAY.getMonth();
+    let allEvents = [];
+
+    /* ─ 카테고리 정의 ─ */
+    const CATEGORIES = [
+      { key: 'written',   label: '필기 접수',    color: '#0c8599' },
+      { key: 'practical', label: '실기 접수',    color: '#e67700' },
+      { key: 'apply',     label: '원서접수',     color: '#1971c2' },
+      { key: 'pass',      label: '합격자 발표',  color: '#2f9e44' },
+      { key: 'special',   label: '사전/특별접수', color: '#862e2e' },
+      { key: 'interview', label: '면접',         color: '#6741d9' },
+      { key: 'etc',       label: '기타',         color: '#495057' },
+    ];
+    const CAT_MAP      = Object.fromEntries(CATEGORIES.map(c => [c.key, c]));
+    const activeFilters = new Set(CATEGORIES.map(c => c.key));
+
+    /* ─ 카테고리 분류 ─ */
+    function categorize(text) {
+      const t = text || '';
+      if (/합격자|발표/.test(t))                                          return 'pass';
+      if (/사전접수|특별접수/.test(t))                                     return 'special';
+      if (/(실기).*(접수|원서)|(접수|원서).*(실기)/.test(t))               return 'practical';
+      if (/(필기).*(접수|원서)|(접수|원서).*(필기)/.test(t))               return 'written';
+      if (/면접/.test(t))                                                 return 'interview';
+      if (/빈자리/.test(t))                                               return 'apply';
+      if (/접수|원서/.test(t))                                            return 'apply';
+      if (/실기/.test(t))                                                 return 'practical';
+      if (/필기/.test(t))                                                 return 'written';
+      return 'etc';
+    }
+
+    /* ─ 범례(필터) 렌더 ─ */
+    function renderLegend() {
+      document.getElementById('ecLegend').innerHTML = CATEGORIES.map(cat => {
+        const on = activeFilters.has(cat.key);
+        return `<div class="ec-legend-item ${on ? 'active' : 'inactive'}" data-cat="${cat.key}" onclick="toggleFilter('${cat.key}')">
+          <div class="ec-legend-dot" style="background:${on ? cat.color : '#3d4566'};"></div>
+          ${cat.label}
+        </div>`;
+      }).join('');
+    }
+
+    /* ─ 필터 토글 ─ */
+    function toggleFilter(key) {
+      if (activeFilters.has(key)) activeFilters.delete(key);
+      else activeFilters.add(key);
+      renderLegend();
+      renderCalendar();
+    }
+
+    /* ─ 제목 정제 ─ */
+    function cleanTitle(raw) {
+      return (raw || '')
+        .replace(/구[글를]?\s*일정에[\s\S]*/,'')   // "구글 일정에 현재 데이터 등록하기" 제거
+        .replace(/일정에[\s\S]*/,'')               // "일정에 현재 데이터 등록" 제거
+        .replace(/현재\s*데이터[\s\S]*/,'')
+        .replace(/등록하기?[\s\S]*/,'')
+        .replace(/원서접수구[\s\S]*/,'')
+        .replace(/\s+/g,' ')
+        .trim()
+        .slice(0, 28);
+    }
+
+    /* ─ API 데이터 → 이벤트 배열 ─ */
+    function parseEvents(rows) {
+      const refYear = TODAY.getFullYear();
+      const events  = [];
+
+      for (const row of rows) {
+        const cells = row.columns ? [...row.columns] : Object.values(row);
+        const full  = cells.join('\n');
+
+        // 날짜 범위 추출
+        const ranges = [];
+        const rangeRe = /(\d{2})\.(\d{2})(?:\([일월화수목금토]\))?~(\d{2})\.(\d{2})(?:\([일월화수목금토]\))?/g;
+        let m;
+        while ((m = rangeRe.exec(full)) !== null) {
+          let s = new Date(refYear, +m[1]-1, +m[2]);
+          let e = new Date(refYear, +m[3]-1, +m[4]);
+          if (e < s) e.setFullYear(refYear + 1);
+          ranges.push({ start: s, end: e });
+        }
+
+        if (!ranges.length) {
+          const singleRe = /(\d{2})\.(\d{2})(?:\([일월화수목금토]\))?/g;
+          while ((m = singleRe.exec(full)) !== null) {
+            const d = new Date(refYear, +m[1]-1, +m[2]);
+            ranges.push({ start: d, end: d });
+          }
+        }
+
+        if (!ranges.length) continue;
+
+        // 제목: 날짜가 없는 셀
+        const descCells = cells.filter(c => !/\d{2}\.\d{2}/.test(String(c)) && String(c).trim().length > 2);
+        const rawTitle  = descCells[0] || cells[cells.length-1] || '';
+        const title     = cleanTitle(String(rawTitle)) || '시험일정';
+        const cat       = categorize(full + ' ' + rawTitle);
+        const color     = CAT_MAP[cat].color;
+
+        for (const r of ranges) events.push({ title, category: cat, color, start: r.start, end: r.end });
+      }
+
+      return events;
+    }
+
+    /* ─ 날짜 유틸 ─ */
+    function sameDay(a, b) {
+      return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+    }
+    function floorDay(d) {
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
+    /* ─ 겹치지 않도록 트랙 배정 ─ */
+    function assignTracks(infos) {
+      const tracks = [];   // tracks[t] = [{cs,ce},...]
+      const map    = new Map();
+      for (const info of infos) {
+        let placed = false;
+        for (let t = 0; t < tracks.length; t++) {
+          if (!tracks[t].some(ti => info.cs <= ti.ce && info.ce >= ti.cs)) {
+            tracks[t].push(info);
+            map.set(info, t);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) { tracks.push([info]); map.set(info, tracks.length - 1); }
+      }
+      return map;
+    }
+
+    /* ─ 한 주 렌더 ─ */
+    const MAX_TRACKS = 3;
+
+    function renderWeek(days, month) {
+      const ws = floorDay(days[0]);
+      const we = floorDay(days[6]);
+
+      const weekEvts = allEvents
+        .filter(ev => activeFilters.has(ev.category))
+        .filter(ev => floorDay(ev.start) <= we && floorDay(ev.end) >= ws);
+
+      // 각 이벤트의 이번 주 내 컬럼 범위
+      const infos = [];
+      for (const ev of weekEvts) {
+        const s = floorDay(ev.start), e = floorDay(ev.end);
+        let cs = -1, ce = -1;
+        for (let i = 0; i < 7; i++) {
+          const d = floorDay(days[i]);
+          if (d >= s && cs === -1) cs = i;
+          if (d <= e)              ce = i;
+        }
+        if (cs === -1) cs = 0;
+        if (ce === -1) ce = 0;
+        infos.push({ ev, cs, ce,
+          startsHere: s >= ws,
+          endsHere:   e <= we,
+        });
+      }
+
+      infos.sort((a, b) => a.cs !== b.cs ? a.cs - b.cs : (b.ce - b.cs) - (a.ce - a.cs));
+      const trackMap = assignTracks(infos);
+
+      // 각 컬럼의 숨겨진 이벤트 수
+      const moreCounts = Array(7).fill(0);
+      for (const [info, t] of trackMap.entries()) {
+        if (t >= MAX_TRACKS) {
+          for (let c = info.cs; c <= info.ce; c++) moreCounts[c]++;
+        }
+      }
+
+      /* 날짜 숫자 행 */
+      let dayRowHtml = '';
+      for (let i = 0; i < 7; i++) {
+        const d      = days[i];
+        const isOther  = d.getMonth() !== month;
+        const isToday  = sameDay(d, TODAY);
+        const isSun    = d.getDay() === 0;
+        const isSat    = d.getDay() === 6;
+        const cls = [isToday ? 'today':'', isSun?'sun':'', isSat?'sat':'', isOther?'other':''].filter(Boolean).join(' ');
+        dayRowHtml += `<div class="ec-day-cell">
+          <span class="ec-daynum ${cls}">${d.getDate()}</span>
+          ${moreCounts[i] ? `<span class="ec-more">+${moreCounts[i]} more</span>` : ''}
+        </div>`;
+      }
+
+      /* 이벤트 바 */
+      let evtHtml = '';
+      let usedTracks = 0;
+      for (const [info, t] of trackMap.entries()) {
+        if (t >= MAX_TRACKS) continue;
+        usedTracks = Math.max(usedTracks, t + 1);
+
+        const gcStart = info.cs + 1;          // CSS grid: 1-indexed
+        const gcEnd   = info.ce + 2;          // exclusive
+        const showTitle = info.startsHere || info.cs === 0;
+
+        // border-radius: 이벤트가 이번 주 끝/시작에서 잘리면 radius 제거
+        const leftCut  = !info.startsHere;
+        const rightCut = !info.endsHere;
+        const contCls  = leftCut && rightCut ? 'cont-both' : leftCut ? 'cont-left' : rightCut ? 'cont-right' : '';
+
+        evtHtml += `<div class="ec-evt ${contCls}"
+          style="grid-column:${gcStart}/${gcEnd}; grid-row:${t+1}; background:${info.ev.color};"
+          title="${escapeHtml(info.ev.title)}"
+        >${showTitle ? escapeHtml(info.ev.title) : ''}</div>`;
+      }
+
+      return `<div class="ec-week">
+        <div class="ec-day-row">${dayRowHtml}</div>
+        ${usedTracks > 0 ? `<div class="ec-evt-layer">${evtHtml}</div>` : ''}
+      </div>`;
+    }
+
+    /* ─ 달력 전체 렌더 ─ */
+    function renderCalendar() {
+      document.getElementById('calTitle').textContent = `${curYear}년 ${KO_MON[curMonth]}`;
+
+      const firstDow    = new Date(curYear, curMonth, 1).getDay();
+      const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
+      const prevDays    = new Date(curYear, curMonth, 0).getDate();
+
+      // 전체 날짜 배열 (이전달 패딩 + 이번달 + 다음달 패딩)
+      const allDays = [];
+      for (let i = firstDow - 1; i >= 0; i--)
+        allDays.push(new Date(curYear, curMonth - 1, prevDays - i));
+      for (let d = 1; d <= daysInMonth; d++)
+        allDays.push(new Date(curYear, curMonth, d));
+      while (allDays.length % 7 !== 0) {
+        const last = allDays[allDays.length - 1];
+        allDays.push(new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1));
+      }
+
+      let html = '';
+      for (let w = 0; w < allDays.length / 7; w++) {
+        html += renderWeek(allDays.slice(w * 7, w * 7 + 7), curMonth);
+      }
+
+      document.getElementById('calBody').innerHTML = html;
+    }
+
+    /* ─ 데이터 로드 ─ */
     async function load(refresh) {
-      content.innerHTML = '<p class="muted text-center" style="padding:50px 0;">불러오는 중...' +
-                          (refresh ? ' (사이트 크롤링 중, 몇 초 걸릴 수 있어요)' : '') + '</p>';
+      document.getElementById('calBody').innerHTML =
+        `<div class="ec-loading">불러오는 중${refresh ? ' (크롤링 중, 잠시 기다려주세요)' : ''}...</div>`;
       try {
         const d = await api('/api/exam-schedule' + (refresh ? '?refresh=1' : ''), { auth: false });
-        const rows = d.schedules || [];
-        if (!rows.length) {
-          content.innerHTML = '<div class="card"><p class="muted text-center" style="padding:30px 0;">표시할 일정이 없어요. 새로고침을 눌러보세요.</p></div>';
-          return;
-        }
-
-        // 헤더 키 수집 (columns 형태 / dict 형태 모두 지원)
-        const dictRows = rows.filter(r => !r.columns);
-        let html = '';
-        if (dictRows.length) {
-          const keys = [...new Set(dictRows.flatMap(r => Object.keys(r)))];
-          html = `<div class="table-scroll"><table class="data"><thead><tr>${
-            keys.map(k => `<th>${escapeHtml(k)}</th>`).join('')
-          }</tr></thead><tbody>${
-            dictRows.map(r => `<tr>${keys.map(k => `<td>${escapeHtml(r[k] || '')}</td>`).join('')}</tr>`).join('')
-          }</tbody></table></div>`;
-        } else {
-          // columns 배열만 있는 경우
-          html = `<div class="table-scroll"><table class="data"><tbody>${
-            rows.map(r => `<tr>${(r.columns || []).map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')
-          }</tbody></table></div>`;
-        }
-        const cached = d.cached ? `<span class="badge" style="margin-bottom:12px;">캐시됨${d.stale ? ' (갱신 실패)' : ''}</span>` : '';
-        content.innerHTML = cached + html;
-      } catch (err) {
-        content.innerHTML = `<div class="card"><p class="muted text-center" style="padding:30px 0;">${escapeHtml(err.message)}</p></div>`;
+        allEvents = parseEvents(d.schedules || []);
+        renderLegend();
+        renderCalendar();
+      } catch (e) {
+        document.getElementById('calBody').innerHTML = `<div class="ec-loading">${escapeHtml(e.message)}</div>`;
       }
     }
 
+    /* ─ 버튼 ─ */
+    document.getElementById('todayBtn').onclick = () => {
+      curYear = TODAY.getFullYear(); curMonth = TODAY.getMonth(); renderCalendar();
+    };
+    document.getElementById('prevBtn').onclick = () => {
+      if (--curMonth < 0)  { curMonth = 11; curYear--; } renderCalendar();
+    };
+    document.getElementById('nextBtn').onclick = () => {
+      if (++curMonth > 11) { curMonth = 0;  curYear++; } renderCalendar();
+    };
     document.getElementById('refreshBtn').onclick = () => load(true);
+
     load(false);
   </script>
 </body>

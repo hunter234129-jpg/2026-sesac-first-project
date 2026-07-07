@@ -3,8 +3,127 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>로그인 · 스터디 플랫폼</title>
+  <title>로그인 · StudyBoard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    :root {
+      --lg-bg: #0b0d14;
+      --lg-card: #13161f;
+      --lg-cyan: #00e5ff;
+      --lg-purple: #7c3aed;
+      --lg-purple-soft: #a78bfa;
+      --lg-text: #e8eaf0;
+      --lg-text2: #8892b0;
+      --lg-text3: #6b7494;
+      --lg-text4: #3d4460;
+      --lg-input: #0f1220;
+      --lg-border: rgba(255,255,255,0.08);
+    }
+    body { background: var(--lg-bg); font-family: 'Inter', sans-serif; }
+
+    /* 상단 네비는 살리되, 이 페이지 톤에 맞춰 얇고 투명하게 */
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      background: rgba(11,13,20,0.7); backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 14px 24px;
+    }
+    .navbar .brand { font-family: 'Orbitron', monospace; font-size: 14px; letter-spacing: 0.08em; color: var(--lg-text); }
+    .navbar .brand .dot { color: var(--lg-cyan); text-shadow: 0 0 8px var(--lg-cyan); }
+    .navbar .nav-links a { color: var(--lg-text2); font-size: 13px; }
+    .navbar .nav-links a:hover { color: var(--lg-cyan); }
+
+    .split-wrap { min-height: 100vh; width: 100%; display: flex; padding-top: 0; }
+
+    /* ── 좌측 패널 ── */
+    .split-left {
+      position: relative; width: 42%; min-width: 340px;
+      display: none;
+      flex-direction: column; align-items: center; justify-content: center;
+      overflow: hidden;
+      background: linear-gradient(155deg, #080c1a 0%, #0d1530 45%, #0a1020 100%);
+    }
+    @media (min-width: 900px) { .split-left { display: flex; } }
+    .split-left canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .nebula-blob { position: absolute; border-radius: 50%; pointer-events: none; }
+    .nebula-blob.a { top: 15%; left: 5%; width: 220px; height: 220px; background: radial-gradient(circle, rgba(124,58,237,0.18) 0%, transparent 70%); filter: blur(40px); }
+    .nebula-blob.b { bottom: 20%; right: 0; width: 180px; height: 180px; background: radial-gradient(circle, rgba(0,229,255,0.1) 0%, transparent 70%); filter: blur(35px); }
+
+    .split-left-content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 40px; }
+    .split-left-tag { text-align: center; padding: 0 32px; max-width: 300px; }
+    .split-left-tag .k { font-family: 'Orbitron', monospace; font-size: 11px; letter-spacing: 0.22em; color: var(--lg-cyan); text-transform: uppercase; margin-bottom: 10px; opacity: 0.8; }
+    .split-left-tag .v { font-size: 15px; color: #b0bcd8; line-height: 1.75; font-weight: 300; }
+
+    /* ── 우측 패널 ── */
+    .split-right {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 100px 24px 48px;
+      background: linear-gradient(160deg, #0f1220 0%, #0b0d14 60%, #0d1025 100%);
+    }
+    .login-card {
+      width: 100%; max-width: 400px; border-radius: 20px; padding: 34px;
+      background: var(--lg-card);
+      border: 1px solid rgba(255,255,255,0.07);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 0.5px rgba(255,255,255,0.04);
+    }
+    .login-card h1 {
+      font-family: 'Orbitron', monospace; font-size: 22px; font-weight: 600;
+      color: var(--lg-text); letter-spacing: 0.02em; margin-bottom: 6px;
+    }
+    .login-card .sub { font-size: 13px; color: var(--lg-text3); margin-bottom: 28px; }
+
+    .lg-field { margin-bottom: 16px; }
+    .lg-field label {
+      display: block; font-size: 11px; font-weight: 500; color: var(--lg-text2);
+      letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px;
+    }
+    .lg-field input {
+      width: 100%; background: var(--lg-input); border: 1px solid var(--lg-border);
+      border-radius: 10px; padding: 12px 16px; font-size: 14px; color: var(--lg-text);
+      outline: none; transition: border-color .2s, box-shadow .2s; font-family: 'Inter', sans-serif;
+    }
+    .lg-field input:focus {
+      border-color: var(--lg-cyan);
+      box-shadow: 0 0 0 3px rgba(0,229,255,0.1), inset 0 0 12px rgba(0,229,255,0.04);
+    }
+    .lg-field.pw-field { position: relative; }
+    .lg-field .pw-toggle {
+      position: absolute; right: 14px; top: 38px; background: none; border: none;
+      cursor: pointer; color: var(--lg-text3); padding: 0; line-height: 1;
+    }
+
+    .lg-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; font-size: 13px; }
+    .lg-remember { display: flex; align-items: center; gap: 9px; color: var(--lg-text2); cursor: pointer; user-select: none; }
+    .lg-checkbox {
+      width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center; transition: all .2s; flex-shrink: 0;
+    }
+    .lg-checkbox.checked { border-color: var(--lg-cyan); background: rgba(0,229,255,0.15); }
+    .lg-forgot { color: var(--lg-cyan); text-decoration: none; opacity: 0.8; }
+    .lg-forgot:hover { opacity: 1; }
+
+    .lg-submit {
+      width: 100%; padding: 13px; border-radius: 10px; border: none;
+      background: linear-gradient(135deg, #00e5ff 0%, #0099cc 100%);
+      color: #0b0d14; font-size: 14px; font-weight: 600; letter-spacing: 0.06em;
+      cursor: pointer; font-family: 'Orbitron', monospace; transition: opacity .2s, transform .15s;
+    }
+    .lg-submit:hover { opacity: 0.9; transform: translateY(-1px); }
+    .lg-submit:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+    .lg-switch { font-size: 13px; color: var(--lg-text3); text-align: center; margin-top: 22px; }
+    .lg-switch a { color: var(--lg-cyan); text-decoration: none; font-weight: 500; opacity: 0.9; }
+    .lg-switch a:hover { opacity: 1; }
+
+    .lg-alert {
+      display: none; margin-bottom: 16px; padding: 10px 14px; border-radius: 10px;
+      font-size: 13px; background: rgba(255,68,102,0.1); border: 1px solid rgba(255,68,102,0.3); color: #ff8fa3;
+    }
+    .lg-alert.show { display: block; }
+  </style>
 </head>
 <body>
   <nav class="navbar">
@@ -12,58 +131,176 @@
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
-  <div class="center-screen">
-    <form class="card auth-card" id="loginForm">
-      <h2>로그인</h2>
-      <p class="sub">다시 만나서 반가워요 👋</p>
-
-      <div class="alert" id="alert"></div>
-
-      <div class="field">
-        <label for="email">이메일</label>
-        <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required>
+  <div class="split-wrap">
+    <!-- 좌측: 별밭 + 행성 -->
+    <div class="split-left">
+      <canvas id="starCanvas"></canvas>
+      <div class="nebula-blob a"></div>
+      <div class="nebula-blob b"></div>
+      <div class="split-left-content">
+        <svg viewBox="0 0 260 260" width="230" height="230">
+          <defs>
+            <radialGradient id="planetBody" cx="38%" cy="35%" r="60%">
+              <stop offset="0%" stop-color="#4af0d0" stop-opacity="0.95" />
+              <stop offset="28%" stop-color="#1a8fb0" />
+              <stop offset="60%" stop-color="#0d3a6e" />
+              <stop offset="100%" stop-color="#060e22" />
+            </radialGradient>
+            <radialGradient id="surfaceSwirl" cx="60%" cy="55%" r="50%">
+              <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.45" />
+              <stop offset="50%" stop-color="#1e40af" stop-opacity="0.2" />
+              <stop offset="100%" stop-color="transparent" />
+            </radialGradient>
+            <radialGradient id="atmosphere" cx="50%" cy="50%" r="50%">
+              <stop offset="75%" stop-color="transparent" />
+              <stop offset="88%" stop-color="#00e5ff" stop-opacity="0.18" />
+              <stop offset="100%" stop-color="#00e5ff" stop-opacity="0" />
+            </radialGradient>
+            <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#a78bfa" stop-opacity="0" />
+              <stop offset="20%" stop-color="#818cf8" stop-opacity="0.55" />
+              <stop offset="45%" stop-color="#00e5ff" stop-opacity="0.8" />
+              <stop offset="55%" stop-color="#00e5ff" stop-opacity="0.8" />
+              <stop offset="80%" stop-color="#818cf8" stop-opacity="0.55" />
+              <stop offset="100%" stop-color="#a78bfa" stop-opacity="0" />
+            </linearGradient>
+            <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="6" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+            <filter id="ringGlow" x="-20%" y="-80%" width="140%" height="260%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+            <clipPath id="planetClip"><circle cx="130" cy="130" r="82" /></clipPath>
+            <clipPath id="frontRingClip"><rect x="0" y="140" width="260" height="120" /></clipPath>
+          </defs>
+          <circle cx="130" cy="130" r="96" fill="url(#atmosphere)" />
+          <ellipse cx="130" cy="140" rx="118" ry="18" fill="none" stroke="url(#ringGrad)" stroke-width="12" filter="url(#ringGlow)" opacity="0.9" />
+          <circle cx="130" cy="130" r="82" fill="url(#planetBody)" filter="url(#glow)" />
+          <circle cx="130" cy="130" r="82" fill="url(#surfaceSwirl)" />
+          <g clip-path="url(#planetClip)" opacity="0.3">
+            <ellipse cx="110" cy="115" rx="28" ry="14" fill="#06b6d4" transform="rotate(-20 110 115)" />
+            <ellipse cx="150" cy="145" rx="22" ry="10" fill="#8b5cf6" transform="rotate(15 150 145)" />
+            <ellipse cx="125" cy="155" rx="18" ry="7" fill="#0ea5e9" transform="rotate(-5 125 155)" />
+          </g>
+          <ellipse cx="108" cy="104" rx="26" ry="18" fill="white" opacity="0.12" transform="rotate(-30 108 104)" />
+          <ellipse cx="130" cy="140" rx="118" ry="18" fill="none" stroke="url(#ringGrad)" stroke-width="12" filter="url(#ringGlow)" opacity="0.9" clip-path="url(#frontRingClip)" />
+          <ellipse cx="130" cy="155" rx="82" ry="12" fill="#000" clip-path="url(#planetClip)" opacity="0.25" />
+          <circle cx="222" cy="118" r="3.5" fill="#00e5ff" opacity="0.8" filter="url(#glow)" />
+          <circle cx="38" cy="155" r="2.5" fill="#a78bfa" opacity="0.7" filter="url(#glow)" />
+        </svg>
+        <div class="split-left-tag">
+          <div class="k">StudyBoard</div>
+          <div class="v">당신의 행성을 다시 깨울 시간입니다.</div>
+        </div>
       </div>
-      <div class="field">
-        <label for="password">비밀번호</label>
-        <input type="password" id="password" placeholder="비밀번호" autocomplete="current-password" required>
+    </div>
+
+    <!-- 우측: 로그인 폼 -->
+    <div class="split-right">
+      <div style="width:100%; max-width:400px;">
+        <form class="login-card" id="loginForm">
+          <h1>돌아오신 걸 환영합니다</h1>
+          <p class="sub">계정에 로그인하세요</p>
+
+          <div class="lg-alert" id="alert"></div>
+
+          <div class="lg-field">
+            <label for="email">이메일</label>
+            <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required>
+          </div>
+          <div class="lg-field pw-field">
+            <label for="password">비밀번호</label>
+            <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
+            <button type="button" class="pw-toggle" id="pwToggle" title="비밀번호 표시">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+
+          <div class="lg-row">
+            <label class="lg-remember" id="rememberRow">
+              <span class="lg-checkbox" id="rememberBox"></span>
+              로그인 상태 유지
+            </label>
+            <a href="#" class="lg-forgot">비밀번호 찾기</a>
+          </div>
+
+          <button type="submit" class="lg-submit" id="submitBtn">로그인</button>
+
+          <p class="lg-switch">계정이 없으신가요? <a href="/register">회원가입</a></p>
+        </form>
       </div>
-
-      <button type="submit" class="btn btn-primary btn-block" id="submitBtn">로그인</button>
-
-      <p class="switch">아직 계정이 없으신가요? <a href="/register">회원가입</a></p>
-    </form>
+    </div>
   </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
-    // 이미 로그인 상태면 대시보드로
     if (Auth.isLoggedIn) location.href = '/dashboard';
 
+    /* 비밀번호 표시 토글 */
+    const pwInput = document.getElementById('password');
+    document.getElementById('pwToggle').onclick = () => {
+      pwInput.type = pwInput.type === 'password' ? 'text' : 'password';
+    };
+
+    /* 로그인 상태 유지 체크(순수 UI 토글 — 토큰은 항상 localStorage에 저장됨) */
+    const rememberBox = document.getElementById('rememberBox');
+    document.getElementById('rememberRow').onclick = () => rememberBox.classList.toggle('checked');
+
     const form  = document.getElementById('loginForm');
-    const alert = document.getElementById('alert');
+    const alertEl = document.getElementById('alert');
     const btn   = document.getElementById('submitBtn');
 
     form.onsubmit = async (e) => {
       e.preventDefault();
-      hideAlert(alert);
-      setLoading(btn, true);
+      alertEl.classList.remove('show');
+      btn.disabled = true; const prevLabel = btn.textContent; btn.textContent = '로그인 중...';
       try {
         const data = await api('/api/auth/login', {
           method: 'POST', auth: false,
           body: {
             email: document.getElementById('email').value.trim(),
-            password: document.getElementById('password').value,
+            password: pwInput.value,
           }
         });
         Auth.save(data.access_token, data.username);
         const next = queryParam('next') || '/dashboard';
         location.href = next;
       } catch (err) {
-        showAlert(alert, err.message);
-        setLoading(btn, false, '로그인');
+        alertEl.textContent = err.message;
+        alertEl.classList.add('show');
+        btn.disabled = false; btn.textContent = prevLabel;
       }
     };
+
+    /* 좌측 패널 별밭 캔버스 */
+    (() => {
+      const canvas = document.getElementById('starCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      function resize() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; }
+      resize();
+      const stars = Array.from({ length: 160 }, () => ({
+        x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+        r: Math.random() * 1.4 + 0.2, alpha: Math.random() * 0.7 + 0.15,
+        speed: Math.random() * 0.004 + 0.001, phase: Math.random() * Math.PI * 2,
+      }));
+      let t = 0;
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        t += 0.012;
+        for (const s of stars) {
+          const a = s.alpha * (0.5 + 0.5 * Math.sin(t * s.speed * 60 + s.phase));
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(200,215,255,${a})`; ctx.fill();
+        }
+        requestAnimationFrame(draw);
+      }
+      draw();
+      window.addEventListener('resize', resize);
+    })();
   </script>
 </body>
 </html>

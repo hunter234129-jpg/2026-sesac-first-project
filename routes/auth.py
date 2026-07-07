@@ -97,7 +97,7 @@ def get_me():
     try:
         cursor.execute(
             '''SELECT id, username, email, real_name, interest_keywords,
-                      is_verified, is_admin, created_at
+                      avatar_id, is_verified, is_admin, created_at
                FROM users
                WHERE id = %s AND is_deleted = 0''',
             (g.user_id,)
@@ -119,27 +119,48 @@ def update_me():
     password          = data.get('password', '')
     real_name         = data.get('real_name', '').strip()
     interest_keywords = data.get('interest_keywords')
+    avatar_id_raw     = data.get('avatar_id')
 
-    if not username and not password and not real_name and interest_keywords is None:
+    avatar_id = None
+    if avatar_id_raw is not None:
+        try:
+            avatar_id = int(avatar_id_raw)
+            if not (0 <= avatar_id < 20):
+                avatar_id = None
+        except (ValueError, TypeError):
+            avatar_id = None
+
+    if not username and not password and not real_name and interest_keywords is None and avatar_id is None:
         return err('수정할 내용이 없습니다', 'NOTHING_TO_UPDATE')
-
-    updates, params = [], []
-    if username:
-        updates.append('username = %s')
-        params.append(username)
-    if password:
-        updates.append('password_hash = %s')
-        params.append(generate_password_hash(password))
-    if real_name:
-        updates.append('real_name = %s')
-        params.append(real_name)
-    if interest_keywords is not None:
-        updates.append('interest_keywords = %s')
-        params.append(interest_keywords)
 
     conn   = get_db()
     cursor = conn.cursor()
     try:
+        if username:
+            cursor.execute(
+                'SELECT id FROM users WHERE username = %s AND id != %s',
+                (username, g.user_id)
+            )
+            if cursor.fetchone():
+                return err('이미 사용 중인 닉네임입니다', 'DUPLICATE', 409)
+
+        updates, params = [], []
+        if username:
+            updates.append('username = %s')
+            params.append(username)
+        if password:
+            updates.append('password_hash = %s')
+            params.append(generate_password_hash(password))
+        if real_name:
+            updates.append('real_name = %s')
+            params.append(real_name)
+        if interest_keywords is not None:
+            updates.append('interest_keywords = %s')
+            params.append(interest_keywords)
+        if avatar_id is not None:
+            updates.append('avatar_id = %s')
+            params.append(avatar_id)
+
         params.append(g.user_id)
         cursor.execute(
             f'UPDATE users SET {", ".join(updates)} WHERE id = %s AND is_deleted = 0',

@@ -24,7 +24,7 @@ ACHIEVEMENTS = [
     {'key': 'night_owl',     'emoji': '🦉', 'title': '밤의 수호자',     'desc': '자정~새벽 4시 사이 공부',     'category': '습관', 'metric': 'night_sessions',    'threshold': 1},
     {'key': 'early_bird',    'emoji': '🐤', 'title': '아침형 인간',     'desc': '새벽 5~7시에 공부 시작',      'category': '습관', 'metric': 'early_sessions',    'threshold': 1},
     {'key': 'social_post',   'emoji': '✍️', 'title': '지식 공유자',     'desc': '게시글을 작성했어요',         'category': '활동', 'metric': 'posts',             'threshold': 1},
-    {'key': 'social_clan',   'emoji': '🛡️', 'title': '동료와 함께',     'desc': '클랜에 가입했어요',           'category': '활동', 'metric': 'clans',             'threshold': 1},
+    {'key': 'social_clan',   'emoji': '🛡️', 'title': '동료와 함께',     'desc': '모임에 참가했어요',           'category': '활동', 'metric': 'clans',             'threshold': 1},
 ]
 
 
@@ -61,7 +61,7 @@ def _compute_metrics(cursor, user_id):
 
     cursor.execute('SELECT COUNT(*) AS c FROM posts WHERE user_id = %s AND deleted_at IS NULL', (user_id,))
     posts = cursor.fetchone()['c']
-    cursor.execute('SELECT COUNT(*) AS c FROM clan_members WHERE user_id = %s', (user_id,))
+    cursor.execute('SELECT COUNT(*) AS c FROM post_members WHERE user_id = %s AND left_at IS NULL', (user_id,))
     clans = cursor.fetchone()['c']
 
     total_sec = int(s.get('total_sec') or 0)

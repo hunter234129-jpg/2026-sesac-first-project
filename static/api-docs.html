@@ -4,19 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>스터디 게시판 API</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Segoe UI','Malgun Gothic',sans-serif; background:#0d1117; color:#c9d1d9; margin:0; padding:40px; }
-    h1   { color:#58a6ff; margin-bottom:4px; }
-    p    { color:#3fb950; font-size:14px; margin-top:0; }
-    h2   { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:1px; margin:28px 0 8px; }
+    html { zoom: 1.25; }
+    body { font-family: 'Inter','Segoe UI','Malgun Gothic',sans-serif; background:#05070d; color:#c9d3e8; margin:0; padding:40px; }
+    h1   { color:#00e5ff; margin-bottom:4px; text-shadow:0 0 20px rgba(0,229,255,.35); }
+    p    { color:#34d399; font-size:14px; margin-top:0; }
+    h2   { font-size:12px; color:#7a8ba8; text-transform:uppercase; letter-spacing:1px; margin:28px 0 8px; }
     ul   { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:4px; }
     li   { font-size:13px; }
-    code { background:#161b22; padding:2px 7px; border-radius:4px; color:#79c0ff; font-size:12px; }
-    .note { color:#8b949e; font-size:12px; margin-left:8px; }
+    code { font-family:'JetBrains Mono',monospace; background:rgba(168,85,247,.12); border:1px solid rgba(168,85,247,.2); padding:2px 7px; border-radius:4px; color:#c9a3ff; font-size:12px; }
+    .note { color:#7a8ba8; font-size:12px; margin-left:8px; }
   </style>
 </head>
 <body>
-<<<<<<< HEAD
   <!-- 관리자 전용 가드 -->
   <script src="/static/js/api.js"></script>
   <script>
@@ -24,8 +26,6 @@
     else if (!Auth.isAdmin)    location.replace('/dashboard');
   </script>
 
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
   <h1>스터디 게시판 API</h1>
   <p>● Server running on 192.168.56.102</p>
 
@@ -66,13 +66,10 @@
     <li><code>GET  /api/study/status</code>             <span class="note">현재 세션 상태 (JWT)</span></li>
     <li><code>GET  /api/study/stats?period=day|week</code> <span class="note">일별·주별 통계 (JWT)</span></li>
     <li><code>GET  /api/study/ranking?period=today|week|all</code> <span class="note">공부 시간 순위</span></li>
-<<<<<<< HEAD
     <li><code>GET  /api/study/streak</code>             <span class="note">연속 공부일 · 최장 연속 (JWT)</span></li>
     <li><code>GET  /api/study/heatmap?days=119</code>   <span class="note">잔디 — 날짜별 공부시간 (JWT)</span></li>
     <li><code>GET  /api/study/live</code>               <span class="note">실시간 공부 중 인원</span></li>
     <li><code>GET  /api/study/planet</code>             <span class="note">내 행성 성장 단계 (JWT)</span></li>
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
   </ul>
 
   <h2>Keywords / Notifications</h2>
@@ -85,20 +82,13 @@
     <li><code>PATCH  /api/notifications/read-all</code>       <span class="note">전체 읽음 (JWT)</span></li>
   </ul>
 
-  <h2>Clans</h2>
+  <h2>모임 (스터디 모집글, type=study)</h2>
   <ul>
-    <li><code>GET    /api/clans</code>                        <span class="note">클랜 목록 · 기여도 랭킹</span></li>
-    <li><code>POST   /api/clans</code>                        <span class="note">클랜 생성 (JWT)</span></li>
-    <li><code>GET    /api/clans/:id</code>                    <span class="note">클랜 상세</span></li>
-    <li><code>GET    /api/clans/:id/members</code>            <span class="note">멤버 조회</span></li>
-    <li><code>POST   /api/clans/:id/join</code>               <span class="note">가입 (JWT)</span></li>
-    <li><code>DELETE /api/clans/:id/leave</code>              <span class="note">탈퇴 (JWT)</span></li>
-<<<<<<< HEAD
-    <li><code>GET    /api/clans/ranking</code>                <span class="note">클랜전 — 이번 주 합산 공부시간 랭킹</span></li>
-    <li><code>GET    /api/clans/:id/battle</code>             <span class="note">클랜전 현황 · 목표 진행률 · 멤버 기여</span></li>
-    <li><code>PUT    /api/clans/:id/goal</code>               <span class="note">주간 공동 목표 설정 (JWT, 클랜장)</span></li>
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
+    <li><code>GET    /api/posts/:id/members</code>            <span class="note">멤버 · 기여도 조회 (study 전용)</span></li>
+    <li><code>POST   /api/posts/:id/join</code>               <span class="note">가입 (JWT)</span></li>
+    <li><code>DELETE /api/posts/:id/leave</code>              <span class="note">탈퇴 (JWT, 글쓴이는 불가)</span></li>
+    <li><code>GET    /api/posts/:id/chat</code>                <span class="note">그룹 채팅 기록 (JWT, 멤버만)</span></li>
+    <li><code>POST   /api/posts</code>                        <span class="note">모임 생성 = 글쓰기 (JWT, linked_exam_name 선택)</span></li>
   </ul>
 
   <h2>Wiki</h2>
@@ -132,7 +122,6 @@
     <li><code>GET /api/exam-schedule</code>            <span class="note">q-net 연간 시험일정 (1시간 캐시, refresh=1)</span></li>
   </ul>
 
-<<<<<<< HEAD
   <h2>Achievements / Planet</h2>
   <ul>
     <li><code>GET /api/achievements</code>             <span class="note">업적 목록 + 진행률 (방문 시 달성분 자동 획득, JWT)</span></li>
@@ -148,8 +137,6 @@
     <li><code>POST /api/ai/wiki-draft</code>            <span class="note">위키 초안 생성 (JWT)</span></li>
   </ul>
 
-=======
->>>>>>> a44dcce5d27164e4347f36c481b199d4059f86ed
   <h2>Admin</h2>
   <ul>
     <li><code>GET    /api/admin/users</code>               <span class="note">회원 목록 (관리자)</span></li>

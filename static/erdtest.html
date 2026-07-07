@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{background:linear-gradient(180deg,#0a1126,#0a1a2c);margin:0;padding:18px;}svg{width:100%;height:auto;display:block;}</style></head><body><svg class="erd-real" viewBox="0 0 1300 812" role="img" aria-label="StudyBoard 실제 ERD — 15개 테이블과 외래키 관계">
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>html{zoom:1.25;}body{background:linear-gradient(180deg,#0a1126,#0a1a2c);margin:0;padding:18px;}svg{width:100%;height:auto;display:block;}</style></head><body><svg class="erd-real" viewBox="0 0 1300 812" role="img" aria-label="StudyBoard 실제 ERD — 15개 테이블과 외래키 관계">
 <defs>
   <marker id="ee_one" markerWidth="18" markerHeight="18" refX="9" refY="9" orient="auto"><path d="M9,3 L9,15" stroke="#88a8de" stroke-width="1.7"/></marker>
   <marker id="ee_many" markerWidth="20" markerHeight="20" refX="2" refY="10" orient="auto"><path d="M2,10 L17,3 M2,10 L17,10 M2,10 L17,17" stroke="#88a8de" stroke-width="1.4" fill="none"/></marker>
@@ -14,9 +14,9 @@
 <path d="M539,448 L304,372" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
 <path d="M539,448 L296,484" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
 <path d="M539,448 L296,594" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
-<path d="M747,448 L1076,354" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
-<path d="M1277,336 L1282,448" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
-<path d="M747,448 L1076,466" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
+<path d="M535,94 L1076,355" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
+<path d="M535,94 L1076,431" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
+<path d="M747,448 L1076,450" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
 <path d="M747,448 L574,742" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
 <path d="M839,760 L780,760" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
 <path d="M539,448 L296,704" fill="none" stroke="#6f93cf" stroke-width="1.3" marker-start="url(#ee_one)" marker-end="url(#ee_many)"/>
@@ -41,7 +41,7 @@
 <text x="560" y="508" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">is_admin</text>
 <line x1="548" y1="514" x2="738" y2="514" stroke="#223158" stroke-width="0.8"/>
 <text x="560" y="527" fill="#7f8db5" font-size="10.5" font-style="italic" font-family="var(--mono),monospace">+ 7 속성</text>
-<rect x="348" y="58" width="178" height="83" rx="9" fill="#16204a" stroke="#36487f" stroke-width="1.3"/>
+<rect x="348" y="58" width="178" height="102" rx="9" fill="#16204a" stroke="#36487f" stroke-width="1.3"/>
 <path d="M348,84 V67 a9,9 0 0 1 9,-9 H517 a9,9 0 0 1 9,9 V84 Z" fill="#26396f"/>
 <text x="437" y="76" fill="#eaf0ff" font-size="13" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">posts</text>
 <line x1="348" y1="84" x2="526" y2="84" stroke="#36487f" stroke-width="1.1"/>
@@ -53,7 +53,9 @@
 <rect x="496" y="106" width="22" height="13" rx="3.5" fill="#d6e2ff"/>
 <text x="507.0" y="115.5" fill="#2c52b8" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">FK</text>
 <line x1="348" y1="122" x2="526" y2="122" stroke="#223158" stroke-width="0.8"/>
-<text x="360" y="135" fill="#7f8db5" font-size="10.5" font-style="italic" font-family="var(--mono),monospace">+ 12 속성</text>
+<text x="360" y="135" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">linked_exam_name</text>
+<line x1="348" y1="141" x2="526" y2="141" stroke="#223158" stroke-width="0.8"/>
+<text x="360" y="154" fill="#7f8db5" font-size="10.5" font-style="italic" font-family="var(--mono),monospace">+ 11 속성</text>
 <rect x="110" y="36" width="178" height="102" rx="9" fill="#16204a" stroke="#36487f" stroke-width="1.3"/>
 <path d="M110,62 V45 a9,9 0 0 1 9,-9 H279 a9,9 0 0 1 9,9 V62 Z" fill="#26396f"/>
 <text x="199" y="54" fill="#eaf0ff" font-size="13" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">comments</text>
@@ -160,32 +162,40 @@
 <text x="116" y="708" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">user_id</text>
 <rect x="252" y="698" width="22" height="13" rx="3.5" fill="#d6e2ff"/>
 <text x="263.0" y="707.5" fill="#2c52b8" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">FK</text>
-<rect x="1090" y="300" width="178" height="64" rx="9" fill="#16204a" stroke="#36487f" stroke-width="1.3"/>
+<rect x="1090" y="300" width="178" height="83" rx="9" fill="#16204a" stroke="#36487f" stroke-width="1.3"/>
 <path d="M1090,326 V309 a9,9 0 0 1 9,-9 H1259 a9,9 0 0 1 9,9 V326 Z" fill="#26396f"/>
-<text x="1179" y="318" fill="#eaf0ff" font-size="13" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">clans</text>
+<text x="1179" y="318" fill="#eaf0ff" font-size="13" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">post_chat_messages</text>
 <line x1="1090" y1="326" x2="1268" y2="326" stroke="#36487f" stroke-width="1.1"/>
 <text x="1102" y="339" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">id</text>
 <rect x="1238" y="329" width="22" height="13" rx="3.5" fill="#fde9b8"/>
 <text x="1249.0" y="338.5" fill="#9a6b00" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">PK</text>
 <line x1="1090" y1="345" x2="1268" y2="345" stroke="#223158" stroke-width="0.8"/>
-<text x="1102" y="358" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">leader_id</text>
+<text x="1102" y="358" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">post_id</text>
 <rect x="1238" y="348" width="22" height="13" rx="3.5" fill="#d6e2ff"/>
 <text x="1249.0" y="357.5" fill="#2c52b8" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">FK</text>
-<rect x="1090" y="412" width="178" height="64" rx="9" fill="#16204a" stroke="#36487f" stroke-width="1.3"/>
-<path d="M1090,438 V421 a9,9 0 0 1 9,-9 H1259 a9,9 0 0 1 9,9 V438 Z" fill="#26396f"/>
-<text x="1179" y="430" fill="#eaf0ff" font-size="13" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">clan_members</text>
-<line x1="1090" y1="438" x2="1268" y2="438" stroke="#36487f" stroke-width="1.1"/>
-<text x="1102" y="451" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">clan_id</text>
-<rect x="1238" y="441" width="22" height="13" rx="3.5" fill="#d6e2ff"/>
-<text x="1249.0" y="450.5" fill="#2c52b8" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">FK</text>
-<rect x="1212" y="441" width="22" height="13" rx="3.5" fill="#fde9b8"/>
-<text x="1223.0" y="450.5" fill="#9a6b00" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">PK</text>
-<line x1="1090" y1="457" x2="1268" y2="457" stroke="#223158" stroke-width="0.8"/>
-<text x="1102" y="470" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">user_id</text>
-<rect x="1238" y="460" width="22" height="13" rx="3.5" fill="#d6e2ff"/>
-<text x="1249.0" y="469.5" fill="#2c52b8" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">FK</text>
-<rect x="1212" y="460" width="22" height="13" rx="3.5" fill="#fde9b8"/>
-<text x="1223.0" y="469.5" fill="#9a6b00" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">PK</text>
+<line x1="1090" y1="364" x2="1268" y2="364" stroke="#223158" stroke-width="0.8"/>
+<text x="1102" y="377" fill="#7f8db5" font-size="10.5" font-style="italic" font-family="var(--mono),monospace">+ 8 속성</text>
+<rect x="1090" y="395" width="178" height="121" rx="9" fill="#16204a" stroke="#36487f" stroke-width="1.3"/>
+<path d="M1090,421 V404 a9,9 0 0 1 9,-9 H1259 a9,9 0 0 1 9,9 V421 Z" fill="#26396f"/>
+<text x="1179" y="413" fill="#eaf0ff" font-size="13" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">post_members</text>
+<line x1="1090" y1="421" x2="1268" y2="421" stroke="#36487f" stroke-width="1.1"/>
+<text x="1102" y="434" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">post_id</text>
+<rect x="1238" y="424" width="22" height="13" rx="3.5" fill="#d6e2ff"/>
+<text x="1249.0" y="433.5" fill="#2c52b8" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">FK</text>
+<rect x="1212" y="424" width="22" height="13" rx="3.5" fill="#fde9b8"/>
+<text x="1223.0" y="433.5" fill="#9a6b00" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">PK</text>
+<line x1="1090" y1="440" x2="1268" y2="440" stroke="#223158" stroke-width="0.8"/>
+<text x="1102" y="453" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">user_id</text>
+<rect x="1238" y="443" width="22" height="13" rx="3.5" fill="#d6e2ff"/>
+<text x="1249.0" y="452.5" fill="#2c52b8" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">FK</text>
+<rect x="1212" y="443" width="22" height="13" rx="3.5" fill="#fde9b8"/>
+<text x="1223.0" y="452.5" fill="#9a6b00" font-size="9" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">PK</text>
+<line x1="1090" y1="459" x2="1268" y2="459" stroke="#223158" stroke-width="0.8"/>
+<text x="1102" y="472" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">contribution_score</text>
+<line x1="1090" y1="478" x2="1268" y2="478" stroke="#223158" stroke-width="0.8"/>
+<text x="1102" y="491" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">joined_at</text>
+<line x1="1090" y1="497" x2="1268" y2="497" stroke="#223158" stroke-width="0.8"/>
+<text x="1102" y="510" fill="#dfe7fb" font-size="11" font-family="var(--mono),monospace">left_at</text>
 <rect x="1086" y="524" width="196" height="64" rx="9" fill="#16204a" stroke="#36487f" stroke-width="1.3"/>
 <path d="M1086,550 V533 a9,9 0 0 1 9,-9 H1273 a9,9 0 0 1 9,9 V550 Z" fill="#26396f"/>
 <text x="1184" y="542" fill="#eaf0ff" font-size="13" font-weight="700" text-anchor="middle" font-family="var(--mono),monospace">user_achievements</text>

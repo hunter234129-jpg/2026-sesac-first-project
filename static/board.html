@@ -5,20 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>게시판 · 스터디 플랫폼</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .btn-my-posts {
+      display: none;
+      padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05);
+      color: var(--muted); cursor: pointer; transition: all .15s; white-space: nowrap;
+    }
+    .btn-my-posts.visible { display: inline-flex; align-items: center; gap: 6px; }
+    .btn-my-posts.active {
+      background: rgba(0,229,255,0.12); border-color: rgba(0,229,255,0.4);
+      color: #00e5ff;
+    }
+    .btn-my-posts:hover { border-color: rgba(0,229,255,0.3); color: #00e5ff; }
+    .pi-recruit {
+      margin-left: auto;
+      font-size: 12px; color: var(--muted, #9aa4c2);
+      white-space: nowrap;
+    }
+    .pi-recruit b { color: var(--text, #e8edf8); }
+  </style>
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container">
     <div class="dash-header" style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap;">
       <div>
         <h1>게시판</h1>
         <p>스터디 모집과 정보 공유</p>
       </div>
-      <button class="btn btn-primary" id="writeBtn">✏️ 글쓰기</button>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button class="btn-my-posts" id="myPostsBtn">✍️ 내가 쓴 글</button>
+        <button class="btn btn-primary" id="writeBtn">✏️ 글쓰기</button>
+      </div>
     </div>
 
     <div class="toolbar">
@@ -42,14 +68,33 @@
 
     <div class="pagination" id="pagination"></div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
   <script>
     renderNav();
+    renderRail('board');
 
-    const state = { page: 1, size: 10, type: '', q: '', sort: 'latest' };
-    const listEl = document.getElementById('postList');
-    const pagEl  = document.getElementById('pagination');
+    const state = { page: 1, size: 10, type: queryParam('type') || '', q: '', sort: 'latest', myOnly: false };
+    const listEl     = document.getElementById('postList');
+    const pagEl      = document.getElementById('pagination');
+    const myPostsBtn = document.getElementById('myPostsBtn');
+
+    if (state.type) {
+      document.querySelectorAll('#typeSeg button').forEach(b =>
+        b.classList.toggle('active', b.dataset.type === state.type));
+    }
+
+    // 로그인 상태면 버튼 노출
+    if (Auth.isLoggedIn) myPostsBtn.classList.add('visible');
+
+    myPostsBtn.onclick = () => {
+      state.myOnly = !state.myOnly;
+      myPostsBtn.classList.toggle('active', state.myOnly);
+      myPostsBtn.textContent = state.myOnly ? '✍️ 내가 쓴 글 ✓' : '✍️ 내가 쓴 글';
+      state.page = 1; load();
+    };
 
     document.getElementById('writeBtn').onclick = () => {
       if (!Auth.isLoggedIn) { location.href = '/login?next=/write'; return; }
@@ -74,6 +119,44 @@
       state.sort = e.target.value; state.page = 1; load();
     };
 
+    function fmtDate(str) {
+      if (!str) return '';
+      let d;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const [y, m, day] = str.split('T')[0].split('-').map(Number);
+        d = new Date(y, m - 1, day);
+      } else {
+        d = new Date(str);
+      }
+      if (isNaN(d)) return '';
+      const KO_DOW = ['일','월','화','수','목','금','토'];
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}(${KO_DOW[d.getDay()]})`;
+    }
+
+    function dDayBadge(p) {
+      if (p.type !== 'study' || !p.recruit_deadline) return '';
+      const str = p.recruit_deadline;
+      let deadline;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const [y, m, d] = str.split('T')[0].split('-').map(Number);
+        deadline = new Date(y, m - 1, d);
+      } else {
+        deadline = new Date(str);
+      }
+      if (isNaN(deadline)) return '';
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const diff = Math.round((deadline - today) / 86400000);
+      const label = diff > 0 ? `D-${diff}` : diff === 0 ? 'D-DAY' : `D+${Math.abs(diff)}`;
+      return `<span class="pi-dday">${label}</span>`;
+    }
+
+    function recruitBadge(p) {
+      if (p.type !== 'study') return '';
+      const total   = p.recruit_count || 0;
+      const current = p.member_count  || 0;
+      return `<span class="pi-recruit">모집 <b>${total}</b>명 (현재 <b>${current}</b>명)</span>`;
+    }
+
     function typeBadge(t) {
       return t === 'study'
         ? '<span class="tbadge study">스터디</span>'
@@ -81,8 +164,24 @@
     }
     function statusBadge(p) {
       if (p.type !== 'study') return '';
-      return p.status === 'closed'
-        ? '<span class="tbadge closed">마감</span>'
+      let deadlinePassed = false;
+      if (p.recruit_deadline) {
+        const str = p.recruit_deadline;
+        let dl;
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+          const [y, m, d] = str.split('T')[0].split('-').map(Number);
+          dl = new Date(y, m - 1, d);
+        } else {
+          dl = new Date(str);
+        }
+        if (!isNaN(dl)) {
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          deadlinePassed = dl < today;
+        }
+      }
+      const isFull = p.recruit_count > 0 && (p.member_count || 0) >= p.recruit_count;
+      return (p.status === 'closed' || deadlinePassed || isFull)
+        ? '<span class="tbadge closed">모집 마감</span>'
         : '<span class="tbadge open">모집중</span>';
     }
 
@@ -91,29 +190,60 @@
       const qs = new URLSearchParams({
         page: state.page, size: state.size, sort: state.sort,
       });
-      if (state.type) qs.set('type', state.type);
-      if (state.q)    qs.set('q', state.q);
+      if (state.type)   qs.set('type', state.type);
+      if (state.q)      qs.set('q', state.q);
+      if (state.myOnly && Auth.userId) qs.set('author_id', Auth.userId);
 
       try {
-        const d = await api('/api/posts?' + qs.toString(), { auth: false });
+        const d = await api('/api/posts?' + qs.toString());
         const posts = d.posts || [];
         if (!posts.length) {
           listEl.innerHTML = '<p class="muted text-center" style="padding:40px 0;">게시글이 없어요. 첫 글을 작성해보세요!</p>';
           pagEl.innerHTML = '';
           return;
         }
-        listEl.innerHTML = posts.map(p => `
-          <a class="post-item" href="/post?id=${p.id}">
-            <div class="pi-main">
-              <div class="pi-title">${typeBadge(p.type)}${statusBadge(p)} ${escapeHtml(p.title)}</div>
-              <div class="pi-meta">
-                <span>${escapeHtml(p.author)}</span>
-                ${p.category ? `<span>· ${escapeHtml(p.category)}</span>` : ''}
-                <span>· ${(p.created_at || '').slice(0, 10)}</span>
-              </div>
+        listEl.innerHTML = posts.map(p => {
+          const isClosed = (() => {
+            if (p.type !== 'study') return false;
+            if (p.status === 'closed') return true;
+            if (p.recruit_count > 0 && (p.member_count || 0) >= p.recruit_count) return true;
+            if (!p.recruit_deadline) return false;
+            const str = p.recruit_deadline;
+            let dl;
+            if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+              const [y, m, d] = str.split('T')[0].split('-').map(Number);
+              dl = new Date(y, m - 1, d);
+            } else { dl = new Date(str); }
+            if (isNaN(dl)) return false;
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            return dl < today;
+          })();
+          const isAuthor = Auth.isLoggedIn && p.author_id === Auth.userId;
+          const isMember = !!p.is_member;   // 작성자 포함, 활성 멤버
+          const blocked = isClosed && !isMember;
+
+          const inner = `
+            <div class="pi-top">
+              ${dDayBadge(p)}${typeBadge(p.type)}${statusBadge(p)}${recruitBadge(p)}
+              <span class="pi-views"><strong>${p.view_count}</strong> 조회</span>
             </div>
-            <div class="pi-views"><strong>${p.view_count}</strong>조회</div>
-          </a>`).join('');
+            <div class="pi-title">${escapeHtml(p.title)}</div>
+            <div class="pi-meta">
+              <span class="pi-avatar">${escapeHtml((p.author || '?')[0].toUpperCase())}</span>
+              <span class="pi-author">${escapeHtml(p.author)}</span>
+              ${p.category ? `<span class="pi-cat">· ${escapeHtml(p.category)}</span>` : ''}
+              <span class="pi-date">${
+                p.type === 'study' && (p.study_start || p.study_end)
+                  ? `${fmtDate(p.study_start) || '미정'}~${fmtDate(p.study_end) || '미정'}`
+                  : fmtDate(p.created_at)
+              }</span>
+            </div>
+            ${blocked ? '<div style="position:absolute;inset:0;border-radius:inherit;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;"><span style="font-size:12px;font-weight:700;color:rgba(255,255,255,.5);letter-spacing:.03em;">모집 마감 · 조회 불가</span></div>' : ''}`;
+
+          return blocked
+            ? `<div class="post-item" style="position:relative;cursor:not-allowed;opacity:.55;">${inner}</div>`
+            : `<a class="post-item" href="/post?id=${p.id}" style="position:relative;">${inner}</a>`;
+        }).join('');
         renderPagination(d.page, d.total_pages);
       } catch (err) {
         listEl.innerHTML = `<p class="muted text-center" style="padding:40px 0;">불러오지 못했어요: ${escapeHtml(err.message)}</p>`;

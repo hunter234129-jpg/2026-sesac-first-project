@@ -5,19 +5,100 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>게시글 · 스터디 플랫폼</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .dday-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .dday-chip {
+      display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px;
+      border-radius: 99px; font-size: 12px; background: rgba(0,229,255,0.08);
+      border: 1px solid rgba(0,229,255,0.2); color: var(--muted, #9aa4c2);
+    }
+    .dday-chip b { color: var(--text, #e8edf8); font-family: monospace; }
+    .dday-chip.soon { background: rgba(255,68,102,0.1); border-color: rgba(255,68,102,0.3); }
+    .dday-chip.soon b { color: #FF4466; }
+    .clan-chat-date {
+      align-self: center; font-size: 11.5px; color: var(--muted, #7a8ba8);
+      background: rgba(255,255,255,.05); padding: 4px 14px; border-radius: 99px;
+      border: 1px solid rgba(255,255,255,.07); margin: 4px 0; flex-shrink: 0;
+    }
+    .cf-emoji-btn {
+      flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.04); font-size: 18px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; transition: background .15s;
+    }
+    .cf-emoji-btn:hover { background: rgba(0,229,255,.1); border-color: rgba(0,229,255,.3); }
+    .cf-emoji-panel {
+      position: relative; background: rgba(13,18,32,.96); border: 1px solid rgba(255,255,255,.1);
+      border-radius: 14px; padding: 10px; margin-bottom: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5); backdrop-filter: blur(16px);
+      display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
+    }
+    .cf-emoji-panel.hidden { display: none; }
+    .cf-emoji-panel button {
+      font-size: 22px; background: none; border: none; cursor: pointer; padding: 5px;
+      border-radius: 8px; transition: background .12s; line-height: 1;
+    }
+    .cf-emoji-panel button:hover { background: rgba(255,255,255,.1); }
+  </style>
 </head>
 <body>
   <nav class="navbar">
-    <a href="/" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <a href="/dashboard" class="brand"><span class="dot">●</span> StudyBoard</a>
+    <span class="breadcrumb" id="breadcrumb"></span>
     <div class="nav-links" id="navLinks"></div>
   </nav>
 
+  <div class="app-shell">
+  <aside class="app-rail" id="appRail"></aside>
+  <div class="app-content">
   <div class="container" style="max-width:760px;">
     <a href="/board" class="muted" style="font-size:14px;">← 목록으로</a>
     <div class="alert mt-16" id="alert"></div>
 
     <div class="post-detail card mt-16" id="postCard">
       <p class="muted text-center" style="padding:40px 0;">불러오는 중...</p>
+    </div>
+
+    <div class="card section hidden" id="requestsCard" style="margin-top:20px;">
+      <div class="section-head"><h2>가입 신청 <span id="requestCount" class="muted"></span></h2></div>
+      <div class="rank-list" id="requestList"></div>
+    </div>
+
+    <div class="card section hidden" id="membersCard" style="margin-top:20px;">
+      <div class="section-head"><h2>멤버 <span id="memberCount" class="muted"></span></h2></div>
+      <div class="rank-list" id="memberList"></div>
+    </div>
+
+    <!-- 파일 용량 초과 다이얼로그 -->
+    <div class="cf-dialog-overlay hidden" id="fileSizeDialog">
+      <div class="cf-dialog">
+        <p class="cf-dialog-title">⚠️ 파일 용량 초과</p>
+        <p class="cf-dialog-body">해당 파일은 200MB가 넘었습니다.<br>200MB 이하의 파일만 전송할 수 있어요.</p>
+        <button class="cf-dialog-ok" onclick="document.getElementById('fileSizeDialog').classList.add('hidden')">확인</button>
+      </div>
+    </div>
+
+    <!-- 모임 채팅 — 카카오톡 오픈채팅 방식, 가입한 멤버만 접근·영구 보존 -->
+    <div class="card section clan-chat-card hidden" id="chatCard" style="margin-top:20px;">
+      <div class="section-head">
+        <h2>💬 모임 채팅</h2>
+        <span class="live-dot" id="chatLiveDot" title="실시간 연결됨" style="display:none;">●</span>
+        <button type="button" class="btn btn-ghost hidden" id="chatLeaveBtn"
+          style="padding:5px 14px; font-size:12px; margin-left:auto; color:#ff6b6b; border-color:rgba(255,107,107,.3);">나가기</button>
+      </div>
+      <div class="clan-chat-log" id="chatLog">
+        <button type="button" class="btn btn-ghost clan-chat-more hidden" id="loadMoreBtn">이전 메시지 더보기</button>
+      </div>
+      <div class="cf-emoji-panel hidden" id="emojiPanel"></div>
+      <form class="clan-chat-form" id="chatForm">
+        <button type="button" class="cf-emoji-btn" id="chatEmojiBtn" title="이모지">😊</button>
+        <button type="button" class="cf-file-btn" id="chatFileBtn" title="파일 첨부">＋</button>
+        <input type="file" id="chatFileInput" hidden>
+        <textarea id="chatTextInput" placeholder="메시지를 입력하세요" maxlength="1000" autocomplete="off" rows="1"></textarea>
+        <button type="submit" class="btn btn-primary">전송</button>
+      </form>
+      <p class="muted clan-chat-readonly hidden" id="chatReadonlyNote" style="font-size:12px; text-align:center; margin-top:8px;">
+        탈퇴한 모임이라 새 메시지는 보낼 수 없어요. 지난 대화만 볼 수 있어요.
+      </p>
     </div>
 
     <div class="comments-section" id="commentsSection" style="display:none;">
@@ -33,49 +114,148 @@
       </p>
     </div>
   </div>
+  </div>
+  </div>
 
   <script src="/static/js/api.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
     renderNav();
+    renderRail('board');
     const postId  = queryParam('id');
     const alertEl = document.getElementById('alert');
     if (!postId) { showAlert(alertEl, '잘못된 접근입니다.'); }
 
     const myId = Auth.userId;
 
+    /* ── 날짜 포맷: "2026-07-06(월)" ── */
+    function fmtDate(str) {
+      if (!str) return '미정';
+      let d;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        const [y, m, day] = str.split('T')[0].split('-').map(Number);
+        d = new Date(y, m - 1, day);
+      } else {
+        d = new Date(str);
+      }
+      if (isNaN(d)) return str;
+      const yy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dow = ['일','월','화','수','목','금','토'][d.getDay()];
+      return `${yy}-${mm}-${dd}(${dow})`;
+    }
+
+    /* ── 시험 D-day ── */
+    function ddayLabel(dateStr) {
+      if (!dateStr) return null;
+      const target = new Date(dateStr);
+      if (isNaN(target)) return null;
+      const today = new Date();
+      const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const d0 = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+      const diff = Math.round((d0 - t0) / 86400000);
+      if (diff === 0) return { text: 'D-DAY', soon: true };
+      if (diff > 0)   return { text: `D-${diff}`, soon: diff <= 7 };
+      return { text: `D+${-diff}`, soon: false };
+    }
+    function examDdayHtml(info) {
+      if (!info) return '';
+      const items = [
+        ['원서접수 시작', info.apply_start],
+        ['원서접수 마감', info.apply_end],
+        ['시험일',       info.exam_start],
+        ['합격자 발표',   info.result_date],
+      ].map(([label, d]) => {
+        const dd = ddayLabel(d);
+        return dd ? `<span class="dday-chip${dd.soon ? ' soon' : ''}">${label} <b>${dd.text}</b></span>` : '';
+      }).filter(Boolean).join('');
+      return items ? `<div class="dday-row">${items}</div>` : '';
+    }
+
     /* ── 게시글 상세 ── */
     async function loadPost() {
       const card = document.getElementById('postCard');
       try {
         const p = await api('/api/posts/' + postId, { auth: false });
+        renderBreadcrumb([{ label: '게시판', href: '/board' }, { label: p.title }]);
         const isOwner = Auth.isLoggedIn && p.user_id === myId;
         const isStudy = p.type === 'study';
+        postOwnerId = p.user_id;
+
+        // 실질적 마감 여부 (status, 마감일, 정원 초과 모두 고려)
+        const isEffectivelyClosed = isStudy && (() => {
+          if (p.status === 'closed') return true;
+          if (p.recruit_count > 0 && (p.member_count || 0) >= p.recruit_count) return true;
+          if (p.recruit_deadline) {
+            const str = p.recruit_deadline;
+            let dl;
+            if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+              const [y, m, d] = str.split('T')[0].split('-').map(Number);
+              dl = new Date(y, m - 1, d);
+            } else { dl = new Date(str); }
+            if (!isNaN(dl)) {
+              const today = new Date(); today.setHours(0, 0, 0, 0);
+              if (dl < today) return true;
+            }
+          }
+          return false;
+        })();
 
         const typeBadge = isStudy
           ? '<span class="tbadge study">스터디</span>'
           : '<span class="tbadge post">게시글</span>';
         const statusBadge = isStudy
-          ? (p.status === 'closed' ? '<span class="tbadge closed">마감</span>' : '<span class="tbadge open">모집중</span>')
+          ? (isEffectivelyClosed ? '<span class="tbadge closed">모집 마감</span>' : '<span class="tbadge open">모집중</span>')
           : '';
 
         let recruitHtml = '';
         if (isStudy) {
           recruitHtml = `
             <div class="pd-recruit">
-              <div><div class="label">모집 인원</div>${p.recruit_count || 0}명</div>
-              <div><div class="label">모집 마감일</div>${p.recruit_deadline || '미정'}</div>
+              <div><div class="label">모집 인원</div>${p.recruit_count || 0}명 (현재 <span id="currentMemberCount">${p.member_count || 0}</span>명)</div>
+              ${p.study_start ? `<div><div class="label">스터디 시작일</div>${fmtDate(p.study_start)}</div>` : ''}
+              ${p.study_end   ? `<div><div class="label">스터디 종료일</div>${fmtDate(p.study_end)}</div>` : ''}
+              <div><div class="label">가입 방식</div>${p.join_mode === 'approval' ? '모임장 승인 필요' : '바로 참가'}</div>
+              ${p.linked_exam_name ? `<div><div class="label">연동 시험</div>🗓️ ${escapeHtml(p.linked_exam_name)}</div>` : ''}
               <div><div class="label">분야</div>${escapeHtml(p.field || '미지정')}</div>
-            </div>`;
+            </div>
+            ${examDdayHtml(p.exam_info)}`;
+        }
+
+        let membership = { status: 'none' };
+        if (isStudy && !isOwner && Auth.isLoggedIn) {
+          try { membership = await api(`/api/posts/${postId}/membership`); } catch (_) {}
         }
 
         let ownerActions = '';
         if (isOwner) {
           ownerActions = `
             <div class="pd-actions">
-              ${isStudy ? `<button class="btn btn-ghost" id="toggleStatusBtn" style="padding:7px 14px;">${p.status === 'open' ? '모집 마감' : '다시 모집'}</button>` : ''}
+              ${isStudy ? (() => {
+                const toggleDisabled = isEffectivelyClosed && p.status === 'open';
+                const label = p.status === 'open' ? '모집 마감' : '다시 모집';
+                const disabledStyle = toggleDisabled ? 'opacity:.35;cursor:not-allowed;pointer-events:none;' : '';
+                return `<button class="btn btn-ghost" id="toggleStatusBtn" style="padding:7px 14px;${disabledStyle}" ${toggleDisabled ? 'disabled' : ''}>${label}</button>`;
+              })() : ''}
               <a class="btn btn-ghost" href="/write?id=${p.id}" style="padding:7px 14px;">수정</a>
               <button class="btn btn-danger" id="deleteBtn" style="padding:7px 14px;">삭제</button>
             </div>`;
+        } else if (isStudy) {
+          if (!Auth.isLoggedIn) {
+            ownerActions = `<div class="pd-actions"><a class="btn btn-primary" href="/login?next=${encodeURIComponent('/post?id='+postId)}" style="padding:7px 14px;">로그인 후 참가</a></div>`;
+          } else if (membership.status === 'active') {
+            ownerActions = `<div class="pd-actions"><button class="btn btn-ghost" id="leaveBtn" style="padding:7px 14px;">탈퇴하기</button></div>`;
+          } else if (membership.status === 'pending') {
+            ownerActions = `
+              <div class="pd-actions">
+                <span class="tbadge" style="background:rgba(245,158,11,.15); color:#F59E0B;">⏳ 승인 대기중</span>
+                <button class="btn btn-ghost" id="cancelReqBtn" style="padding:7px 14px;">신청 취소</button>
+              </div>`;
+          } else {
+            const label = p.join_mode === 'approval' ? '참가 신청하기' : '참가하기';
+            ownerActions = `<div class="pd-actions"><button class="btn btn-primary" id="joinBtn" style="padding:7px 14px;">${label}</button></div>`;
+          }
         }
 
         card.innerHTML = `
@@ -84,7 +264,9 @@
             <span>✍️ ${escapeHtml(p.author)}</span>
             <span>👁 조회 ${p.view_count}</span>
             ${p.category ? `<span>🏷️ ${escapeHtml(p.category)}</span>` : ''}
-            <span>🕒 ${(p.created_at || '').replace('T',' ').slice(0,16)}</span>
+            ${isStudy && p.recruit_deadline
+              ? `<span>🕒 마감 ${fmtDate(p.recruit_deadline)}</span>`
+              : `<span>🕒 ${fmtDate(p.created_at)}</span>`}
             ${ownerActions}
           </div>
           ${recruitHtml}
@@ -104,9 +286,131 @@
           try { await api(`/api/posts/${postId}/status`, { method: 'PATCH', body: { status: next } }); loadPost(); }
           catch (err) { showAlert(alertEl, err.message); }
         };
+        // 모임 참가 신청/즉시 가입
+        const joinBtn = document.getElementById('joinBtn');
+        if (joinBtn) joinBtn.onclick = async () => {
+          const label = joinBtn.textContent;
+          setLoading(joinBtn, true);
+          try { await api(`/api/posts/${postId}/join`, { method: 'POST' }); loadPost(); }
+          catch (err) { showAlert(alertEl, err.message); setLoading(joinBtn, false, label); }
+        };
+        // 탈퇴
+        const leaveBtn = document.getElementById('leaveBtn');
+        if (leaveBtn) leaveBtn.onclick = async () => {
+          if (!confirm('모임에서 탈퇴할까요?')) return;
+          try { await api(`/api/posts/${postId}/leave`, { method: 'DELETE' }); loadPost(); }
+          catch (err) { showAlert(alertEl, err.message); }
+        };
+        // 가입 신청 취소
+        const cancelReqBtn = document.getElementById('cancelReqBtn');
+        if (cancelReqBtn) cancelReqBtn.onclick = async () => {
+          try { await api(`/api/posts/${postId}/leave`, { method: 'DELETE' }); loadPost(); }
+          catch (err) { showAlert(alertEl, err.message); }
+        };
+
+        if (isStudy) {
+          loadMembers(p.user_id, isOwner && p.join_mode === 'approval');
+          document.getElementById('requestsCard').classList.add('hidden');
+          if (Auth.isLoggedIn) initChat();
+        }
       } catch (err) {
         card.innerHTML = `<p class="muted text-center" style="padding:40px 0;">${escapeHtml(err.message)}</p>`;
       }
+    }
+
+    /* ── 멤버 목록(스터디 모임) ── */
+    async function loadMembers(ownerId, showRequests) {
+      try {
+        const [members, requests] = await Promise.all([
+          api(`/api/posts/${postId}/members`, { auth: false }),
+          showRequests ? api(`/api/posts/${postId}/requests`).catch(() => []) : Promise.resolve([]),
+        ]);
+
+        document.getElementById('membersCard').classList.remove('hidden');
+        document.getElementById('memberCount').textContent = `${members.length}명`;
+        const curEl = document.getElementById('currentMemberCount');
+        if (curEl) curEl.textContent = members.length;
+
+        const el = document.getElementById('memberList');
+
+        const memberRows = members.map((m, i) => {
+          const isLeader = m.id === ownerId;
+          const isMe = m.id === myId;
+          return `
+            <div class="rank-row ${isMe ? 'me' : ''}">
+              <div class="rank-num">${i + 1}</div>
+              <div class="rank-name">
+                ${isLeader ? '👑 ' : ''}${escapeHtml(m.username)}${isMe ? ' <span style="font-size:11px;color:var(--muted,#9aa4c2);">(본인)</span>' : ''}
+              </div>
+            </div>`;
+        }).join('');
+
+        const requestRows = requests.map(r => `
+          <div class="rank-row" data-uid="${r.id}" style="opacity:.8;">
+            <div class="rank-num" style="font-size:14px;">⏳</div>
+            <div class="rank-name" style="color:var(--muted,#9aa4c2);">
+              ${escapeHtml(r.username)}
+              <span style="font-size:11px; margin-left:4px;">(승인 대기)</span>
+            </div>
+            <div style="display:flex; gap:6px; margin-left:auto;">
+              <button class="btn btn-primary" data-act="accept" style="padding:4px 12px; font-size:12px;">승인</button>
+              <button class="btn btn-ghost"   data-act="reject" style="padding:4px 12px; font-size:12px;">취소</button>
+            </div>
+          </div>`).join('');
+
+        el.innerHTML = memberRows + (requests.length
+          ? `<div style="border-top:1px solid rgba(255,255,255,.06); margin-top:6px; padding-top:6px;">${requestRows}</div>`
+          : '');
+
+        el.querySelectorAll('[data-act]').forEach(btn => {
+          btn.onclick = async () => {
+            const uid = btn.closest('[data-uid]').dataset.uid;
+            btn.disabled = true;
+            try {
+              if (btn.dataset.act === 'accept') {
+                await api(`/api/posts/${postId}/requests/${uid}/accept`, { method: 'POST' });
+              } else {
+                await api(`/api/posts/${postId}/requests/${uid}`, { method: 'DELETE' });
+              }
+              loadPost();
+            } catch (err) { showAlert(alertEl, err.message); btn.disabled = false; }
+          };
+        });
+      } catch (_) {}
+    }
+
+    /* ── 가입 신청 관리(모임장 전용, join_mode='approval'일 때만) ── */
+    async function loadRequests() {
+      const card = document.getElementById('requestsCard');
+      try {
+        const reqs = await api(`/api/posts/${postId}/requests`);
+        if (!reqs.length) { card.classList.add('hidden'); return; }
+        card.classList.remove('hidden');
+        document.getElementById('requestCount').textContent = `${reqs.length}건`;
+        const el = document.getElementById('requestList');
+        el.innerHTML = reqs.map(r => `
+          <div class="rank-row" data-uid="${r.id}">
+            <div class="rank-name">${escapeHtml(r.username)}</div>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-primary" data-act="accept" style="padding:5px 12px;">수락</button>
+              <button class="btn btn-ghost" data-act="reject" style="padding:5px 12px;">거절</button>
+            </div>
+          </div>`).join('');
+        el.querySelectorAll('[data-act]').forEach(btn => {
+          btn.onclick = async () => {
+            const uid = btn.closest('[data-uid]').dataset.uid;
+            btn.disabled = true;
+            try {
+              if (btn.dataset.act === 'accept') {
+                await api(`/api/posts/${postId}/requests/${uid}/accept`, { method: 'POST' });
+              } else {
+                await api(`/api/posts/${postId}/requests/${uid}`, { method: 'DELETE' });
+              }
+              loadPost();
+            } catch (err) { showAlert(alertEl, err.message); btn.disabled = false; }
+          };
+        });
+      } catch (_) { card.classList.add('hidden'); }
     }
 
     /* ── 댓글 ── */
@@ -117,7 +421,7 @@
         <div class="comment" data-cid="${c.id}">
           <div class="comment-meta">
             <span class="cm-author">${escapeHtml(c.username)}</span>
-            <span class="cm-date">${(c.created_at||'').replace('T',' ').slice(0,16)}</span>
+            <span class="cm-date">${fmtDateTime(c.created_at)}</span>
           </div>
           <div class="comment-body" data-body>${escapeHtml(c.content)}</div>
           <div class="comment-actions">
@@ -226,6 +530,321 @@
       document.getElementById('commentForm').style.display = 'none';
       document.getElementById('loginToComment').style.display = 'block';
     }
+
+    /* ══════════ 모임 채팅 — 카카오톡 오픈채팅 방식 ══════════
+       가입 절차 자체가 이미 입장 승인이라 신청/수락 핸드셰이크가 없다.
+       탈퇴해도 대화 기록은 지워지지 않고(영구 보존), 본인이 나간 시점까지만 계속 보인다. */
+    const AVATARS = [
+      { emoji: '🦊', bg: '#FF6B6B' }, { emoji: '🐱', bg: '#FFA94D' }, { emoji: '🐶', bg: '#FFD43B' },
+      { emoji: '🐼', bg: '#94D82D' }, { emoji: '🐨', bg: '#37B24D' }, { emoji: '🦁', bg: '#20C997' },
+      { emoji: '🐯', bg: '#22B8CF' }, { emoji: '🐵', bg: '#4DABF7' }, { emoji: '🐰', bg: '#5C7CFA' },
+      { emoji: '🐺', bg: '#845EF7' }, { emoji: '🐸', bg: '#CC5DE8' }, { emoji: '🐧', bg: '#F783AC' },
+      { emoji: '🦉', bg: '#FF8787' }, { emoji: '🐙', bg: '#FFC078' }, { emoji: '🦋', bg: '#FFE066' },
+      { emoji: '🐹', bg: '#B2F2BB' }, { emoji: '🐭', bg: '#99E9F2' }, { emoji: '🐔', bg: '#91A7FF' },
+      { emoji: '🐮', bg: '#D0BFFF' }, { emoji: '🐷', bg: '#FCC2D7' },
+    ];
+    function avatarChip(avatarId, size) {
+      const a = AVATARS[avatarId] || AVATARS[0];
+      return `<span class="avatar-chip" style="background:${a.bg}; width:${size}px; height:${size}px; font-size:${Math.round(size * 0.58)}px;">${a.emoji}</span>`;
+    }
+
+    let chatSocket = null;
+    let oldestMsgId = null;
+    let chatIsActiveMember = false;
+    let lastRenderedDate = null;  // 마지막으로 렌더링된 메시지의 날짜('YYYY-MM-DD')
+    let postOwnerId = null;       // 게시글 작성자 ID (나가기 버튼 노출 여부 판단용)
+
+    const DOW_KO = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
+    function parseMsgDate(createdAt) {
+      if (!createdAt) return null;
+      const s = String(createdAt);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        // "2026-07-07T09:00:00" 또는 "2026-07-07 09:00:00"
+        const [datePart, timePart = ''] = s.replace('T', ' ').split(' ');
+        const [y, mo, dy] = datePart.split('-').map(Number);
+        const [h = 0, mi = 0] = timePart.split(':').map(Number);
+        return new Date(y, mo - 1, dy, h, mi);
+      }
+      // Flask HTTP date "Mon, 07 Jul 2026 09:00:00 GMT"
+      const dt = new Date(s);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    function msgDateStr(createdAt) {
+      const dt = parseMsgDate(createdAt);
+      if (!dt) return null;
+      const y  = dt.getFullYear();
+      const mo = String(dt.getMonth() + 1).padStart(2, '0');
+      const dy = String(dt.getDate()).padStart(2, '0');
+      return `${y}-${mo}-${dy}`;
+    }
+
+    function msgTimeStr(createdAt) {
+      const dt = parseMsgDate(createdAt);
+      if (!dt) return '';
+      const h   = dt.getHours();
+      const min = dt.getMinutes();
+      const ampm = h < 12 ? '오전' : '오후';
+      const h12  = h % 12 || 12;
+      return `${ampm} ${h12}:${String(min).padStart(2, '0')}`;
+    }
+
+    function dateSeparatorHtml(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dow = DOW_KO[new Date(y, m - 1, d).getDay()];
+      return `<div class="clan-chat-date" data-date="${dateStr}">📅 ${y}년 ${m}월 ${d}일 ${dow}</div>`;
+    }
+
+    function formatFileSize(bytes) {
+      if (!bytes || bytes <= 0) return '';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+      return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
+    function buildMsgHtml(msgs, prevDate) {
+      let html = '';
+      let cur = prevDate;
+      for (const m of msgs) {
+        const d = msgDateStr(m.created_at);
+        if (d && d !== cur) { html += dateSeparatorHtml(d); cur = d; }
+        html += chatBubbleHtml(m);
+      }
+      return { html, lastDate: cur };
+    }
+
+    function chatBubbleHtml(m) {
+      if (m.msg_type === 'system') {
+        return `<div class="clan-chat-sys" data-id="${m.id}">${escapeHtml(m.content)}</div>`;
+      }
+      const mine = m.sender_id === myId;
+      let body;
+      if (m.msg_type === 'file') {
+        const isImage = (m.mime_type || '').startsWith('image/');
+        if (isImage) {
+          body = `<a href="${m.file_url}" target="_blank" rel="noopener noreferrer"><img class="cf-file-img" src="${m.file_url}" alt="${escapeHtml(m.file_name)}"></a>`;
+        } else {
+          const sizeStr = m.file_size ? `용량: ${formatFileSize(m.file_size)}` : '';
+          body = `<a href="${m.file_url}" download="${escapeHtml(m.file_name || '')}" target="_blank" rel="noopener noreferrer" class="cf-file-card">
+            <div class="cfc-icon">↓</div>
+            <div class="cfc-info">
+              <div class="cfc-name">${escapeHtml(m.file_name || '파일')}</div>
+              ${sizeStr ? `<div class="cfc-size">${sizeStr}</div>` : ''}
+            </div>
+          </a>`;
+        }
+      } else {
+        body = escapeHtml(m.content);
+      }
+      const timeEl = msgTimeStr(m.created_at)
+        ? `<div class="ccr-time">${msgTimeStr(m.created_at)}</div>` : '';
+      return `
+        <div class="clan-chat-row ${mine ? 'mine' : ''}" data-id="${m.id}">
+          ${!mine ? avatarChip(m.avatar_id, 26) : ''}
+          <div class="ccr-bubble-wrap">
+            ${!mine ? `<div class="ccr-name">${escapeHtml(m.username)}</div>` : ''}
+            <div class="ccr-msg-row">
+              ${mine ? timeEl : ''}
+              <div class="ccr-bubble ${m.msg_type === 'file' ? 'file' : ''}">${body}</div>
+              ${!mine ? timeEl : ''}
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function appendMessages(msgs, prepend) {
+      if (!msgs.length) return;
+      const log = document.getElementById('chatLog');
+      const moreBtn = document.getElementById('loadMoreBtn');
+
+      if (prepend) {
+        // 오래된 메시지를 위로 추가 — 내부 날짜 구분선 생성
+        const { html, lastDate } = buildMsgHtml(msgs, null);
+        // 마지막 추가 메시지 날짜가 현재 첫 번째 메시지 날짜와 같으면 중복 구분선 제거
+        if (lastDate) {
+          const firstSep = log.querySelector('.clan-chat-date');
+          if (firstSep && firstSep.dataset.date === lastDate) firstSep.remove();
+        }
+        const beforeHeight = log.scrollHeight;
+        moreBtn.insertAdjacentHTML('afterend', html);
+        log.scrollTop = log.scrollHeight - beforeHeight;
+        oldestMsgId = msgs[0].id;
+      } else {
+        // 최신 메시지를 아래에 추가 — lastRenderedDate 기준으로 구분선 삽입
+        const { html, lastDate } = buildMsgHtml(msgs, lastRenderedDate);
+        log.insertAdjacentHTML('beforeend', html);
+        log.scrollTop = log.scrollHeight;
+        if (oldestMsgId === null) oldestMsgId = msgs[0].id;
+        if (lastDate) lastRenderedDate = lastDate;
+      }
+    }
+
+    async function loadChatHistory(before) {
+      const qs = before ? `?before=${before}&size=30` : '?size=30';
+      const d = await api(`/api/posts/${postId}/chat${qs}`);
+      chatIsActiveMember = d.is_active_member;
+      document.getElementById('loadMoreBtn').classList.toggle('hidden', !d.has_more);
+      appendMessages(d.messages, !!before);
+      document.getElementById('chatForm').style.display = chatIsActiveMember ? 'flex' : 'none';
+      document.getElementById('chatReadonlyNote').classList.toggle('hidden', chatIsActiveMember);
+      // 나가기 버튼: 활성 멤버이고 글 작성자가 아닐 때만 표시
+      const showLeave = chatIsActiveMember && myId && myId !== postOwnerId;
+      document.getElementById('chatLeaveBtn').classList.toggle('hidden', !showLeave);
+    }
+
+    function connectChatSocket() {
+      if (chatSocket || !chatIsActiveMember) return;
+      chatSocket = io({ auth: { token: Auth.token } });
+      const liveDot = document.getElementById('chatLiveDot');
+      chatSocket.on('connect', () => {
+        liveDot.style.display = 'inline';
+        chatSocket.emit('join_post_chat', { post_id: Number(postId) });
+      });
+      chatSocket.on('disconnect', () => { liveDot.style.display = 'none'; });
+      chatSocket.on('post_message', (m) => {
+        if (m.post_id !== Number(postId)) return;
+        appendMessages([m], false);
+      });
+      chatSocket.on('chat_blocked', (d) => {
+        if (d.post_id !== Number(postId)) return;
+        appendMessages([{ id: 'blocked-' + Date.now(), msg_type: 'system', content: d.message }], false);
+      });
+      chatSocket.on('post_kicked', (d) => {
+        if (d.post_id !== Number(postId)) return;
+        chatSocket.emit('leave_post_chat', { post_id: Number(postId) });
+        chatIsActiveMember = false;
+        document.getElementById('chatForm').style.display = 'none';
+        document.getElementById('chatReadonlyNote').classList.remove('hidden');
+        document.getElementById('chatLeaveBtn').classList.add('hidden');
+      });
+    }
+
+    async function initChat() {
+      // join/leave/가입승인 등으로 loadPost()가 다시 불릴 때마다 initChat도 다시 불리는데,
+      // 이미 초기화돼 있으면 또 불러오지 않는다 — 안 그러면 history가 매번 중복으로 쌓인다.
+      if (chatSocket) return;
+      try {
+        await loadChatHistory();
+      } catch (err) {
+        if (err.code === 'NOT_MEMBER') return;   // 가입 안 한 사람에겐 그냥 숨김(정상 상태)
+        showAlert(alertEl, err.message);
+        return;
+      }
+      document.getElementById('chatCard').classList.remove('hidden');
+      connectChatSocket();
+    }
+
+    document.getElementById('chatLeaveBtn').onclick = async () => {
+      if (!confirm('모임에서 나가시겠습니까?\n나간 이후에는 채팅 기록을 볼 수 없어요.')) return;
+      try {
+        await api(`/api/posts/${postId}/leave`, { method: 'DELETE' });
+        // 탈퇴 성공 → 서버가 post_kicked 이벤트 + "나갔습니다" 시스템 메시지 emit
+        loadPost();
+      } catch (err) {
+        showAlert(alertEl, err.message);
+      }
+    };
+
+    document.getElementById('loadMoreBtn').onclick = () => loadChatHistory(oldestMsgId);
+
+    const chatTextInput = document.getElementById('chatTextInput');
+
+    function sendChatMessage() {
+      const text = chatTextInput.value.trim();
+      if (!text || !chatSocket) return;
+      chatSocket.emit('post_message', { post_id: Number(postId), message: text });
+      chatTextInput.value = '';
+      chatTextInput.style.height = '';  // 높이 초기화
+    }
+
+    // textarea 내용에 따라 높이 자동 조절
+    chatTextInput.addEventListener('input', () => {
+      chatTextInput.style.height = '';
+      chatTextInput.style.height = Math.min(chatTextInput.scrollHeight, 120) + 'px';
+    });
+
+    // Enter → 전송 / Shift+Enter → 줄바꿈
+    chatTextInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+
+    document.getElementById('chatForm').onsubmit = (e) => {
+      e.preventDefault();
+      sendChatMessage();
+    };
+
+    // ── 이모지 피커 ────────────────────────────────────────────────────────
+    const EMOJIS = [
+      '😀','😄','😂','🤣','😊','😍','🥰','😘',
+      '😎','🤩','😏','😢','😭','😤','🤔','😅',
+      '👍','👎','👏','🙏','💪','🤝','✌️','🤞',
+      '❤️','🔥','⭐','🎉','✅','❌','💯','😱',
+      '🎊','📝','☕','🍀','🎯','💡','🚀','🌈',
+    ];
+    const emojiPanel = document.getElementById('emojiPanel');
+    const chatEmojiBtn = document.getElementById('chatEmojiBtn');
+
+    // 패널 버튼 생성 (한 번만)
+    emojiPanel.innerHTML = EMOJIS.map(e =>
+      `<button type="button" data-emoji="${e}">${e}</button>`
+    ).join('');
+
+    chatEmojiBtn.onclick = (ev) => {
+      ev.stopPropagation();
+      emojiPanel.classList.toggle('hidden');
+    };
+
+    emojiPanel.onclick = (ev) => {
+      const emoji = ev.target.closest('[data-emoji]')?.dataset.emoji;
+      if (!emoji) return;
+      const pos = chatTextInput.selectionStart ?? chatTextInput.value.length;
+      chatTextInput.value = chatTextInput.value.slice(0, pos) + emoji + chatTextInput.value.slice(pos);
+      chatTextInput.selectionStart = chatTextInput.selectionEnd = pos + emoji.length;
+      chatTextInput.dispatchEvent(new Event('input'));  // 높이 재계산
+      chatTextInput.focus();
+      emojiPanel.classList.add('hidden');
+    };
+
+    document.addEventListener('click', (ev) => {
+      if (!emojiPanel.contains(ev.target) && ev.target !== chatEmojiBtn) {
+        emojiPanel.classList.add('hidden');
+      }
+    });
+
+    const chatFileBtn   = document.getElementById('chatFileBtn');
+    const chatFileInput = document.getElementById('chatFileInput');
+    chatFileBtn.onclick = () => chatFileInput.click();
+    const MAX_FILE_BYTES = 200 * 1024 * 1024; // 200 MB
+
+    chatFileInput.onchange = async () => {
+      const file = chatFileInput.files[0];
+      chatFileInput.value = '';
+      if (!file || !chatSocket) return;
+      if (file.size > MAX_FILE_BYTES) {
+        document.getElementById('fileSizeDialog').classList.remove('hidden');
+        return;
+      }
+      chatFileBtn.disabled = true;
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('ref_type', 'post_chat');
+        const uploaded = await api('/api/upload', { method: 'POST', body: fd, isForm: true });
+        chatSocket.emit('post_file', {
+          post_id: Number(postId), file_url: uploaded.url, file_name: uploaded.original,
+          mime_type: file.type, file_size: file.size,
+        });
+      } catch (err) {
+        showAlert(alertEl, err.message || '파일 업로드에 실패했어요.');
+      } finally {
+        chatFileBtn.disabled = false;
+      }
+    };
 
     if (postId) { loadPost(); loadComments(); }
   </script>
